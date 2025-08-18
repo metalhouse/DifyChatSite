@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员控制台 - DifyChat</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon-16.svg" sizes="16x16">
+    <link rel="alternate icon" href="assets/images/favicon.svg">
+    <meta name="theme-color" content="#dc3545">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        :root {
+            --admin-primary: #dc3545;
+            --admin-secondary: #6c757d;
+            --admin-success: #198754;
+            --admin-warning: #ffc107;
+            --admin-danger: #dc3545;
+            --admin-info: #0dcaf0;
+            --admin-dark: #212529;
+            --admin-light: #f8f9fa;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Microsoft YaHei', sans-serif;
+            padding-top: 56px;
+        }
+
+        /* 导航栏 */
+        .navbar {
+            background: linear-gradient(135deg, var(--admin-danger), #c82333) !important;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: white !important;
+        }
+
+        /* 管理面板容器 */
+        .admin-container {
+            height: calc(100vh - 56px);
+            display: flex;
+        }
+
+        /* 侧边栏导航 */
+        .admin-sidebar {
+            width: 280px;
+            background: rgba(255, 255, 255, 0.95);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        }
+
+        .admin-sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            background: transparent;
+        }
+
+        .admin-sidebar-header h5 {
+            margin: 0;
+            font-weight: 600;
+            color: var(--admin-dark);
+            display: flex;
+            align-items: center;
+        }
+
+        .admin-sidebar-header h5 i {
+            margin-right: 0.5rem;
+            color: var(--admin-danger);
+        }
+
+        .admin-nav {
+            flex: 1;
+            padding: 1rem 0;
+            overflow-y: auto;
+        }
+
+        .admin-nav-item {
+            display: block;
+            padding: 1rem 1.5rem;
+            color: var(--admin-dark);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        .admin-nav-item:hover {
+            background: rgba(220, 53, 69, 0.1);
+            color: var(--admin-danger);
+            transform: translateX(5px);
+        }
+
+        .admin-nav-item.active {
+            background: linear-gradient(135deg, var(--admin-danger), #c82333);
+            color: white;
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+        }
+
+        .admin-nav-item i {
+            margin-right: 0.75rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        /* 主内容区域 */
+        .admin-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+
+        .admin-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            background: transparent;
+        }
+
+        .admin-header h4 {
+            margin: 0;
+            color: var(--admin-dark);
+            font-weight: 600;
+        }
+
+        .admin-content {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        /* 统计卡片 */
+        .stats-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .stats-card-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            margin-bottom: 1rem;
+        }
+
+        .stats-card-icon.users {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+
+        .stats-card-icon.agents {
+            background: linear-gradient(135deg, #007bff, #6610f2);
+        }
+
+        .stats-card-icon.conversations {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+        }
+
+        .stats-card-icon.system {
+            background: linear-gradient(135deg, #dc3545, #e83e8c);
+        }
+
+        .stats-card-title {
+            font-size: 0.9rem;
+            color: var(--admin-secondary);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .stats-card-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--admin-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .stats-card-change {
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .stats-card-change.positive {
+            color: var(--admin-success);
+        }
+
+        .stats-card-change.negative {
+            color: var(--admin-danger);
+        }
+
+        /* 数据表格 */
+        .admin-table {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(5px);
+        }
+
+        .admin-table .table {
+            margin: 0;
+        }
+
+        .admin-table .table thead th {
+            background: linear-gradient(135deg, var(--admin-dark), #495057);
+            color: white;
+            border: none;
+            font-weight: 600;
+            padding: 1rem;
+        }
+
+        .admin-table .table tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .admin-table .table tbody tr:hover {
+            background: rgba(220, 53, 69, 0.05);
+        }
+
+        /* 操作按钮 */
+        .admin-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 0.25rem;
+        }
+
+        .admin-btn i {
+            margin-right: 0.5rem;
+        }
+
+        .admin-btn-primary {
+            background: linear-gradient(135deg, var(--admin-danger), #c82333);
+            color: white;
+        }
+
+        .admin-btn-primary:hover {
+            background: linear-gradient(135deg, #c82333, #bd2130);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .admin-btn-success {
+            background: linear-gradient(135deg, var(--admin-success), #146c43);
+            color: white;
+        }
+
+        .admin-btn-success:hover {
+            background: linear-gradient(135deg, #146c43, #0f5132);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .admin-btn-warning {
+            background: linear-gradient(135deg, var(--admin-warning), #ffca2c);
+            color: var(--admin-dark);
+        }
+
+        .admin-btn-warning:hover {
+            background: linear-gradient(135deg, #ffca2c, #ffc720);
+            color: var(--admin-dark);
+            transform: translateY(-2px);
+        }
+
+        .admin-btn-danger {
+            background: linear-gradient(135deg, var(--admin-danger), #dc3545);
+            color: white;
+        }
+
+        .admin-btn-danger:hover {
+            background: linear-gradient(135deg, #c82333, #bd2130);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* 状态标签 */
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-badge.active {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            color: #155724;
+        }
+
+        .status-badge.inactive {
+            background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+            color: #721c24;
+        }
+
+        .status-badge.pending {
+            background: linear-gradient(135deg, #fff3cd, #ffeeba);
+            color: #856404;
+        }
+
+        /* 模态框样式 */
+        .modal-content {
+            border-radius: 12px;
+            border: none;
+            backdrop-filter: blur(10px);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, var(--admin-danger), #c82333);
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .modal-header .btn-close {
+            filter: invert(1);
+        }
+
+        /* 表单样式 */
+        .form-control {
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 0.75rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus {
+            border-color: var(--admin-danger);
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: var(--admin-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        /* 加载状态 */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(220, 53, 69, 0.3);
+            border-top: 4px solid var(--admin-danger);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .admin-sidebar {
+                width: 100%;
+                position: fixed;
+                top: 56px;
+                left: -100%;
+                height: calc(100vh - 56px);
+                z-index: 1000;
+                transition: left 0.3s ease;
+            }
+
+            .admin-sidebar.show {
+                left: 0;
+            }
+
+            .admin-main {
+                width: 100%;
+            }
+
+            .stats-card-value {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* 系统健康状态 */
+        .health-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .health-indicator.healthy {
+            background: #28a745;
+            box-shadow: 0 0 8px rgba(40, 167, 69, 0.5);
+        }
+
+        .health-indicator.warning {
+            background: #ffc107;
+            box-shadow: 0 0 8px rgba(255, 193, 7, 0.5);
+        }
+
+        .health-indicator.error {
+            background: #dc3545;
+            box-shadow: 0 0 8px rgba(220, 53, 69, 0.5);
+        }
+
+        /* 搜索栏 */
+        .search-bar {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .search-bar input {
+            padding-left: 2.5rem;
+        }
+
+        .search-bar i {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--admin-secondary);
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="./index.html">
+                <i class="fas fa-robot me-2"></i>
+                DifyChat
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="./index.html">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="./chat.html">聊天</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="./profile.html">个人资料</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="./admin.html">
+                            <i class="fas fa-cogs me-1"></i>管理后台
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-shield me-1"></i>
+                            <span id="adminUsername">管理员</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="./profile.html">
+                                <i class="fas fa-user me-2"></i>个人资料
+                            </a></li>
+                            <li><a class="dropdown-item" href="./settings.html">
+                                <i class="fas fa-cog me-2"></i>系统设置
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="admin-logout">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="admin-container">
+        <!-- 侧边栏导航 -->
+        <div class="admin-sidebar" id="adminSidebar">
+            <div class="admin-sidebar-header">
+                <h5>
+                    <i class="fas fa-tachometer-alt"></i>
+                    控制面板
+                </h5>
+            </div>
+            <nav class="admin-nav">
+                <button class="admin-nav-item active" onclick="showSection('dashboard')">
+                    <i class="fas fa-chart-pie"></i>
+                    仪表板
+                </button>
+                <button class="admin-nav-item" onclick="showSection('users')">
+                    <i class="fas fa-users"></i>
+                    用户管理
+                </button>
+                <button class="admin-nav-item" onclick="showSection('agents')">
+                    <i class="fas fa-robot"></i>
+                    智能体管理
+                </button>
+                <button class="admin-nav-item" onclick="showSection('conversations')">
+                    <i class="fas fa-comments"></i>
+                    对话管理
+                </button>
+                <button class="admin-nav-item" onclick="showSection('system')">
+                    <i class="fas fa-server"></i>
+                    系统监控
+                </button>
+                <button class="admin-nav-item" onclick="showSection('logs')">
+                    <i class="fas fa-file-alt"></i>
+                    日志管理
+                </button>
+            </nav>
+        </div>
+
+        <!-- 主内容区域 -->
+        <div class="admin-main">
+            <!-- 仪表板 -->
+            <div id="dashboardSection" class="admin-section">
+                <div class="admin-header">
+                    <h4>仪表板</h4>
+                    <p class="text-muted mb-0">系统概览和关键指标</p>
+                </div>
+                <div class="admin-content">
+                    <!-- 统计卡片 -->
+                    <div class="row mb-4">
+                        <div class="col-md-3 mb-3">
+                            <div class="stats-card">
+                                <div class="stats-card-icon users">
+                                    <i class="fas fa-users"></i>
+                                </div>
+                                <div class="stats-card-title">总用户数</div>
+                                <div class="stats-card-value" id="totalUsers">-</div>
+                                <div class="stats-card-change positive">
+                                    <i class="fas fa-arrow-up"></i>
+                                    +5.2% 本月
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stats-card">
+                                <div class="stats-card-icon agents">
+                                    <i class="fas fa-robot"></i>
+                                </div>
+                                <div class="stats-card-title">智能体数量</div>
+                                <div class="stats-card-value" id="totalAgents">-</div>
+                                <div class="stats-card-change positive">
+                                    <i class="fas fa-arrow-up"></i>
+                                    +12.1% 本月
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stats-card">
+                                <div class="stats-card-icon conversations">
+                                    <i class="fas fa-comments"></i>
+                                </div>
+                                <div class="stats-card-title">总对话数</div>
+                                <div class="stats-card-value" id="totalConversations">-</div>
+                                <div class="stats-card-change positive">
+                                    <i class="fas fa-arrow-up"></i>
+                                    +8.7% 本月
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stats-card">
+                                <div class="stats-card-icon system">
+                                    <i class="fas fa-server"></i>
+                                </div>
+                                <div class="stats-card-title">系统状态</div>
+                                <div class="stats-card-value">
+                                    <span class="health-indicator healthy" id="systemHealthIndicator"></span>
+                                    <span id="systemStatus">正常</span>
+                                </div>
+                                <div class="stats-card-change">
+                                    运行时间: <span id="uptime">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 最近活动 -->
+                    <div class="row">
+                        <div class="col-lg-8 mb-4">
+                            <div class="admin-table">
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>最近活动</th>
+                                                <th>用户</th>
+                                                <th>时间</th>
+                                                <th>状态</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="recentActivities">
+                                            <tr>
+                                                <td colspan="4" class="text-center">
+                                                    <div class="loading">
+                                                        <div class="spinner"></div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 mb-4">
+                            <div class="admin-table">
+                                <div class="table-responsive">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>系统组件</th>
+                                                <th>状态</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="systemComponents">
+                                            <tr>
+                                                <td colspan="2" class="text-center">
+                                                    <div class="loading">
+                                                        <div class="spinner"></div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 用户管理 -->
+            <div id="usersSection" class="admin-section" style="display: none;">
+                <div class="admin-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4>用户管理</h4>
+                            <p class="text-muted mb-0">管理系统用户账户</p>
+                        </div>
+                        <button class="admin-btn admin-btn-primary" onclick="showCreateUserModal()">
+                            <i class="fas fa-plus"></i>
+                            新建用户
+                        </button>
+                    </div>
+                </div>
+                <div class="admin-content">
+                    <!-- 搜索栏 -->
+                    <div class="search-bar">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="form-control" placeholder="搜索用户..." id="userSearch">
+                    </div>
+
+                    <!-- 用户列表 -->
+                    <div class="admin-table">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>用户ID</th>
+                                        <th>用户名</th>
+                                        <th>邮箱</th>
+                                        <th>角色</th>
+                                        <th>状态</th>
+                                        <th>注册时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTable">
+                                    <tr>
+                                        <td colspan="7" class="text-center">
+                                            <div class="loading">
+                                                <div class="spinner"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 智能体管理 -->
+            <div id="agentsSection" class="admin-section" style="display: none;">
+                <div class="admin-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4>智能体管理</h4>
+                            <p class="text-muted mb-0">管理AI智能体配置</p>
+                        </div>
+                        <button class="admin-btn admin-btn-primary" onclick="showCreateAgentModal()">
+                            <i class="fas fa-plus"></i>
+                            新建智能体
+                        </button>
+                    </div>
+                </div>
+                <div class="admin-content">
+                    <!-- 搜索栏 -->
+                    <div class="search-bar">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="form-control" placeholder="搜索智能体..." id="agentSearch">
+                    </div>
+
+                    <!-- 智能体列表 -->
+                    <div class="admin-table">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>智能体ID</th>
+                                        <th>名称</th>
+                                        <th>类型</th>
+                                        <th>所有者</th>
+                                        <th>状态</th>
+                                        <th>对话数</th>
+                                        <th>创建时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="agentsTable">
+                                    <tr>
+                                        <td colspan="8" class="text-center">
+                                            <div class="loading">
+                                                <div class="spinner"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 对话管理 -->
+            <div id="conversationsSection" class="admin-section" style="display: none;">
+                <div class="admin-header">
+                    <h4>对话管理</h4>
+                    <p class="text-muted mb-0">查看和管理用户对话</p>
+                </div>
+                <div class="admin-content">
+                    <!-- 搜索栏 -->
+                    <div class="search-bar">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="form-control" placeholder="搜索对话..." id="conversationSearch">
+                    </div>
+
+                    <!-- 对话列表 -->
+                    <div class="admin-table">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>对话ID</th>
+                                        <th>用户</th>
+                                        <th>智能体</th>
+                                        <th>消息数</th>
+                                        <th>状态</th>
+                                        <th>开始时间</th>
+                                        <th>最后活动</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="conversationsTable">
+                                    <tr>
+                                        <td colspan="8" class="text-center">
+                                            <div class="loading">
+                                                <div class="spinner"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 系统监控 -->
+            <div id="systemSection" class="admin-section" style="display: none;">
+                <div class="admin-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4>系统监控</h4>
+                            <p class="text-muted mb-0">监控系统健康状态和性能</p>
+                        </div>
+                        <button class="admin-btn admin-btn-success" onclick="refreshSystemStatus()">
+                            <i class="fas fa-sync-alt"></i>
+                            刷新状态
+                        </button>
+                    </div>
+                </div>
+                <div class="admin-content">
+                    <!-- 系统状态卡片 -->
+                    <div class="row mb-4">
+                        <div class="col-md-6 mb-3">
+                            <div class="stats-card">
+                                <div class="stats-card-title">数据库连接</div>
+                                <div class="stats-card-value">
+                                    <span class="health-indicator" id="dbHealthIndicator"></span>
+                                    <span id="dbStatus">检查中...</span>
+                                </div>
+                                <div class="stats-card-change" id="dbDetails">
+                                    连接池状态检查中...
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="stats-card">
+                                <div class="stats-card-title">Redis缓存</div>
+                                <div class="stats-card-value">
+                                    <span class="health-indicator" id="redisHealthIndicator"></span>
+                                    <span id="redisStatus">检查中...</span>
+                                </div>
+                                <div class="stats-card-change" id="redisDetails">
+                                    缓存状态检查中...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 系统信息 -->
+                    <div class="admin-table">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>组件</th>
+                                        <th>状态</th>
+                                        <th>详细信息</th>
+                                        <th>最后检查</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="systemStatusTable">
+                                    <tr>
+                                        <td colspan="4" class="text-center">
+                                            <div class="loading">
+                                                <div class="spinner"></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 日志管理 -->
+            <div id="logsSection" class="admin-section" style="display: none;">
+                <div class="admin-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h4>日志管理</h4>
+                            <p class="text-muted mb-0">查看系统日志和错误记录</p>
+                        </div>
+                        <div>
+                            <select class="form-select me-2" id="logLevel" style="width: auto; display: inline-block;">
+                                <option value="all">所有级别</option>
+                                <option value="error">错误</option>
+                                <option value="warn">警告</option>
+                                <option value="info">信息</option>
+                                <option value="debug">调试</option>
+                            </select>
+                            <button class="admin-btn admin-btn-success" onclick="refreshLogs()">
+                                <i class="fas fa-sync-alt"></i>
+                                刷新日志
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="admin-content">
+                    <div class="admin-table">
+                        <div style="max-height: 600px; overflow-y: auto; background: #1a1a1a; border-radius: 8px; padding: 1rem;">
+                            <pre id="logsContent" style="color: #00ff00; margin: 0; font-family: 'Courier New', monospace; font-size: 0.9rem;">
+正在加载日志...
+                            </pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建用户模态框 -->
+    <div class="modal fade" id="createUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">创建新用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createUserForm">
+                        <div class="mb-3">
+                            <label class="form-label">用户名</label>
+                            <input type="text" class="form-control" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">邮箱</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">密码</label>
+                            <input type="password" class="form-control" name="password" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">角色</label>
+                            <select class="form-select" name="role">
+                                <option value="user">普通用户</option>
+                                <option value="admin">管理员</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="createUser()">创建用户</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建智能体模态框 -->
+    <div class="modal fade" id="createAgentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">创建新智能体</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createAgentForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">智能体名称 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="name" required placeholder="请输入智能体名称">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">类型 <span class="text-danger">*</span></label>
+                                <select class="form-select" name="type" required>
+                                    <option value="chatbot">对话机器人</option>
+                                    <option value="workflow">工作流</option>
+                                    <option value="completion">文本补全</option>
+                                    <option value="agent">智能体</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">描述 <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" rows="3" required placeholder="请描述智能体的功能和用途"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">可见性</label>
+                            <select class="form-select" name="visibility">
+                                <option value="private">私有</option>
+                                <option value="public">公开</option>
+                                <option value="shared">共享</option>
+                            </select>
+                            <small class="form-text text-muted">控制智能体的访问权限</small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="createAgent()">创建智能体</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编辑智能体模态框 -->
+    <div class="modal fade" id="editAgentModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑智能体</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editAgentForm">
+                        <input type="hidden" id="editAgentId" name="id">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">智能体名称 <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editAgentName" name="name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">类型</label>
+                                <select class="form-select" id="editAgentType" name="type" disabled>
+                                    <option value="chatbot">对话机器人</option>
+                                    <option value="workflow">工作流</option>
+                                    <option value="completion">文本补全</option>
+                                    <option value="agent">智能体</option>
+                                </select>
+                                <small class="form-text text-muted">类型不可修改</small>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">描述 <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="editAgentDescription" name="description" rows="3" required></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">状态</label>
+                                <select class="form-select" id="editAgentStatus" name="status">
+                                    <option value="active">活跃</option>
+                                    <option value="inactive">非活跃</option>
+                                    <option value="pending">待审核</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">可见性</label>
+                                <select class="form-select" id="editAgentVisibility" name="visibility">
+                                    <option value="private">私有</option>
+                                    <option value="public">公开</option>
+                                    <option value="shared">共享</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">所有者</label>
+                                <input type="text" class="form-control" id="editAgentOwner" readonly>
+                                <small class="form-text text-muted">所有者信息只读</small>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="saveAgentChanges()">保存更改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 管理后台JS -->
+    <script type="module" src="./js/admin/admin-controller.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+/* ===========================
+   主题样式
+   =========================== */
+
+/* 主题切换过渡效果 */
+html {
+  transition: background-color var(--duration-base) var(--ease-out),
+              color var(--duration-base) var(--ease-out);
+}
+
+/* 主题特定样式 */
+[data-theme="light"] {
+  /* 明亮主题特定样式 */
+}
+
+[data-theme="dark"] {
+  /* 深色主题特定样式 */
+}
+
+[data-theme="auto"] {
+  /* 自动主题样式 */
+}
+
+/* 主题切换动画 */
+.theme-transition * {
+  transition: background-color var(--duration-base) var(--ease-out),
+              color var(--duration-base) var(--ease-out),
+              border-color var(--duration-base) var(--ease-out) !important;
+}
+
+/* 主题切换按钮 */
+.theme-toggle {
+  position: relative;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--radius-base);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.theme-toggle:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.theme-toggle-icon {
+  font-size: var(--text-lg);
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+.theme-toggle-icon.light {
+  display: block;
+}
+
+.theme-toggle-icon.dark {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle-icon.light {
+  display: none;
+}
+
+[data-theme="dark"] .theme-toggle-icon.dark {
+  display: block;
+}
+
+[data-theme="auto"] .theme-toggle-icon.auto {
+  display: block;
+}
+
+[data-theme="auto"] .theme-toggle-icon.light,
+[data-theme="auto"] .theme-toggle-icon.dark {
+  display: none;
+}

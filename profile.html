@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人资料 - DifyChat</title>
+    
+    <!-- Favicon - 完整兼容性配置 -->
+    <!-- SVG图标 - 现代浏览器 -->
+    <link rel="icon" type="image/svg+xml" href="./assets/images/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="./assets/images/favicon-16.svg" sizes="16x16">
+    
+    <!-- 传统ICO格式 - 旧浏览器兼容 -->
+    <link rel="icon" type="image/x-icon" href="./favicon.ico">
+    <link rel="shortcut icon" href="./favicon.ico">
+    
+    <!-- 移动端图标 -->
+    <link rel="apple-touch-icon" href="./assets/images/favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="./assets/images/favicon.svg">
+    
+    <!-- 浏览器主题色 -->
+    <meta name="theme-color" content="#007bff">
+    <meta name="msapplication-TileColor" content="#007bff">
+    
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome 6.4 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --primary-dark: #0056b3;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+            --light-bg: #f8f9fa;
+            --border-radius: 12px;
+            --box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+
+        body {
+            background-color: var(--light-bg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        
+        .profile-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        
+        .profile-avatar {
+            width: 120px;
+            height: 120px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin: 0 auto 1rem;
+            box-shadow: var(--box-shadow);
+        }
+        
+        .profile-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+        
+        .profile-card {
+            background: white;
+            border: none;
+            box-shadow: var(--box-shadow);
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-control {
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            padding: 0.75rem 1rem;
+        }
+        
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 2rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, var(--primary-dark), #004085);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+        }
+        
+        .stats-card {
+            border-left: 4px solid var(--primary-color);
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0 var(--border-radius) var(--border-radius) 0;
+        }
+        
+        .stats-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+        
+        .error-message {
+            color: var(--danger-color);
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .success-message {
+            color: var(--success-color);
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .profile-header {
+                padding: 1rem 0;
+            }
+            
+            .profile-avatar {
+                width: 80px;
+                height: 80px;
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 0 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="./index.html">
+                <i class="fas fa-robot me-2"></i>
+                DifyChat
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="./index.html">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="./chat.html">聊天</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="./chatroom.html">聊天室</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="./profile.html">个人资料</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user me-1"></i>
+                            <span id="currentUsername">用户</span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="./profile.html">个人资料</a></li>
+                            <li><a class="dropdown-item" href="./settings.html">设置</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="navLogout">退出登录</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 个人资料头部 -->
+    <div class="profile-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-lg-3 text-center">
+                    <div class="profile-avatar" id="profileAvatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                </div>
+                <div class="col-lg-9">
+                    <h1 class="mb-2" id="profileDisplayName">加载中...</h1>
+                    <p class="mb-1">
+                        <i class="fas fa-at me-2"></i>
+                        <span id="profileUsername">加载中...</span>
+                    </p>
+                    <p class="mb-1">
+                        <i class="fas fa-calendar me-2"></i>
+                        加入时间：<span id="profileJoinDate">加载中...</span>
+                    </p>
+                    <p class="mb-0">
+                        <i class="fas fa-shield-alt me-2"></i>
+                        角色：<span id="profileRole">加载中...</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主要内容 -->
+    <div class="container">
+        <!-- 加载状态 -->
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <div class="mt-2">正在加载个人资料...</div>
+        </div>
+
+        <!-- 错误信息 -->
+        <div class="error-message" id="errorMessage" style="display: none;">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <span id="errorText">发生未知错误</span>
+        </div>
+
+        <!-- 成功信息 -->
+        <div class="success-message" id="successMessage" style="display: none;">
+            <i class="fas fa-check-circle me-2"></i>
+            <span id="successText">操作成功</span>
+        </div>
+
+        <div class="row" id="mainContent">
+            <!-- 统计信息 -->
+            <div class="col-lg-4 mb-4">
+                <div class="profile-card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>
+                            使用统计
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="stats-card mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="stats-number" id="chatCount">0</div>
+                                    <small class="text-muted">对话数量</small>
+                                </div>
+                                <i class="fas fa-comments fa-2x text-primary"></i>
+                            </div>
+                        </div>
+                        <div class="stats-card mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="stats-number" id="messageCount">0</div>
+                                    <small class="text-muted">消息数量</small>
+                                </div>
+                                <i class="fas fa-paper-plane fa-2x text-primary"></i>
+                            </div>
+                        </div>
+                        <div class="stats-card">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="stats-number" id="onlineTime">0h</div>
+                                    <small class="text-muted">在线时长</small>
+                                </div>
+                                <i class="fas fa-clock fa-2x text-primary"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 账户信息 -->
+                <div class="profile-card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            账户信息
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <i class="fas fa-clock text-info me-2"></i>
+                            <span>上次登录: <span id="lastLogin">加载中...</span></span>
+                        </div>
+                        <div class="mb-3">
+                            <i class="fas fa-desktop text-info me-2"></i>
+                            <span>当前设备: Web浏览器</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 个人信息表单 -->
+            <div class="col-lg-8">
+                <div class="profile-card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user-edit me-2"></i>
+                            个人信息
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="profileForm">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="displayName" class="form-label">显示名称</label>
+                                    <input type="text" class="form-control" id="displayName" placeholder="输入显示名称">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="email" class="form-label">邮箱地址</label>
+                                    <input type="email" class="form-control" id="email" placeholder="输入邮箱地址">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="phone" class="form-label">手机号码</label>
+                                    <input type="tel" class="form-control" id="phone" placeholder="输入手机号码">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="company" class="form-label">公司/组织</label>
+                                    <input type="text" class="form-control" id="company" placeholder="输入公司或组织名称">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="bio" class="form-label">个人简介</label>
+                                <textarea class="form-control" id="bio" rows="3" placeholder="介绍一下自己..."></textarea>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary" id="updateProfileBtn">
+                                    <i class="fas fa-save me-2"></i>
+                                    保存更改
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="resetFormBtn">
+                                    <i class="fas fa-undo me-2"></i>
+                                    重置
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 密码修改 -->
+                <div class="profile-card">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-lock me-2"></i>
+                            修改密码
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="passwordForm">
+                            <div class="mb-3">
+                                <label for="currentPassword" class="form-label">当前密码</label>
+                                <input type="password" class="form-control" id="currentPassword" placeholder="输入当前密码">
+                            </div>
+                            <div class="mb-3">
+                                <label for="newPassword" class="form-label">新密码</label>
+                                <input type="password" class="form-control" id="newPassword" placeholder="输入新密码">
+                                <div class="form-text">
+                                    密码必须至少8位，包含大小写字母、数字和特殊字符
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="confirmPassword" class="form-label">确认新密码</label>
+                                <input type="password" class="form-control" id="confirmPassword" placeholder="确认新密码">
+                            </div>
+                            <button type="submit" class="btn btn-warning" id="changePasswordBtn">
+                                <i class="fas fa-key me-2"></i>
+                                修改密码
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示容器 -->
+    <div class="toast-container position-fixed top-0 end-0 p-3"></div>
+
+    <!-- Bootstrap 5.3 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 内联版本 - 避免外部依赖问题 -->
+    <script>
+        console.log('🚀 开始加载页面脚本...');
+        
+        // 简单的LogoutManager
+        const LogoutManager = {
+            logout: function(options = {}) {
+                console.log('🔄 执行登出...');
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                window.location.href = options.redirectUrl || './login.html';
+            }
+        };
+        
+        // 简单的环境配置
+        const ENV_CONFIG = {
+            API_BASE_URL: 'http://localhost:4005',
+            API_PREFIX: '/api',
+            getApiUrl: function() {
+                return this.API_BASE_URL + this.API_PREFIX;
+            }
+        };
+
+        console.log('⚙️ 配置已加载:', ENV_CONFIG);
+
+        // 简化的API客户端
+        class SimpleApiClient {
+            constructor() {
+                this.baseURL = ENV_CONFIG.getApiUrl();
+                console.log('🌐 API客户端初始化:', this.baseURL);
+            }
+
+            async request(endpoint, options = {}) {
+                try {
+                    const url = this.baseURL + endpoint;
+                    const config = {
+                        method: options.method || 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...this.getAuthHeaders()
+                        }
+                    };
+
+                    if (options.data) {
+                        config.body = JSON.stringify(options.data);
+                    }
+
+                    console.log('🌐 API请求:', url, config);
+
+                    const response = await fetch(url, config);
+                    const data = await response.json();
+
+                    console.log('📡 API响应:', data);
+
+                    if (!response.ok) {
+                        throw new Error(data.message || `HTTP ${response.status}`);
+                    }
+
+                    return data;
+                } catch (error) {
+                    console.error('❌ API请求失败:', error);
+                    throw error;
+                }
+            }
+
+            getAuthHeaders() {
+                const token = localStorage.getItem('access_token');
+                return token ? { 'Authorization': `Bearer ${token}` } : {};
+            }
+        }
+
+        // 设置全局变量
+        window.ENV_CONFIG = ENV_CONFIG;
+        const apiClient = new SimpleApiClient();
+        
+        console.log('✅ API客户端创建完成');
+
+        /**
+         * 个人资料管理器 - 调试版本
+         */
+        class ProfileManager {
+            constructor() {
+                console.log('🏗️ ProfileManager 构造函数开始');
+                
+                this.apiClient = apiClient;
+                this.currentUser = null;
+                this.originalFormData = {};
+                
+                // DOM元素
+                this.elements = {
+                    loadingSpinner: document.getElementById('loadingSpinner'),
+                    errorMessage: document.getElementById('errorMessage'),
+                    successMessage: document.getElementById('successMessage'),
+                    mainContent: document.getElementById('mainContent'),
+                    profileForm: document.getElementById('profileForm'),
+                    passwordForm: document.getElementById('passwordForm'),
+                };
+                
+                console.log('📋 DOM元素获取:', this.elements);
+                
+                this.init();
+            }
+
+            async init() {
+                try {
+                    console.log('🚀 初始化个人资料系统...');
+                    
+                    // 显示加载状态
+                    console.log('⏳ 显示加载状态');
+                    this.showLoading(true);
+                    
+                    // 立即显示一些内容以确保页面不空白
+                    setTimeout(() => {
+                        console.log('⏰ 延迟加载用户资料');
+                        this.loadUserProfile();
+                    }, 500);
+                    
+                    // 绑定事件
+                    this.bindEvents();
+                    
+                    console.log('✅ 个人资料系统初始化完成');
+                    
+                } catch (error) {
+                    console.error('❌ 个人资料系统初始化失败:', error);
+                    this.showError('页面初始化失败：' + error.message);
+                    this.showLoading(false);
+                }
+            }
+
+            async loadUserProfile() {
+                try {
+                    console.log('📋 开始加载用户资料...');
+                    
+                    // 检查Token
+                    const token = localStorage.getItem('access_token');
+                    if (!token) {
+                        console.log('⚠️ 未找到Token，显示演示数据');
+                        this.showDemoData();
+                        return;
+                    }
+                    
+                    console.log('🔑 找到Token，尝试加载真实数据');
+                    
+                    // 获取用户基本信息
+                    const userResponse = await this.apiClient.request('/users/profile', {
+                        method: 'GET'
+                    });
+                    
+                    if (!userResponse || !userResponse.data) {
+                        console.log('⚠️ API响应无效，显示演示数据');
+                        this.showDemoData();
+                        return;
+                    }
+                    
+                    const userInfo = userResponse.data;
+                    this.currentUser = userInfo;
+                    
+                    console.log('👤 用户信息加载成功:', userInfo);
+                    
+                    // 更新页面显示
+                    this.updateProfileHeader(userInfo);
+                    this.fillProfileForm(userInfo);
+                    this.updateNavigation(userInfo);
+                    
+                    // 加载统计信息
+                    await this.loadUserStats();
+                    
+                    console.log('✅ 用户资料加载完成');
+
+                } catch (error) {
+                    console.error('❌ 加载用户资料失败:', error);
+                    console.log('🎭 显示演示数据作为备选');
+                    this.showDemoData();
+                } finally {
+                    // 确保总是显示内容
+                    this.showLoading(false);
+                    this.elements.mainContent.style.display = 'block';
+                }
+            }
+
+            // 显示演示数据
+            showDemoData() {
+                console.log('🎭 设置演示数据');
+                
+                const demoUser = {
+                    username: 'demo_user',
+                    display_name: '演示用户',
+                    email: 'demo@example.com',
+                    phone: '13800138000',
+                    created_at: new Date().toISOString(),
+                    role: 'user'
+                };
+
+                this.currentUser = demoUser;
+                this.updateProfileHeader(demoUser);
+                this.fillProfileForm(demoUser);
+                this.updateNavigation(demoUser);
+                
+                // 设置演示统计数据
+                document.getElementById('chatCount').textContent = '5';
+                document.getElementById('messageCount').textContent = '23';
+                document.getElementById('onlineTime').textContent = '2h';
+                document.getElementById('lastLogin').textContent = '刚刚';
+
+                // 强制显示主要内容
+                console.log('🎭 强制显示主要内容');
+                this.elements.mainContent.style.display = 'block';
+                this.elements.loadingSpinner.style.display = 'none';
+
+                this.showError('当前为演示模式，请先登录以查看真实数据');
+                
+                console.log('🎭 演示数据设置完成，主内容状态:', this.elements.mainContent.style.display);
+            }
+
+            updateProfileHeader(userInfo) {
+                const displayName = userInfo.display_name || userInfo.username || '用户';
+                const username = userInfo.username || userInfo.user_id || '';
+                const joinDate = userInfo.created_at ? 
+                    new Date(userInfo.created_at).toLocaleDateString('zh-CN') : '未知';
+                const role = this.getRoleDisplayName(userInfo.role || userInfo.permissions);
+
+                // 更新头部信息
+                document.getElementById('profileDisplayName').textContent = displayName;
+                document.getElementById('profileUsername').textContent = username;
+                document.getElementById('profileJoinDate').textContent = joinDate;
+                document.getElementById('profileRole').textContent = role;
+
+                // 更新头像
+                const avatar = document.getElementById('profileAvatar');
+                if (userInfo.avatar_url) {
+                    avatar.innerHTML = `<img src="${userInfo.avatar_url}" alt="头像" loading="lazy">`;
+                } else {
+                    avatar.innerHTML = `<i class="fas fa-user"></i>`;
+                    avatar.style.fontSize = '3rem';
+                }
+            }
+
+            fillProfileForm(userInfo) {
+                const formData = {
+                    displayName: userInfo.display_name || userInfo.username || '',
+                    email: userInfo.email || '',
+                    phone: userInfo.phone || '',
+                    company: userInfo.company || '',
+                    bio: userInfo.bio || ''
+                };
+
+                // 填充表单
+                Object.keys(formData).forEach(key => {
+                    const element = document.getElementById(key);
+                    if (element) {
+                        element.value = formData[key];
+                    }
+                });
+
+                // 保存原始数据用于重置
+                this.originalFormData = { ...formData };
+            }
+
+            updateNavigation(userInfo) {
+                const username = userInfo.display_name || userInfo.username || '用户';
+                const navUsername = document.getElementById('currentUsername');
+                if (navUsername) {
+                    navUsername.textContent = username;
+                }
+            }
+
+            async loadUserStats() {
+                try {
+                    console.log('📊 开始加载用户统计...');
+                    
+                    // 获取对话统计
+                    const statsResponse = await this.apiClient.request('/conversations/user/stats', {
+                        method: 'GET'
+                    });
+                    
+                    if (statsResponse && statsResponse.data) {
+                        const stats = statsResponse.data;
+                        
+                        // 更新统计显示
+                        document.getElementById('chatCount').textContent = stats.total_conversations || 0;
+                        document.getElementById('messageCount').textContent = stats.total_messages || 0;
+                        
+                        // 计算在线时长（模拟）
+                        const onlineHours = Math.max(1, Math.floor((stats.total_messages || 0) / 10));
+                        document.getElementById('onlineTime').textContent = onlineHours + 'h';
+                        
+                        console.log('📊 统计数据加载成功:', stats);
+                    } else {
+                        // 使用默认值
+                        console.log('📊 使用默认统计数据');
+                        this.setDefaultStats();
+                    }
+
+                    // 更新最后登录时间
+                    this.updateLastLogin();
+
+                } catch (error) {
+                    console.error('❌ 加载统计信息失败:', error);
+                    this.setDefaultStats();
+                }
+            }
+
+            setDefaultStats() {
+                document.getElementById('chatCount').textContent = '0';
+                document.getElementById('messageCount').textContent = '0';
+                document.getElementById('onlineTime').textContent = '0h';
+            }
+
+            updateLastLogin() {
+                if (this.currentUser && this.currentUser.last_login) {
+                    const lastLogin = new Date(this.currentUser.last_login).toLocaleString('zh-CN');
+                    document.getElementById('lastLogin').textContent = lastLogin;
+                } else {
+                    document.getElementById('lastLogin').textContent = '首次登录';
+                }
+            }
+
+            getRoleDisplayName(role) {
+                if (Array.isArray(role)) {
+                    if (role.includes('admin')) return '管理员';
+                    if (role.includes('chatroom_admin')) return '聊天室管理员';
+                    if (role.includes('chatroom_access')) return '聊天室用户';
+                    return '普通用户';
+                }
+                
+                switch (role) {
+                    case 'admin':
+                    case 'administrator':
+                        return '管理员';
+                    case 'superadmin':
+                        return '超级管理员';
+                    case 'chatroom_admin':
+                        return '聊天室管理员';
+                    default:
+                        return '普通用户';
+                }
+            }
+
+            bindEvents() {
+                // 个人信息表单提交
+                this.elements.profileForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.updateProfile();
+                });
+
+                // 重置表单
+                document.getElementById('resetFormBtn').addEventListener('click', () => {
+                    this.resetProfileForm();
+                });
+
+                // 密码修改表单提交
+                this.elements.passwordForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.changePassword();
+                });
+
+                // 导航登出
+                document.getElementById('navLogout').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.logout();
+                });
+            }
+
+            async updateProfile() {
+                try {
+                    const btn = document.getElementById('updateProfileBtn');
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>保存中...';
+                    btn.disabled = true;
+
+                    const formData = {
+                        display_name: document.getElementById('displayName').value.trim(),
+                        email: document.getElementById('email').value.trim(),
+                        phone: document.getElementById('phone').value.trim(),
+                        company: document.getElementById('company').value.trim(),
+                        bio: document.getElementById('bio').value.trim()
+                    };
+
+                    // 基本验证
+                    if (!formData.display_name) {
+                        throw new Error('显示名称不能为空');
+                    }
+
+                    if (formData.email && !this.isValidEmail(formData.email)) {
+                        throw new Error('邮箱格式不正确');
+                    }
+
+                    if (formData.phone && !this.isValidPhone(formData.phone)) {
+                        throw new Error('手机号格式不正确');
+                    }
+
+                    console.log('📤 更新个人资料:', formData);
+
+                    // 调用更新API
+                    const response = await this.apiClient.request('/users/profile', {
+                        method: 'PUT',
+                        data: formData
+                    });
+
+                    if (response && response.success) {
+                        this.showSuccess('个人资料更新成功');
+                        
+                        // 重新加载用户资料
+                        await this.loadUserProfile();
+                    } else {
+                        throw new Error(response?.message || '更新失败');
+                    }
+
+                } catch (error) {
+                    console.error('❌ 更新个人资料失败:', error);
+                    
+                    if (error.message.includes('404')) {
+                        this.showError('个人资料更新功能暂未开放');
+                    } else {
+                        this.showError('更新失败：' + error.message);
+                    }
+                } finally {
+                    const btn = document.getElementById('updateProfileBtn');
+                    btn.innerHTML = '<i class="fas fa-save me-2"></i>保存更改';
+                    btn.disabled = false;
+                }
+            }
+
+            resetProfileForm() {
+                Object.keys(this.originalFormData).forEach(key => {
+                    const element = document.getElementById(key);
+                    if (element) {
+                        element.value = this.originalFormData[key] || '';
+                    }
+                });
+                this.showSuccess('表单已重置');
+            }
+
+            async changePassword() {
+                try {
+                    const btn = document.getElementById('changePasswordBtn');
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>修改中...';
+                    btn.disabled = true;
+
+                    const currentPassword = document.getElementById('currentPassword').value.trim();
+                    const newPassword = document.getElementById('newPassword').value.trim();
+                    const confirmPassword = document.getElementById('confirmPassword').value.trim();
+
+                    // 验证输入
+                    if (!currentPassword || !newPassword || !confirmPassword) {
+                        throw new Error('请填写所有密码字段');
+                    }
+
+                    if (newPassword !== confirmPassword) {
+                        throw new Error('新密码和确认密码不匹配');
+                    }
+
+                    if (newPassword.length < 8) {
+                        throw new Error('新密码长度至少8位');
+                    }
+
+                    if (!this.isStrongPassword(newPassword)) {
+                        throw new Error('密码必须包含大小写字母、数字和特殊字符');
+                    }
+
+                    console.log('🔐 开始修改密码...');
+
+                    const changeData = {
+                        current_password: currentPassword,
+                        new_password: newPassword,
+                        confirm_password: confirmPassword
+                    };
+
+                    const response = await this.apiClient.request('/auth/change-password', {
+                        method: 'POST',
+                        data: changeData
+                    });
+
+                    if (response && response.success) {
+                        this.showSuccess('密码修改成功，3秒后将重新登录...');
+                        
+                        // 清空表单
+                        this.elements.passwordForm.reset();
+                        
+                        // 3秒后跳转到登录页
+                        setTimeout(() => {
+                            this.logout();
+                        }, 3000);
+                    } else {
+                        throw new Error(response?.message || '密码修改失败');
+                    }
+
+                } catch (error) {
+                    console.error('❌ 修改密码失败:', error);
+                    
+                    if (error.message.includes('404')) {
+                        this.showError('密码修改功能暂未开放');
+                    } else {
+                        this.showError('修改密码失败：' + error.message);
+                    }
+                } finally {
+                    const btn = document.getElementById('changePasswordBtn');
+                    btn.innerHTML = '<i class="fas fa-key me-2"></i>修改密码';
+                    btn.disabled = false;
+                }
+            }
+
+            // 工具方法
+            isValidEmail(email) {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                return emailRegex.test(email);
+            }
+
+            isValidPhone(phone) {
+                const phoneRegex = /^1[3-9]\d{9}$/;
+                return phoneRegex.test(phone);
+            }
+
+            isStrongPassword(password) {
+                const strongPasswordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,100}$/;
+                return strongPasswordRegex.test(password);
+            }
+
+            showLoading(show) {
+                console.log('⏳ 设置加载状态:', show);
+                if (this.elements.loadingSpinner) {
+                    this.elements.loadingSpinner.style.display = show ? 'block' : 'none';
+                }
+                
+                // 如果不显示加载，就显示主内容
+                if (!show && this.elements.mainContent) {
+                    console.log('📱 显示主要内容');
+                    this.elements.mainContent.style.display = 'block';
+                    console.log('📱 主内容显示状态已设置为:', this.elements.mainContent.style.display);
+                }
+            }
+
+            showError(message) {
+                console.log('❌ 显示错误:', message);
+                if (this.elements.errorMessage && document.getElementById('errorText')) {
+                    document.getElementById('errorText').textContent = message;
+                    this.elements.errorMessage.style.display = 'block';
+                    this.elements.successMessage.style.display = 'none';
+                    
+                    // 确保主内容也显示
+                    this.elements.mainContent.style.display = 'block';
+                    
+                    // 自动隐藏错误消息
+                    setTimeout(() => {
+                        this.elements.errorMessage.style.display = 'none';
+                    }, 5000);
+                }
+            }
+
+            showSuccess(message) {
+                console.log('✅ 显示成功:', message);
+                if (this.elements.successMessage && document.getElementById('successText')) {
+                    document.getElementById('successText').textContent = message;
+                    this.elements.successMessage.style.display = 'block';
+                    this.elements.errorMessage.style.display = 'none';
+                    
+                    // 自动隐藏成功消息
+                    setTimeout(() => {
+                        this.elements.successMessage.style.display = 'none';
+                    }, 3000);
+                }
+            }
+
+            redirectToLogin(message = '请先登录') {
+                console.log('🔄 重定向到登录页面:', message);
+                alert(message);
+                window.location.href = './login.html';
+            }
+
+            logout() {
+                if (typeof LogoutManager !== 'undefined') {
+                    LogoutManager.logout({
+                        redirectUrl: './login.html',
+                        onSuccess: () => {
+                            console.log('✅ 已退出登录');
+                        }
+                    });
+                } else {
+                    // 简单的登出
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('refresh_token');
+                    window.location.href = './login.html';
+                }
+            }
+        }
+
+        // 初始化系统 - 多种方式确保执行
+        console.log('🔧 准备初始化ProfileManager...');
+        
+        function initializeProfile() {
+            console.log('🎯 执行ProfileManager初始化');
+            try {
+                const profileManager = new ProfileManager();
+                window.profileManager = profileManager;
+                console.log('✅ ProfileManager初始化成功');
+            } catch (error) {
+                console.error('❌ ProfileManager初始化失败:', error);
+                
+                // 显示基本错误页面
+                document.body.innerHTML = `
+                    <div style="padding: 2rem; text-align: center; background: #f8f9fa;">
+                        <h2 style="color: #dc3545; margin-bottom: 1rem;">⚠️ 页面初始化失败</h2>
+                        <p style="color: #6c757d; margin-bottom: 1rem;">错误信息: ${error.message}</p>
+                        <button onclick="location.reload()" style="background: #007bff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px;">刷新页面</button>
+                    </div>
+                `;
+            }
+        }
+
+        // 确保在任何情况下都能执行
+        if (document.readyState === 'loading') {
+            console.log('📋 DOM正在加载，等待DOMContentLoaded');
+            document.addEventListener('DOMContentLoaded', initializeProfile);
+        } else {
+            console.log('📋 DOM已就绪，立即初始化');
+            initializeProfile();
+        }
+
+        // 备用初始化（防止事件监听失败）
+        setTimeout(() => {
+            if (!window.profileManager) {
+                console.log('⏰ 备用初始化触发');
+                initializeProfile();
+            }
+        }, 1000);
+
+    </script>
+</body>
+</html>

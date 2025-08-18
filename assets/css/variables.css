@@ -1,0 +1,341 @@
+/* ===========================
+   CSS变量和主题系统
+   =========================== */
+
+:root {
+  /* 色彩系统 - 明亮主题 */
+  --primary-color: #0066cc;
+  --primary-hover: #0052a3;
+  --primary-light: #e6f2ff;
+  --primary-dark: #004499;
+  
+  --secondary-color: #6c757d;
+  --secondary-hover: #5a6268;
+  --secondary-light: #f8f9fa;
+  
+  /* 背景色 */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-chat: #ffffff;
+  --bg-sidebar: #f8fafc;
+  --bg-input: #ffffff;
+  --bg-modal: #ffffff;
+  
+  /* 文字颜色 */
+  --text-primary: #1a202c;
+  --text-secondary: #4a5568;
+  --text-muted: #718096;
+  --text-inverse: #ffffff;
+  --text-link: #0066cc;
+  --text-link-hover: #0052a3;
+  
+  /* 边框颜色 */
+  --border-light: #e2e8f0;
+  --border-medium: #cbd5e0;
+  --border-dark: #a0aec0;
+  --border-focus: #0066cc;
+  
+  /* 功能色彩 */
+  --success: #38a169;
+  --success-light: #f0fff4;
+  --warning: #d69e2e;
+  --warning-light: #fffbf0;
+  --error: #e53e3e;
+  --error-light: #fed7d7;
+  --info: #3182ce;
+  --info-light: #ebf8ff;
+  
+  /* 消息气泡颜色 */
+  --msg-user-bg: #0066cc;
+  --msg-user-text: #ffffff;
+  --msg-ai-bg: #f8fafc;
+  --msg-ai-text: #1a202c;
+  --msg-system-bg: #e2e8f0;
+  --msg-system-text: #4a5568;
+  
+  /* 字体系统 */
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", 
+                 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", 
+                 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", 
+               Consolas, "Courier New", monospace;
+  
+  /* 字体大小 */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.25rem;    /* 20px */
+  --text-2xl: 1.5rem;    /* 24px */
+  --text-3xl: 1.875rem;  /* 30px */
+  --text-4xl: 2.25rem;   /* 36px */
+  
+  /* 行高 */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-loose: 1.75;
+  
+  /* 字重 */
+  --font-light: 300;
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  
+  /* 间距系统 */
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+  --space-12: 3rem;     /* 48px */
+  --space-16: 4rem;     /* 64px */
+  --space-20: 5rem;     /* 80px */
+  --space-24: 6rem;     /* 96px */
+  
+  /* 组件间距 */
+  --gutter-xs: var(--space-2);
+  --gutter-sm: var(--space-4);
+  --gutter-md: var(--space-6);
+  --gutter-lg: var(--space-8);
+  --gutter-xl: var(--space-12);
+  
+  /* 圆角系统 */
+  --radius-sm: 0.25rem;   /* 4px */
+  --radius-base: 0.5rem;  /* 8px */
+  --radius-md: 0.75rem;   /* 12px */
+  --radius-lg: 1rem;      /* 16px */
+  --radius-xl: 1.5rem;    /* 24px */
+  --radius-2xl: 2rem;     /* 32px */
+  --radius-full: 9999px;  /* 完全圆角 */
+  
+  /* 阴影系统 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-base: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 
+                 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+               0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 
+               0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 
+               0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* 过渡动画 */
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 350ms;
+  --duration-slower: 500ms;
+  
+  /* 缓动函数 */
+  --ease-out: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0.0, 1, 1);
+  --ease-in-out: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  
+  /* 布局尺寸 */
+  --sidebar-width: 320px;
+  --sidebar-width-collapsed: 60px;
+  --header-height: 60px;
+  --footer-height: 40px;
+  --input-height: 60px;
+  --message-max-width: 700px;
+  
+  /* Z-index层级 */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-toast: 1080;
+  
+  /* 断点 */
+  --breakpoint-xs: 480px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  
+  /* 容器最大宽度 */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+  --container-2xl: 1536px;
+  
+  /* 输入框样式 */
+  --input-bg: var(--bg-primary);
+  --input-border: var(--border-light);
+  --input-focus-border: var(--border-focus);
+  --input-placeholder: var(--text-muted);
+  --input-padding-x: var(--space-3);
+  --input-padding-y: var(--space-2);
+  
+  /* 按钮样式 */
+  --btn-padding-x: var(--space-4);
+  --btn-padding-y: var(--space-2);
+  --btn-border-radius: var(--radius-base);
+  --btn-font-weight: var(--font-medium);
+  
+  /* 卡片样式 */
+  --card-bg: var(--bg-primary);
+  --card-border: var(--border-light);
+  --card-shadow: var(--shadow-sm);
+  --card-padding: var(--space-6);
+  --card-border-radius: var(--radius-lg);
+  
+  /* 消息样式 */
+  --message-padding: var(--space-4);
+  --message-margin: var(--space-3);
+  --message-border-radius: var(--radius-lg);
+  --message-avatar-size: 40px;
+  
+  /* 滚动条样式 */
+  --scrollbar-width: 6px;
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb: var(--border-medium);
+  --scrollbar-thumb-hover: var(--border-dark);
+}
+
+/* 深色主题变量 */
+[data-theme="dark"] {
+  /* 主色调 */
+  --primary-color: #4299e1;
+  --primary-hover: #3182ce;
+  --primary-light: #1a365d;
+  --primary-dark: #2b77e5;
+  
+  /* 背景色 */
+  --bg-primary: #1a202c;
+  --bg-secondary: #2d3748;
+  --bg-tertiary: #4a5568;
+  --bg-chat: #1a202c;
+  --bg-sidebar: #2d3748;
+  --bg-input: #2d3748;
+  --bg-modal: #2d3748;
+  
+  /* 文字颜色 */
+  --text-primary: #ffffff;
+  --text-secondary: #e2e8f0;
+  --text-muted: #a0aec0;
+  --text-inverse: #1a202c;
+  --text-link: #4299e1;
+  --text-link-hover: #3182ce;
+  
+  /* 边框颜色 */
+  --border-light: #4a5568;
+  --border-medium: #718096;
+  --border-dark: #a0aec0;
+  --border-focus: #4299e1;
+  
+  /* 功能色彩 */
+  --success: #48bb78;
+  --success-light: #1a2e1a;
+  --warning: #ed8936;
+  --warning-light: #2d2a1a;
+  --error: #f56565;
+  --error-light: #2d1a1a;
+  --info: #4299e1;
+  --info-light: #1a2d3e;
+  
+  /* 消息气泡颜色 */
+  --msg-user-bg: #4299e1;
+  --msg-user-text: #ffffff;
+  --msg-ai-bg: #2d3748;
+  --msg-ai-text: #e2e8f0;
+  --msg-system-bg: #4a5568;
+  --msg-system-text: #e2e8f0;
+  
+  /* 输入框样式 */
+  --input-bg: var(--bg-secondary);
+  --input-border: var(--border-light);
+  --input-focus-border: var(--border-focus);
+  --input-placeholder: var(--text-muted);
+  
+  /* 卡片样式 */
+  --card-bg: var(--bg-secondary);
+  --card-border: var(--border-light);
+  --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  
+  /* 滚动条样式 */
+  --scrollbar-thumb: var(--border-light);
+  --scrollbar-thumb-hover: var(--border-medium);
+}
+
+/* 自动主题（跟随系统） */
+@media (prefers-color-scheme: dark) {
+  [data-theme="auto"] {
+    /* 继承深色主题变量 */
+    --primary-color: #4299e1;
+    --primary-hover: #3182ce;
+    --primary-light: #1a365d;
+    --primary-dark: #2b77e5;
+    
+    --bg-primary: #1a202c;
+    --bg-secondary: #2d3748;
+    --bg-tertiary: #4a5568;
+    --bg-chat: #1a202c;
+    --bg-sidebar: #2d3748;
+    --bg-input: #2d3748;
+    --bg-modal: #2d3748;
+    
+    --text-primary: #ffffff;
+    --text-secondary: #e2e8f0;
+    --text-muted: #a0aec0;
+    --text-inverse: #1a202c;
+    --text-link: #4299e1;
+    --text-link-hover: #3182ce;
+    
+    --border-light: #4a5568;
+    --border-medium: #718096;
+    --border-dark: #a0aec0;
+    --border-focus: #4299e1;
+    
+    --msg-user-bg: #4299e1;
+    --msg-user-text: #ffffff;
+    --msg-ai-bg: #2d3748;
+    --msg-ai-text: #e2e8f0;
+    --msg-system-bg: #4a5568;
+    --msg-system-text: #e2e8f0;
+    
+    --input-bg: var(--bg-secondary);
+    --card-bg: var(--bg-secondary);
+    --scrollbar-thumb: var(--border-light);
+    --scrollbar-thumb-hover: var(--border-medium);
+  }
+}
+
+/* 高对比度主题（无障碍） */
+[data-theme="high-contrast"] {
+  --primary-color: #0000ff;
+  --primary-hover: #0000cc;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f0f0f0;
+  --text-primary: #000000;
+  --text-secondary: #333333;
+  --border-light: #000000;
+  --border-medium: #000000;
+  --msg-user-bg: #000000;
+  --msg-user-text: #ffffff;
+  --msg-ai-bg: #ffffff;
+  --msg-ai-text: #000000;
+}
+
+/* 打印样式 */
+@media print {
+  :root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #ffffff;
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --border-light: #cccccc;
+    --shadow-base: none;
+  }
+}

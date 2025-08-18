@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket聊天室 - DifyChat</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon-16.svg" sizes="16x16">
+    <link rel="alternate icon" href="assets/images/favicon.svg">
+    <meta name="theme-color" content="#28a745">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            min-height: 100vh;
+            font-family: 'Microsoft YaHei', sans-serif;
+            padding-top: 56px;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        /* 导航栏样式 */
+        .navbar {
+            background: linear-gradient(135deg, #28a745, #198754) !important;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+
+        .user-dropdown-toggle {
+            color: rgba(255,255,255,0.8) !important;
+            transition: color 0.3s ease;
+        }
+        
+        .user-dropdown-toggle:hover,
+        .user-dropdown-toggle:focus,
+        .user-dropdown-toggle.show {
+            color: rgba(255,255,255,1) !important;
+        }
+
+        /* 聊天室容器 */
+        .chatroom-container {
+            height: calc(100vh - 56px);
+            display: flex;
+            overflow: hidden;
+            width: 100vw;
+            max-width: 100%;
+        }
+
+        /* 侧边栏 - 房间列表 */
+        .room-sidebar {
+            width: clamp(250px, 25vw, 350px);
+            background: rgba(255, 255, 255, 0.95);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header {
+            padding: clamp(0.5rem, 2vw, 1rem);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            background: transparent;
+            color: #1A1A1A;
+            height: clamp(60px, 8vh, 80px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-header h6 {
+            margin: 0;
+            font-weight: 600;
+            font-size: clamp(0.9rem, 2.5vw, 1.25rem);
+            line-height: 1.2;
+            color: #1A1A1A;
+        }
+
+        .create-room-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .create-room-btn:hover {
+            background: #20c997;
+            transform: scale(1.1);
+        }
+
+        .room-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+
+        /* 房间项目 */
+        .room-item {
+            display: flex;
+            align-items: center;
+            padding: clamp(0.5rem, 1.5vw, 0.75rem);
+            margin-bottom: clamp(0.3rem, 1vw, 0.5rem);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid transparent;
+            color: #1A1A1A;
+        }
+
+        .room-item:hover {
+            background: rgba(40, 167, 69, 0.1);
+            border-color: rgba(40, 167, 69, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .room-item.active {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+
+        .room-avatar {
+            width: clamp(40px, 6vw, 50px);
+            height: clamp(40px, 6vw, 50px);
+            border-radius: 50%;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            margin-right: clamp(0.5rem, 1.5vw, 0.75rem);
+            font-size: clamp(1rem, 2vw, 1.3rem);
+        }
+
+        .room-item.active .room-avatar {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .room-info {
+            flex: 1;
+        }
+
+        .room-name {
+            font-weight: 600;
+            margin: 0;
+            font-size: clamp(0.8rem, 2vw, 0.95rem);
+            color: #1A1A1A;
+        }
+
+        .room-item.active .room-name {
+            color: white !important;
+        }
+
+        .room-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 0.25rem;
+        }
+
+        .room-members {
+            font-size: clamp(0.7rem, 1.8vw, 0.75rem);
+            opacity: 0.7;
+            color: #666;
+        }
+
+        .room-item.active .room-members {
+            color: rgba(255, 255, 255, 0.8) !important;
+        }
+
+        .room-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #28a745;
+            margin-left: 0.5rem;
+        }
+
+        .room-status.inactive {
+            background: #6c757d;
+        }
+
+        /* 聊天区域 */
+        .chat-area {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 聊天头部 */
+        .chat-header {
+            padding: clamp(0.5rem, 2vw, 1rem);
+            background: transparent;
+            color: #333;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: clamp(60px, 8vh, 80px);
+            flex-shrink: 0;
+        }
+
+        .chat-header-left {
+            display: flex;
+            align-items: center;
+        }
+
+        .chat-header h5 {
+            margin: 0;
+            color: #FDFBF7;
+            font-weight: 600;
+        }
+
+        .connection-status {
+            margin-left: 1rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .connection-status.connected {
+            background: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+        }
+
+        .connection-status.disconnected {
+            background: rgba(220, 53, 69, 0.2);
+            color: #dc3545;
+        }
+
+        .connection-status.connecting {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .online-members {
+            display: flex;
+            align-items: center;
+            color: #FDFBF7;
+            font-size: 0.85rem;
+        }
+
+        .member-avatars {
+            display: flex;
+            margin-left: 0.5rem;
+        }
+
+        .member-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #28a745;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.7rem;
+            margin-left: -0.25rem;
+            border: 2px solid white;
+        }
+
+        /* 消息区域 */
+        .chat-messages {
+            flex: 1;
+            padding: clamp(0.5rem, 2vw, 1rem);
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: rgba(255, 255, 255, 0.95);
+            min-height: 0;
+        }
+
+        /* 消息样式 */
+        .message {
+            margin-bottom: 1rem;
+            animation: fadeInUp 0.3s ease;
+        }
+
+        .message-user {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .message-other {
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .message-system {
+            display: flex;
+            justify-content: center;
+        }
+
+        .message-agent {
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .message-bubble {
+            max-width: clamp(250px, 75vw, 600px);
+            padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(0.75rem, 2vw, 1rem);
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+            font-size: clamp(0.8rem, 2.2vw, 0.9rem);
+            line-height: 1.4;
+        }
+
+        .message-user .message-bubble {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .message-other .message-bubble {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            color: #495057;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .message-agent .message-bubble {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            color: #1565c0;
+            border: 1px solid rgba(25, 118, 210, 0.2);
+        }
+
+        .message-system .message-bubble {
+            background: rgba(255, 193, 7, 0.2);
+            color: #856404;
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            text-align: center;
+            font-style: italic;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.25rem;
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            margin-right: 0.5rem;
+        }
+
+        .message-time {
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+
+        .message-content {
+            margin-bottom: 0.25rem;
+        }
+
+        .reply-preview {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.8em;
+            border-left: 3px solid rgba(0, 0, 0, 0.3);
+        }
+
+        /* 正在输入指示器 */
+        .typing-indicators {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+        }
+
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .typing-dots {
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
+
+        .typing-dot {
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: #666;
+            margin: 0 1px;
+            animation: typing 1.5s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+
+        /* 输入区域 */
+        .chat-input {
+            padding: clamp(0.5rem, 2vw, 1rem);
+            background: rgba(255, 255, 255, 0.95);
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .input-group {
+            display: flex;
+            gap: clamp(0.3rem, 1vw, 0.5rem);
+            align-items: flex-end;
+        }
+
+        .input-group textarea {
+            flex: 1;
+            min-width: 0;
+            border-radius: 20px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(0.75rem, 2vw, 1rem);
+            resize: none;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            max-width: 100%;
+            box-sizing: border-box;
+            min-height: 44px;
+            max-height: 120px;
+        }
+
+        .input-group textarea:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        }
+
+        .input-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .action-button {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .send-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .mention-button {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+        }
+
+        .mention-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(23, 162, 184, 0.3);
+        }
+
+        /* 加载状态 */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-top: 3px solid #28a745;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Toast通知样式 */
+        #toastContainer {
+            z-index: 1100;
+        }
+
+        .toast-notification {
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+            max-width: 350px;
+            word-wrap: break-word;
+        }
+
+        .toast-notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .toast-notification.toast-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+
+        .toast-notification.toast-error {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+        }
+
+        .toast-notification.toast-warning {
+            background: linear-gradient(135deg, #ffc107, #e0a800);
+            color: #856404;
+        }
+
+        .toast-notification.toast-info {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .room-sidebar {
+                position: fixed;
+                left: -100%;
+                top: 56px;
+                height: calc(100vh - 56px);
+                z-index: 1000;
+                transition: left 0.3s ease;
+                background: rgba(255, 255, 255, 0.98) !important;
+                backdrop-filter: blur(10px);
+                width: 80vw !important;
+                max-width: 320px;
+            }
+
+            .room-sidebar.show {
+                left: 0;
+            }
+
+            .chatroom-container {
+                width: 100%;
+            }
+
+            .chat-area {
+                width: 100%;
+            }
+
+            .chat-header h5 {
+                font-size: 1.1rem;
+            }
+
+            .online-members {
+                display: none;
+            }
+        }
+
+        /* 侧边栏遮罩层 */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 56px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        @media (max-width: 768px) {
+            .room-sidebar.show ~ .sidebar-overlay {
+                display: block;
+            }
+        }
+
+        /* 滚动条样式 */
+        .room-list::-webkit-scrollbar,
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .room-list::-webkit-scrollbar-track,
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .room-list::-webkit-scrollbar-thumb,
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+
+        .room-list::-webkit-scrollbar-thumb:hover,
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="./index.html">
+                <i class="fas fa-robot me-2"></i>
+                DifyChat
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="./index.html">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="./chat.html">聊天</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="./chatroom.html">聊天室</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="./profile.html">个人资料</a>
+                    </li>
+                    <li class="nav-item" id="adminNavItem" style="display: none;">
+                        <a class="nav-link" href="./admin.html">
+                            <i class="fas fa-cogs me-1"></i>管理后台
+                        </a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle user-dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            <span id="currentUsername">用户</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="./profile.html">
+                                <i class="fas fa-user me-2"></i>个人资料
+                            </a></li>
+                            <li><a class="dropdown-item" href="./settings.html">
+                                <i class="fas fa-cog me-2"></i>设置
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="nav-logout">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="chatroom-container">
+        <!-- 移动端侧边栏遮罩 -->
+        <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+        
+        <!-- 房间列表侧边栏 -->
+        <div class="room-sidebar" id="roomSidebar">
+            <div class="sidebar-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-comments me-2"></i>
+                    聊天室
+                </h6>
+                <button class="create-room-btn" onclick="showCreateRoomModal()" title="创建聊天室">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <div class="room-list" id="roomList">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <span>加载聊天室...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 聊天区域 -->
+        <div class="chat-area">
+            <!-- 聊天头部 -->
+            <div class="chat-header">
+                <div class="chat-header-left">
+                    <h5 id="currentRoomName">
+                        <i class="fas fa-users me-2"></i>
+                        请选择聊天室
+                    </h5>
+                    <div class="connection-status connecting" id="connectionStatus">
+                        <span class="status-indicator"></span>
+                        <span id="statusText">连接中...</span>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center">
+                    <div class="online-members" id="onlineMembers">
+                        <span>在线成员:</span>
+                        <div class="member-avatars" id="memberAvatars">
+                            <!-- 在线成员头像将动态添加 -->
+                        </div>
+                    </div>
+                    <button class="btn btn-outline-light btn-sm ms-3 d-md-none" onclick="toggleSidebar()" title="显示/隐藏侧边栏">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 消息区域 -->
+            <div class="chat-messages" id="chatMessages">
+                <div class="text-center text-muted mt-5">
+                    <i class="fas fa-users fa-3x mb-3"></i>
+                    <h5>欢迎使用 WebSocket 聊天室</h5>
+                    <p>请从左侧选择一个聊天室开始群聊，或创建新的聊天室</p>
+                </div>
+            </div>
+
+            <!-- 正在输入指示器 -->
+            <div class="typing-indicators" id="typingIndicators" style="display: none;">
+                <!-- 正在输入的用户列表将动态添加 -->
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="chat-input">
+                <div class="input-group">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="输入您的消息... (Shift+Enter换行，Enter发送，@智能体名 可以@智能体)"
+                        rows="1"
+                        disabled
+                    ></textarea>
+                    <div class="input-actions">
+                        <button id="mentionButton" class="action-button mention-button" title="@智能体" disabled>
+                            <i class="fas fa-at"></i>
+                        </button>
+                        <button id="sendButton" class="action-button send-button" type="button" title="发送消息" disabled>
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast通知容器 -->
+    <div id="toastContainer" class="position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+        <!-- Toast消息将动态添加到这里 -->
+    </div>
+
+    <!-- 创建聊天室模态框 -->
+    <div class="modal fade" id="createRoomModal" tabindex="-1" aria-labelledby="createRoomModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createRoomModalLabel">
+                        <i class="fas fa-plus me-2"></i>创建聊天室
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createRoomForm">
+                        <div class="mb-3">
+                            <label for="roomName" class="form-label">聊天室名称</label>
+                            <input type="text" class="form-control" id="roomName" placeholder="请输入聊天室名称" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="roomDescription" class="form-label">聊天室描述 (可选)</label>
+                            <textarea class="form-control" id="roomDescription" rows="3" placeholder="请输入聊天室描述"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="isPrivate">
+                                <label class="form-check-label" for="isPrivate">
+                                    私密聊天室 (需要邀请才能加入)
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-success" id="createRoomBtn">
+                        <i class="fas fa-plus me-1"></i>创建
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- @智能体选择模态框 -->
+    <div class="modal fade" id="mentionAgentModal" tabindex="-1" aria-labelledby="mentionAgentModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="mentionAgentModalLabel">
+                        <i class="fas fa-at me-2"></i>选择智能体
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="list-group" id="agentList">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <span>加载智能体列表...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 开发工具 -->
+    <script src="js/utils/dev-tools.js?v=1.0.0"></script>
+    <script src="js/utils/health-checker.js?v=1.0.0"></script>
+    
+    <!-- 全局配置 -->
+    <script type="module" src="config/env.js?v=2.0.0"></script>
+    <script type="module" src="config/global-config.js?v=2.0.0"></script>
+    <script src="config/global-config-simple.js"></script>
+    
+    <!-- 引入工具类和服务 -->
+    <script src="js/utils/storage-simple.js"></script>
+    <script src="js/utils/token-manager.js"></script>
+    <script src="js/utils/error-handler-simple.js"></script>
+    <script src="js/services/auth-service-simple.js"></script>
+    
+    <!-- 聊天室页面控制器 -->
+    <script src="js/controllers/chatroom-controller.js"></script>
+
+    <script>
+        // 等待环境配置加载完成
+        function waitForEnvConfig(callback, maxAttempts = 50) {
+            let attempts = 0;
+            
+            function check() {
+                attempts++;
+                
+                if (window.ENV_CONFIG) {
+                    console.log('✅ 环境配置已加载');
+                    callback();
+                } else if (attempts < maxAttempts) {
+                    setTimeout(check, 100);
+                } else {
+                    console.warn('⚠️ 环境配置加载超时，使用降级配置');
+                    callback();
+                }
+            }
+            
+            check();
+        }
+        
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('页面DOM加载完成');
+            
+            // 检查用户登录状态
+            if (!TokenManager || !TokenManager.getAccessToken()) {
+                console.log('用户未登录，跳转到登录页面');
+                window.location.href = './login.html';
+                return;
+            }
+
+            // 等待环境配置加载完成后初始化
+            waitForEnvConfig(function() {
+                try {
+                    // 初始化聊天室控制器
+                    console.log('初始化聊天室控制器');
+                    window.chatroomController = new ChatroomController();
+                    window.chatroomController.initialize();
+                } catch (error) {
+                    console.error('初始化聊天室控制器失败:', error);
+                    showToast('聊天室初始化失败: ' + error.message, 'error');
+                }
+            });
+        });
+
+        // 侧边栏切换函数
+        function toggleSidebar() {
+            const sidebar = document.getElementById('roomSidebar');
+            sidebar.classList.toggle('show');
+        }
+
+        // 创建聊天室模态框
+        function showCreateRoomModal() {
+            console.log('显示创建房间模态框');
+            const modal = new bootstrap.Modal(document.getElementById('createRoomModal'));
+            modal.show();
+        }
+
+        // 全局函数供HTML调用
+        window.showCreateRoomModal = showCreateRoomModal;
+
+        // Toast通知函数
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toastId = 'toast-' + Date.now();
+            
+            const toastHTML = `
+                <div id="${toastId}" class="toast-notification toast-${type}">
+                    ${message}
+                </div>
+            `;
+            
+            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+            
+            const toastElement = document.getElementById(toastId);
+            
+            // 显示动画
+            setTimeout(() => {
+                toastElement.classList.add('show');
+            }, 100);
+            
+            // 自动隐藏
+            setTimeout(() => {
+                toastElement.classList.remove('show');
+                setTimeout(() => {
+                    if (toastElement && toastElement.parentNode) {
+                        toastElement.parentNode.removeChild(toastElement);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // 全局错误处理
+        window.addEventListener('error', function(event) {
+            console.error('页面错误:', event.error);
+            showToast('页面发生错误，请刷新重试', 'error');
+        });
+
+        // 导航栏退出登录
+        document.getElementById('nav-logout').addEventListener('click', function(e) {
+            e.preventDefault();
+            if (window.chatroomController && window.chatroomController.websocket) {
+                window.chatroomController.websocket.disconnect();
+            }
+            AuthService.logout();
+            window.location.href = './login.html';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API测试 - DifyChat</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { margin: 5px; padding: 10px 15px; }
+    </style>
+</head>
+<body>
+    <h1>DifyChat API 测试</h1>
+    
+    <div id="status"></div>
+    
+    <h2>配置测试</h2>
+    <button onclick="testConfigs()">测试配置加载</button>
+    <button onclick="testApiConnection()">测试API连接</button>
+    <button onclick="showCurrentConfig()">显示当前配置</button>
+    
+    <h2>API测试</h2>
+    <button onclick="testHealthCheck()">健康检查</button>
+    
+    <div id="results"></div>
+
+    <!-- 配置文件 -->
+    <script type="module" src="config/env.js?v=2.0.0"></script>
+    <script type="module" src="config/global-config.js?v=2.0.0"></script>
+    <script src="config/app-config.js?v=1.0.1"></script>
+    
+    <!-- API依赖 -->
+    <script src="js/api/dify-api-compat.js?v=1.0.0"></script>
+
+    <script>
+        let statusDiv = document.getElementById('status');
+        let resultsDiv = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            statusDiv.appendChild(div);
+            console.log(message);
+        }
+
+        function showResults(title, data) {
+            const div = document.createElement('div');
+            div.innerHTML = `<h3>${title}</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            resultsDiv.appendChild(div);
+        }
+
+        // 等待依赖加载
+        function waitForDependencies(callback, maxAttempts = 100) {
+            let attempts = 0;
+            
+            function check() {
+                attempts++;
+                log(`检查依赖... (${attempts}/${maxAttempts})`);
+                
+                if (window.DifyApiService && window.ENV_CONFIG && window.GLOBAL_CONFIG) {
+                    log('✅ 所有依赖已加载', 'success');
+                    window.difyApi = new window.DifyApiService();
+                    callback();
+                } else if (attempts < maxAttempts) {
+                    setTimeout(check, 100);
+                } else {
+                    log('❌ 依赖加载超时', 'error');
+                }
+            }
+            
+            check();
+        }
+
+        function testConfigs() {
+            log('开始测试配置...');
+            
+            try {
+                // 测试ENV_CONFIG
+                if (window.ENV_CONFIG) {
+                    log('✅ ENV_CONFIG 已加载', 'success');
+                    showResults('ENV_CONFIG', {
+                        environment: window.ENV_CONFIG.ENVIRONMENT,
+                        apiUrl: window.ENV_CONFIG.getApiUrl(),
+                        wsUrl: window.ENV_CONFIG.getWsUrl(),
+                        timeouts: {
+                            api: window.ENV_CONFIG.API_TIMEOUT,
+                            dify: window.ENV_CONFIG.DIFY_TIMEOUT
+                        }
+                    });
+                } else {
+                    log('❌ ENV_CONFIG 未加载', 'error');
+                }
+
+                // 测试GLOBAL_CONFIG
+                if (window.GLOBAL_CONFIG) {
+                    log('✅ GLOBAL_CONFIG 已加载', 'success');
+                    showResults('GLOBAL_CONFIG', {
+                        version: window.GLOBAL_CONFIG.VERSION,
+                        backend: window.GLOBAL_CONFIG.BACKEND,
+                        frontend: window.GLOBAL_CONFIG.FRONTEND
+                    });
+                } else {
+                    log('❌ GLOBAL_CONFIG 未加载', 'error');
+                }
+
+                // 测试APP_CONFIG
+                if (window.APP_CONFIG) {
+                    log('✅ APP_CONFIG 已加载', 'success');
+                    showResults('APP_CONFIG', {
+                        appName: window.APP_CONFIG.APP_NAME,
+                        version: window.APP_CONFIG.APP_VERSION,
+                        api: window.APP_CONFIG.API
+                    });
+                } else {
+                    log('❌ APP_CONFIG 未加载', 'error');
+                }
+
+                // 测试DifyApiService
+                if (window.DifyApiService) {
+                    log('✅ DifyApiService 类已加载', 'success');
+                } else {
+                    log('❌ DifyApiService 类未加载', 'error');
+                }
+
+                if (window.difyApi) {
+                    log('✅ difyApi 实例已创建', 'success');
+                } else {
+                    log('❌ difyApi 实例未创建', 'error');
+                }
+
+            } catch (error) {
+                log(`配置测试出错: ${error.message}`, 'error');
+            }
+        }
+
+        async function testApiConnection() {
+            log('测试API连接...');
+            
+            if (!window.checkBackendConnection) {
+                log('❌ checkBackendConnection 函数不可用', 'error');
+                return;
+            }
+
+            try {
+                const isConnected = await window.checkBackendConnection();
+                if (isConnected) {
+                    log('✅ 后端连接正常', 'success');
+                } else {
+                    log('⚠️ 后端连接失败', 'warning');
+                }
+            } catch (error) {
+                log(`连接测试出错: ${error.message}`, 'error');
+            }
+        }
+
+        async function testHealthCheck() {
+            log('测试健康检查...');
+            
+            if (!window.difyApi) {
+                log('❌ difyApi 实例不可用', 'error');
+                return;
+            }
+
+            try {
+                const isHealthy = await window.difyApi.checkHealth();
+                if (isHealthy) {
+                    log('✅ 健康检查通过', 'success');
+                } else {
+                    log('⚠️ 健康检查失败', 'warning');
+                }
+            } catch (error) {
+                log(`健康检查出错: ${error.message}`, 'error');
+            }
+        }
+
+        function showCurrentConfig() {
+            if (window.showConfig) {
+                window.showConfig();
+                log('当前配置已输出到控制台', 'info');
+            } else {
+                log('showConfig 函数不可用', 'error');
+            }
+        }
+
+        // 页面加载时自动初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('页面加载完成，等待依赖...');
+            
+            waitForDependencies(function() {
+                log('🎉 初始化完成！', 'success');
+                testConfigs();
+            });
+        });
+    </script>
+</body>
+</html>

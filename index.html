@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="DifyChat - 智能对话Web应用">
+    <meta name="keywords" content="AI聊天,智能对话,DifyChat">
+    <meta name="author" content="DifyChat Team">
+    
+    <!-- Bootstrap 5.3 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome 6.4 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- 自定义样式 -->
+    <!-- 暂时注释掉可能冲突的CSS -->
+    <!-- <link rel="stylesheet" href="./assets/css/variables.css"> -->
+    <!-- <link rel="stylesheet" href="./assets/css/base.css"> -->
+    <!-- <link rel="stylesheet" href="./assets/css/layouts.css"> -->
+    <!-- <link rel="stylesheet" href="./assets/css/components.css"> -->
+    <!-- <link rel="stylesheet" href="./assets/css/pages.css"> -->
+    <!-- <link rel="stylesheet" href="./assets/css/themes.css"> -->
+    <!-- <link rel="stylesheet" href="./assets/css/responsive.css"> -->
+    <!-- <link rel="stylesheet" href="./assets/css/animations.css"> -->
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon-16.svg" sizes="16x16">
+    <link rel="alternate icon" href="assets/images/favicon.svg">
+    <meta name="theme-color" content="#007bff">
+    
+    <title>DifyChat - 智能对话助手</title>
+</head>
+<body>
+    <!-- 加载动画 -->
+    <div id="loading-screen" class="loading-screen" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        flex-direction: column;
+    ">
+        <div class="loading-spinner">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <p class="loading-text mt-3" style="color: #666; font-size: 16px;">正在启动 DifyChat...</p>
+        </div>
+    </div>
+
+    <!-- 主应用容器 -->
+    <div id="app" class="app-container" style="min-height: 100vh; background: #f8f9fa;">
+        <!-- 导航栏 -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary" style="background-color: #0d6efd !important; min-height: 60px;">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#" style="font-weight: bold; color: white !important;">
+                    <i class="fas fa-robot me-2"></i>
+                    DifyChat
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" style="border-color: rgba(255,255,255,0.3);">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="./index.html" id="nav-home" style="color: white !important;">首页</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="./chat.html" id="nav-chat" style="color: rgba(255,255,255,0.8) !important;">聊天</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="./chatroom.html" id="nav-chatroom" style="color: rgba(255,255,255,0.8) !important;">聊天室</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="./settings.html" id="nav-settings" style="color: rgba(255,255,255,0.8) !important;">设置</a>
+                        </li>
+                    </ul>
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="./login.html" id="nav-login" style="color: rgba(255,255,255,0.8) !important;">登录</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主要内容区域 -->
+        <main id="main-content" class="container-fluid py-4">
+            <!-- 首页内容 -->
+            <div id="home-page" class="row">
+                <div class="col-12">
+                    <!-- 欢迎横幅 -->
+                    <div class="jumbotron bg-gradient p-5 rounded mb-4" style="background: linear-gradient(135deg, #007bff, #0056b3); color: white !important;">
+                        <div class="container text-center">
+                            <h1 class="display-4 mb-4" style="color: white !important; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+                                <i class="fas fa-robot me-3"></i>
+                                欢迎使用 DifyChat
+                            </h1>
+                            <p class="lead mb-4" style="color: white !important; text-shadow: 1px 1px 2px rgba(0,0,0,0.3);">
+                                您的智能对话助手 - 基于先进AI技术，为您提供智能、高效的对话体验
+                            </p>
+                            <div class="d-flex justify-content-center gap-3 flex-wrap">
+                                <button class="btn btn-light btn-lg" id="start-chat-btn">
+                                    <i class="fas fa-comments me-2"></i>
+                                    开始聊天
+                                </button>
+                                <button class="btn btn-outline-light btn-lg" id="start-chatroom-btn">
+                                    <i class="fas fa-users me-2"></i>
+                                    进入聊天室
+                                </button>
+                                <button class="btn btn-outline-light btn-lg" id="learn-more-btn">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    了解更多
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 功能特性 -->
+                    <div class="row g-4 mb-5">
+                        <div class="col-md-3">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center p-4">
+                                    <div class="feature-icon mb-3">
+                                        <i class="fas fa-brain text-primary" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <h5 class="card-title">智能对话</h5>
+                                    <p class="card-text text-muted">
+                                        基于先进AI模型，理解自然语言，提供智能、准确的回答
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center p-4">
+                                    <div class="feature-icon mb-3">
+                                        <i class="fas fa-users text-info" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <h5 class="card-title">多人聊天室</h5>
+                                    <p class="card-text text-muted">
+                                        实时多人群聊，@智能体功能，在线状态显示，互动体验升级
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center p-4">
+                                    <div class="feature-icon mb-3">
+                                        <i class="fas fa-file-upload text-success" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <h5 class="card-title">文件支持</h5>
+                                    <p class="card-text text-muted">
+                                        支持多种文件格式上传，AI可以分析和处理您的文档内容
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card h-100 border-0 shadow-sm">
+                                <div class="card-body text-center p-4">
+                                    <div class="feature-icon mb-3">
+                                        <i class="fas fa-shield-alt text-warning" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <h5 class="card-title">安全可靠</h5>
+                                    <p class="card-text text-muted">
+                                        数据安全加密，隐私保护严格，让您安心使用
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 快速开始 -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-header bg-white">
+                                    <h5 class="mb-0">
+                                        <i class="fas fa-rocket me-2 text-primary"></i>
+                                        快速开始
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                                <div class="me-3">
+                                                    <span class="badge bg-primary rounded-circle" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">1</span>
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-1">进入聊天</h6>
+                                                    <small class="text-muted">点击"开始聊天"按钮</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                                <div class="me-3">
+                                                    <span class="badge bg-primary rounded-circle" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">2</span>
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-1">输入问题</h6>
+                                                    <small class="text-muted">在输入框中输入您的问题</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="d-flex align-items-center p-3 bg-light rounded">
+                                                <div class="me-3">
+                                                    <span class="badge bg-primary rounded-circle" style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">3</span>
+                                                </div>
+                                                <div>
+                                                    <h6 class="mb-1">获得回答</h6>
+                                                    <small class="text-muted">AI将为您提供智能回答</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Toast 提示容器 -->
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3"></div>
+
+    <!-- Bootstrap 5.3 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 配置文件 -->
+    <script type="module" src="config/env.js?v=2.0.0"></script>
+    <script type="module" src="config/global-config.js?v=2.0.0"></script>
+    <script src="config/app-config.js?v=1.0.1"></script>
+    
+    <!-- API依赖 - 使用兼容版本 -->
+    <script src="js/api/dify-api-compat.js?v=1.0.0"></script>
+    
+    <!-- 退出登录工具 -->
+    <script src="js/utils/logout-manager.js?v=1.0.1"></script>
+    
+    <!-- 退出登录工具 -->
+    <script src="js/utils/logout-manager.js"></script>
+    
+    <!-- 简化的应用脚本 -->
+    <script>
+        // 等待所有依赖加载完成后初始化
+        function waitForDependencies(callback, maxAttempts = 50) {
+            let attempts = 0;
+            
+            function check() {
+                attempts++;
+                
+                if (window.DifyApiService && window.ENV_CONFIG) {
+                    console.log('✅ 依赖加载完成，初始化API实例');
+                    window.difyApi = new window.DifyApiService();
+                    callback();
+                } else if (attempts < maxAttempts) {
+                    setTimeout(check, 100);
+                } else {
+                    console.error('❌ 依赖加载超时');
+                }
+            }
+            
+            check();
+        }
+        
+        // 应用初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DifyChat 应用正在启动...');
+            
+            waitForDependencies(function() {
+                initApp();
+            });
+        });
+
+        function initApp() {
+            try {
+                // 检查导航栏是否可见
+                const navbar = document.querySelector('.navbar');
+                console.log('导航栏元素:', navbar);
+                console.log('导航栏可见性:', navbar ? window.getComputedStyle(navbar).display : 'not found');
+                
+                // 检查登录状态并更新导航（如果已登录才更新）
+                updateNavigation();
+                
+                // 绑定事件
+                bindEvents();
+                
+                // 隐藏加载屏幕
+                setTimeout(() => {
+                    const loadingScreen = document.getElementById('loading-screen');
+                    if (loadingScreen) {
+                        loadingScreen.style.opacity = '0';
+                        setTimeout(() => {
+                            loadingScreen.style.display = 'none';
+                        }, 300);
+                    }
+                }, 1000);
+
+                console.log('✅ DifyChat 应用启动完成');
+            } catch (error) {
+                console.error('应用初始化失败:', error);
+                // 即使出错也要隐藏加载屏幕
+                const loadingScreen = document.getElementById('loading-screen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                }
+            }
+        }
+
+        // 绑定页面事件
+        function bindEvents() {
+            // 开始聊天按钮
+            document.getElementById('start-chat-btn')?.addEventListener('click', function() {
+                if (isUserLoggedIn()) {
+                    window.location.href = './chat-enhanced.html';
+                } else {
+                    showToast('请先登录后再开始聊天', 'warning');
+                    setTimeout(() => {
+                        window.location.href = './login.html';
+                    }, 1500);
+                }
+            });
+
+            // 进入聊天室按钮
+            document.getElementById('start-chatroom-btn')?.addEventListener('click', function() {
+                if (isUserLoggedIn()) {
+                    window.location.href = './chatroom.html';
+                } else {
+                    showToast('请先登录后再进入聊天室', 'warning');
+                    setTimeout(() => {
+                        window.location.href = './login.html';
+                    }, 1500);
+                }
+            });
+
+            // 了解更多按钮
+            document.getElementById('learn-more-btn')?.addEventListener('click', function() {
+                showToast('了解更多功能开发中...', 'info');
+            });
+
+            // 导航链接
+            document.getElementById('nav-chat')?.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (isUserLoggedIn()) {
+                    window.location.href = './chat-enhanced.html';
+                } else {
+                    showToast('请先登录后再进入聊天', 'warning');
+                    setTimeout(() => {
+                        window.location.href = './login.html';
+                    }, 1500);
+                }
+            });
+
+            document.getElementById('nav-home')?.addEventListener('click', function(e) {
+                e.preventDefault();
+                // 已经在首页
+            });
+
+            document.getElementById('nav-settings')?.addEventListener('click', function(e) {
+                e.preventDefault();
+                showToast('设置功能开发中...', 'info');
+            });
+
+            document.getElementById('nav-login')?.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.location.href = './login.html';
+            });
+            
+            // 用户登出 - 使用LogoutManager
+            document.getElementById('user-logout')?.addEventListener('click', async function(e) {
+                e.preventDefault();
+                await LogoutManager.logout({
+                    onSuccess: () => {
+                        showToast('已退出登录', 'success');
+                        updateNavigation();
+                    },
+                    onError: (error) => {
+                        showToast('登出失败', 'error');
+                    }
+                });
+            });
+        }
+
+        // 检查用户是否已登录 - 使用DifyAPI
+        function isUserLoggedIn() {
+            return window.difyApi && window.difyApi.isLoggedIn && window.difyApi.isLoggedIn();
+        }
+
+        // 获取用户信息 - 使用DifyAPI
+        function getUserInfo() {
+            return window.difyApi && window.difyApi.getUserInfo ? window.difyApi.getUserInfo() : null;
+        }
+
+        // 更新导航栏显示
+        function updateNavigation() {
+            try {
+                const navbarNav = document.querySelector('#navbarNav .navbar-nav:last-child');
+                if (!navbarNav) {
+                    console.warn('导航栏元素未找到');
+                    return;
+                }
+                
+                // 检查是否已登录，如果API还没加载完成，默认显示未登录状态
+                const isLoggedIn = window.difyApi && window.difyApi.isLoggedIn && window.difyApi.isLoggedIn();
+                
+                if (isLoggedIn) {
+                    const userInfo = getUserInfo();
+                    if (userInfo) {
+                        // 已登录状态：显示用户信息和登出
+                        navbarNav.innerHTML = `
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" style="color: rgba(255,255,255,0.8) !important;">
+                                    <i class="fas fa-user-circle me-1"></i>
+                                    ${userInfo.username || userInfo.display_name || '用户'}
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="./chat-enhanced.html">
+                                        <i class="fas fa-comments me-2"></i>进入聊天
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="./profile.html">
+                                        <i class="fas fa-user me-2"></i>个人资料
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="./settings.html">
+                                        <i class="fas fa-cog me-2"></i>设置
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="#" id="user-logout">
+                                        <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                                    </a></li>
+                                </ul>
+                            </li>
+                        `;
+                        
+                        // 绑定用户菜单事件
+                        document.getElementById('user-logout')?.addEventListener('click', handleLogout);
+                        }
+                } else {
+                    // 未登录状态，保持HTML中原有的登录/注册按钮
+                }
+                // 如果未登录，保持HTML中原有的登录/注册按钮，不做任何修改
+                
+            } catch (error) {
+                console.error('更新导航栏失败:', error);
+                // 出错时不做任何修改，保持原有的登录/注册按钮
+            }
+        }
+
+        // 处理用户登出 - 使用LogoutManager
+        function handleLogout(e) {
+            e.preventDefault();
+            
+            LogoutManager.logout({
+                redirectUrl: './index.html', // 首页退出后留在首页
+                onSuccess: () => {
+                    showToast('已成功登出', 'success');
+                    // 更新导航栏
+                    setTimeout(() => {
+                        updateNavigation();
+                    }, 1000);
+                }
+            });
+        }
+
+        // Toast 消息显示函数
+        function showToast(message, type = 'info') {
+            let toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                toastContainer.style.zIndex = '9999';
+                document.body.appendChild(toastContainer);
+            }
+            
+            const toastId = 'toast-' + Date.now();
+            const bgClass = {
+                'success': 'bg-success',
+                'error': 'bg-danger',
+                'warning': 'bg-warning',
+                'info': 'bg-info'
+            }[type] || 'bg-info';
+            
+            const iconClass = {
+                'success': 'fa-check-circle',
+                'error': 'fa-exclamation-circle',
+                'warning': 'fa-exclamation-triangle',
+                'info': 'fa-info-circle'
+            }[type] || 'fa-info-circle';
+            
+            const toastHTML = `
+                <div id="${toastId}" class="toast ${bgClass} text-white" role="alert">
+                    <div class="toast-body">
+                        <i class="fas ${iconClass} me-2"></i>
+                        ${message}
+                    </div>
+                </div>
+            `;
+            
+            toastContainer.insertAdjacentHTML('beforeend', toastHTML);
+            
+            const toastElement = document.getElementById(toastId);
+            if (window.bootstrap && window.bootstrap.Toast) {
+                const bsToast = new bootstrap.Toast(toastElement, { delay: 3000 });
+                bsToast.show();
+            } else {
+                // 如果Bootstrap未加载，使用简单的显示方式
+                toastElement.style.display = 'block';
+                setTimeout(() => {
+                    toastElement.remove();
+                }, 3000);
+            }
+            
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        }
+
+        // 全局错误处理
+        window.addEventListener('error', function(event) {
+            console.error('全局错误:', event.error);
+            showToast('应用出现错误，请刷新页面重试', 'error');
+        });
+
+        // 未处理的Promise拒绝
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('未处理的Promise拒绝:', event.reason);
+            showToast('请求失败，请检查网络连接', 'error');
+        });
+    </script>
+</body>
+</html>
