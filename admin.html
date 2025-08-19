@@ -33,6 +33,7 @@
             min-height: 100vh;
             font-family: 'Microsoft YaHei', sans-serif;
             padding-top: 56px;
+            overflow-x: hidden; /* 防止水平滚动 */
         }
 
         /* 导航栏 */
@@ -40,6 +41,11 @@
             background: linear-gradient(135deg, var(--admin-danger), #c82333) !important;
             backdrop-filter: blur(10px);
             box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1030;
         }
 
         .navbar-brand {
@@ -52,16 +58,19 @@
         .admin-container {
             height: calc(100vh - 56px);
             display: flex;
+            overflow: hidden; /* 防止整体容器滚动，但内部区域可以滚动 */
         }
 
         /* 侧边栏导航 */
         .admin-sidebar {
             width: 280px;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(255, 255, 255, 0.98); /* 提高不透明度 */
             border-right: 1px solid rgba(0, 0, 0, 0.1);
             display: flex;
             flex-direction: column;
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(15px);
+            height: 100%; /* 确保占满高度 */
+            flex-shrink: 0; /* 防止收缩 */
         }
 
         .admin-sidebar-header {
@@ -125,14 +134,17 @@
             flex: 1;
             display: flex;
             flex-direction: column;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.98); /* 提高不透明度 */
+            backdrop-filter: blur(15px);
+            height: 100%; /* 确保占满高度 */
+            overflow: hidden; /* 防止主容器滚动，但内容区域可以滚动 */
         }
 
         .admin-header {
             padding: 1.5rem;
             border-bottom: 1px solid rgba(0, 0, 0, 0.1);
             background: transparent;
+            flex-shrink: 0; /* 防止头部被压缩 */
         }
 
         .admin-header h4 {
@@ -144,18 +156,44 @@
         .admin-content {
             flex: 1;
             padding: 1.5rem;
-            overflow-y: auto;
+            overflow-y: auto; /* 恢复垂直滚动 */
+            overflow-x: hidden; /* 防止水平滚动 */
+            background: rgba(255, 255, 255, 0.02); /* 轻微背景区别 */
+            /* 确保滚动条样式美观 */
+            scrollbar-width: thin;
+            scrollbar-color: rgba(220, 53, 69, 0.3) rgba(255, 255, 255, 0.1);
+        }
+        
+        /* 自定义滚动条样式 */
+        .admin-content::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .admin-content::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        
+        .admin-content::-webkit-scrollbar-thumb {
+            background: rgba(220, 53, 69, 0.3);
+            border-radius: 4px;
+        }
+        
+        .admin-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(220, 53, 69, 0.5);
         }
 
         /* 统计卡片 */
         .stats-card {
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.7));
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85));
             border-radius: 12px;
             padding: 1.5rem;
-            border: 1px solid rgba(0, 0, 0, 0.05);
-            backdrop-filter: blur(5px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            backdrop-filter: blur(10px);
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+            height: auto; /* 确保高度自适应 */
+            margin-bottom: 1rem; /* 增加底部间距 */
         }
 
         .stats-card:hover {
@@ -221,11 +259,13 @@
 
         /* 数据表格 */
         .admin-table {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(5px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+            backdrop-filter: blur(10px);
+            margin-bottom: 1rem; /* 增加底部间距 */
+            border: 1px solid rgba(0, 0, 0, 0.08);
         }
 
         .admin-table .table {
@@ -404,6 +444,7 @@
                 height: calc(100vh - 56px);
                 z-index: 1000;
                 transition: left 0.3s ease;
+                background: rgba(255, 255, 255, 0.98); /* 确保移动端背景足够不透明 */
             }
 
             .admin-sidebar.show {
@@ -412,10 +453,19 @@
 
             .admin-main {
                 width: 100%;
+                background: rgba(255, 255, 255, 0.98); /* 确保移动端背景足够不透明 */
             }
 
             .stats-card-value {
                 font-size: 1.5rem;
+            }
+            
+            .admin-content {
+                padding: 1rem; /* 移动端减少内边距 */
+            }
+            
+            body {
+                overflow-x: hidden; /* 移动端防止横向滚动 */
             }
         }
 
@@ -459,6 +509,82 @@
             top: 50%;
             transform: translateY(-50%);
             color: var(--admin-secondary);
+        }
+        
+        /* 确保所有区域都有合适的背景遮罩 */
+        .admin-section {
+            height: 100%;
+            display: flex !important; /* 强制使用flex布局 */
+            flex-direction: column;
+            overflow: hidden; /* 防止section级别的溢出 */
+        }
+        
+        .admin-section.hidden {
+            display: none !important; /* 隐藏时完全不显示 */
+        }
+        
+        .admin-section .admin-content {
+            flex: 1;
+            overflow-y: auto; /* 确保内容可以滚动 */
+            overflow-x: hidden;
+        }
+        
+        /* 模态框背景遮罩增强 */
+        .modal-backdrop {
+            background-color: rgba(0, 0, 0, 0.7) !important;
+        }
+        
+        /* 表格滚动优化 */
+        .table-responsive {
+            border-radius: 8px;
+            overflow: auto; /* 确保表格可以滚动 */
+            max-height: none; /* 移除高度限制 */
+        }
+        
+        /* 表格内部滚动条样式 */
+        .table-responsive::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        .table-responsive::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        
+        .table-responsive::-webkit-scrollbar-thumb {
+            background: rgba(220, 53, 69, 0.3);
+            border-radius: 3px;
+        }
+        
+        /* 日志区域滚动条样式 */
+        #logsContent::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        #logsContent::-webkit-scrollbar-track {
+            background: rgba(0, 255, 0, 0.1);
+        }
+        
+        #logsContent::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 0, 0.3);
+            border-radius: 4px;
+        }
+        
+        /* 防止内容溢出的通用规则 */
+        * {
+            box-sizing: border-box;
+        }
+        
+        .row {
+            margin-left: -0.75rem;
+            margin-right: -0.75rem;
+        }
+        
+        .col-md-3, .col-md-4, .col-md-6, .col-md-8, .col-md-12, 
+        .col-lg-4, .col-lg-8, .col-lg-12 {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
         }
     </style>
 </head>
@@ -673,7 +799,7 @@
             </div>
 
             <!-- 用户管理 -->
-            <div id="usersSection" class="admin-section" style="display: none;">
+            <div id="usersSection" class="admin-section hidden">
                 <div class="admin-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -724,7 +850,7 @@
             </div>
 
             <!-- 智能体管理 -->
-            <div id="agentsSection" class="admin-section" style="display: none;">
+            <div id="agentsSection" class="admin-section hidden">
                 <div class="admin-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -776,7 +902,7 @@
             </div>
 
             <!-- 对话管理 -->
-            <div id="conversationsSection" class="admin-section" style="display: none;">
+            <div id="conversationsSection" class="admin-section hidden">
                 <div class="admin-header">
                     <h4>对话管理</h4>
                     <p class="text-muted mb-0">查看和管理用户对话</p>
@@ -820,7 +946,7 @@
             </div>
 
             <!-- 系统监控 -->
-            <div id="systemSection" class="admin-section" style="display: none;">
+            <div id="systemSection" class="admin-section hidden">
                 <div class="admin-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
@@ -890,7 +1016,7 @@
             </div>
 
             <!-- 日志管理 -->
-            <div id="logsSection" class="admin-section" style="display: none;">
+            <div id="logsSection" class="admin-section hidden">
                 <div class="admin-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
