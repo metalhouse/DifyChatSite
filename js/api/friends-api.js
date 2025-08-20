@@ -24,7 +24,8 @@ class FriendsApiService {
                 HISTORY: '/api/friends/messages/history',
                 MARK_READ: '/api/friends/messages/mark-read',
                 UNREAD_COUNTS: '/api/friends/messages/unread-counts',
-                DELETE: '/api/friends/messages'
+                DELETE: '/api/friends/messages',
+                SEARCH: '/api/friends/messages/search'
             },
             INVITE: {
                 TO_ROOM: '/api/friends/invite-to-room'
@@ -540,6 +541,55 @@ class FriendsApiService {
             return response;
         } catch (error) {
             console.error('❌ 删除消息失败:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 批量删除消息
+     * @param {Array} messageIds 消息ID数组
+     * @returns {Promise<Object>} 删除结果
+     */
+    async deleteMessages(messageIds) {
+        try {
+            const url = `${this.endpoints.MESSAGES.DELETE}/batch`;
+            const data = { messageIds };
+            
+            console.log(`🗑️ 批量删除消息: ${messageIds.length} 条`);
+            const response = await this.request('DELETE', url, data);
+            console.log('✅ 批量删除消息成功');
+            return response;
+        } catch (error) {
+            console.error('❌ 批量删除消息失败:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 搜索聊天记录
+     * @param {string} friendId 好友ID
+     * @param {string} keyword 搜索关键词
+     * @param {Object} options 搜索选项
+     * @returns {Promise<Object>} 搜索结果
+     */
+    async searchMessages(friendId, keyword, options = {}) {
+        try {
+            const url = this.endpoints.MESSAGES.SEARCH;
+            const data = {
+                friendId,
+                keyword,
+                page: options.page || 1,
+                limit: options.limit || 20,
+                dateRange: options.dateRange || null,
+                messageType: options.messageType || null
+            };
+            
+            console.log(`🔍 搜索与 ${friendId} 的聊天记录: "${keyword}"`);
+            const response = await this.request('POST', url, data);
+            console.log('✅ 聊天记录搜索成功:', response.data?.messages?.length || 0, '条结果');
+            return response;
+        } catch (error) {
+            console.error('❌ 搜索聊天记录失败:', error.message);
             throw error;
         }
     }

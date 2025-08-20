@@ -59,6 +59,9 @@ class ChatroomController {
             this.friendsManager = new FriendsManager(this);
             await this.friendsManager.initialize();
             
+            // 设置全局引用，以便HTML中的按钮可以调用
+            window.friendsManager = this.friendsManager;
+            
             // 初始化WebSocket连接
             this.initializeWebSocket();
             

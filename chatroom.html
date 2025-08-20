@@ -1049,6 +1049,75 @@
         .chat-messages::-webkit-scrollbar-thumb:hover {
             background: rgba(0, 0, 0, 0.3);
         }
+
+        /* 消息管理相关样式 */
+        .message-select-wrapper {
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message-checkbox {
+            margin-right: 0.5rem;
+            margin-top: 0.25rem;
+            flex-shrink: 0;
+        }
+
+        .message-actions {
+            position: absolute;
+            top: 0;
+            right: 0;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .message:hover .message-actions {
+            opacity: 1;
+        }
+
+        .message-selection-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .message-context-menu {
+            position: fixed;
+            z-index: 1050;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .search-result-item {
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .search-result-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .search-result-content mark {
+            background-color: #fff3cd;
+            padding: 0.1em 0.2em;
+            border-radius: 3px;
+        }
+
+        /* 私聊操作按钮样式 */
+        .private-chat-actions .btn {
+            border-color: rgba(255, 255, 255, 0.5);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .private-chat-actions .btn:hover {
+            border-color: rgba(255, 255, 255, 0.8);
+            color: white;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -1198,12 +1267,24 @@
                     </div>
                 </div>
                 <div class="d-flex align-items-center">
+                    <!-- 群聊模式：在线成员显示 -->
                     <div class="online-members" id="onlineMembers">
                         <span>在线成员:</span>
                         <div class="member-avatars" id="memberAvatars">
                             <!-- 在线成员头像将动态添加 -->
                         </div>
                     </div>
+                    
+                    <!-- 私聊模式：搜索和管理按钮 -->
+                    <div class="private-chat-actions" id="privateChatActions" style="display: none;">
+                        <button class="btn btn-outline-light btn-sm" onclick="window.friendsManager.showSearchDialog()" title="搜索聊天记录">
+                            <i class="fas fa-search"></i>
+                        </button>
+                        <button class="btn btn-outline-light btn-sm ms-2" onclick="window.friendsManager.enterSelectionMode()" title="管理消息">
+                            <i class="fas fa-tasks"></i>
+                        </button>
+                    </div>
+                    
                     <button class="btn btn-outline-light btn-sm ms-3 d-md-none" onclick="toggleSidebar()" title="显示/隐藏侧边栏">
                         <i class="fas fa-bars"></i>
                     </button>

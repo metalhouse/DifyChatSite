@@ -298,7 +298,7 @@ class FriendsManager {
                 </div>
             `;
             
-            // TODO: 加载历史私聊消息
+            // 加载历史私聊消息
             this.loadPrivateChatHistory(friendId);
         }
 
@@ -308,8 +308,21 @@ class FriendsManager {
             messageInput.placeholder = `给 ${friendName} 发消息...`;
         }
         
+        // 用户进入与好友的聊天时，标记该好友的消息为已读
+        this.markMessagesAsRead(friendId);
+        
         if (sendButton) {
             sendButton.disabled = false;
+        }
+
+        // 显示私聊操作按钮，隐藏群聊元素
+        const privateChatActions = document.getElementById('privateChatActions');
+        const onlineMembers = document.getElementById('onlineMembers');
+        if (privateChatActions) {
+            privateChatActions.style.display = 'block';
+        }
+        if (onlineMembers) {
+            onlineMembers.style.display = 'none';
         }
 
         // 更新连接状态显示
@@ -347,10 +360,8 @@ class FriendsManager {
             if (response.data && response.data.messages) {
                 this.renderChatMessages(response.data.messages);
                 
-                // 标记所有消息为已读
-                if (response.data.messages.length > 0) {
-                    await this.friendsApi.markMessagesAsRead(friendId);
-                }
+                // 注意：不在这里标记已读，由startPrivateChat统一处理
+                console.log(`✅ 加载了 ${response.data.messages.length} 条聊天记录`);
             } else {
                 // 没有消息历史，显示欢迎界面
                 if (chatMessages && this.currentPrivateChat && this.currentPrivateChat.friendId === friendId) {
@@ -404,25 +415,46 @@ class FriendsManager {
             new Date(a.createdAt) - new Date(b.createdAt)
         );
 
+        // 调试：检查消息数据结构
+        console.log('🔍 消息数据结构调试:', sortedMessages[0]);
+
         // 渲染消息
         chatMessages.innerHTML = sortedMessages.map(message => {
             const isCurrentUser = message.senderId === currentUserId;
             const messageClass = isCurrentUser ? 'message-user' : 'message-other';
             const senderName = isCurrentUser ? '我' : message.senderInfo?.username || this.currentPrivateChat.friendName;
             
+            // 兼容不同的ID字段名
+            const messageId = message.id || message._id || message.messageId || message.message_id;
+            
+            // 调试：检查消息ID
+            console.log('🔍 消息ID调试:', messageId, '完整消息:', message);
+            
             return `
-                <div class="message ${messageClass}">
-                    <div class="message-bubble">
-                        <div class="message-header">
-                            <span class="message-sender">${senderName}</span>
-                            <span class="message-time">${this.formatTime(new Date(message.createdAt))}</span>
-                            ${message.isEncrypted ? '<i class="fas fa-lock text-success" title="已加密"></i>' : ''}
+                <div class="message ${messageClass}" data-message-id="${messageId}">
+                    <div class="message-select-wrapper">
+                        <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
+                        <div class="message-bubble">
+                            <div class="message-header">
+                                <span class="message-sender">${senderName}</span>
+                                <span class="message-time">${this.formatTime(new Date(message.createdAt))}</span>
+                                ${message.isEncrypted ? '<i class="fas fa-lock text-success" title="已加密"></i>' : ''}
+                                <div class="message-actions" style="display: none;">
+                                    <button class="btn btn-sm btn-outline-danger delete-message-btn" data-message-id="${messageId}" title="删除消息">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="message-content">${this.escapeHtml(message.content)}</div>
                         </div>
-                        <div class="message-content">${this.escapeHtml(message.content)}</div>
                     </div>
                 </div>
             `;
         }).join('');
+
+        // 重置事件附加标志并附加事件
+        this.eventsAttached = false;
+        this.attachMessageEvents();
 
         // 滚动到底部
         setTimeout(() => {
@@ -997,24 +1029,38 @@ class FriendsManager {
         const messageElement = document.createElement('div');
         messageElement.className = 'message message-other';
         
+        // 兼容不同的ID字段名
+        const messageId = message.id || message._id || message.messageId || message.message_id;
+        messageElement.dataset.messageId = messageId;
+        
         const senderName = message.senderInfo?.nickname || message.senderInfo?.username || '好友';
         const time = this.formatTime(new Date(message.createdAt));
         
         messageElement.innerHTML = `
-            <div class="message-bubble">
-                <div class="message-header">
-                    <span class="message-sender">${this.escapeHtml(senderName)}</span>
-                    <span class="message-time">${time}</span>
+            <div class="message-select-wrapper">
+                <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
+                <div class="message-bubble">
+                    <div class="message-header">
+                        <span class="message-sender">${this.escapeHtml(senderName)}</span>
+                        <span class="message-time">${time}</span>
+                        <div class="message-actions" style="display: none;">
+                            <button class="btn btn-sm btn-outline-danger delete-message-btn" data-message-id="${messageId}" title="删除消息">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="message-content">${this.escapeHtml(message.content)}</div>
                 </div>
-                <div class="message-content">${this.escapeHtml(message.content)}</div>
             </div>
         `;
 
         chatMessages.appendChild(messageElement);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         
-        // 标记消息为已读
-        this.markMessagesAsRead(message.senderId);
+        // 只有当前正在与发送方聊天时才标记为已读
+        if (this.currentPrivateChat && this.currentPrivateChat.friendId === message.senderId) {
+            this.markMessagesAsRead(message.senderId);
+        }
     }
 
     /**
@@ -1030,16 +1076,28 @@ class FriendsManager {
         const messageElement = document.createElement('div');
         messageElement.className = 'message message-user';
         
+        // 兼容不同的ID字段名
+        const messageId = data.id || data._id || data.messageId || data.message_id;
+        messageElement.dataset.messageId = messageId;
+        
         const currentUser = this.chatroomController.currentUser;
         const time = this.formatTime(new Date(data.createdAt));
         
         messageElement.innerHTML = `
-            <div class="message-bubble">
-                <div class="message-header">
-                    <span class="message-sender">${this.escapeHtml(currentUser.username)}</span>
-                    <span class="message-time">${time}</span>
+            <div class="message-select-wrapper">
+                <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
+                <div class="message-bubble">
+                    <div class="message-header">
+                        <span class="message-sender">${this.escapeHtml(currentUser.username)}</span>
+                        <span class="message-time">${time}</span>
+                        <div class="message-actions" style="display: none;">
+                            <button class="btn btn-sm btn-outline-danger delete-message-btn" data-message-id="${messageId}" title="删除消息">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="message-content">${this.escapeHtml(data.content)}</div>
                 </div>
-                <div class="message-content">${this.escapeHtml(data.content)}</div>
             </div>
         `;
 
@@ -1082,6 +1140,436 @@ class FriendsManager {
         } catch (error) {
             console.error('❌ 标记消息已读失败:', error);
         }
+    }
+
+    /**
+     * 清除私聊状态，切换回群聊模式
+     */
+    clearPrivateChat() {
+        this.currentPrivateChat = null;
+        
+        // 隐藏私聊操作按钮，显示群聊元素
+        const privateChatActions = document.getElementById('privateChatActions');
+        const onlineMembers = document.getElementById('onlineMembers');
+        if (privateChatActions) {
+            privateChatActions.style.display = 'none';
+        }
+        if (onlineMembers) {
+            onlineMembers.style.display = 'block';
+        }
+        
+        // 退出选择模式
+        if (this.selectionMode) {
+            this.exitSelectionMode();
+        }
+        
+        console.log('✅ 已清除私聊状态');
+    }
+
+    /**
+     * 附加消息事件处理
+     */
+    attachMessageEvents() {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages || this.eventsAttached) return;
+
+        // 标记事件已附加，避免重复绑定
+        this.eventsAttached = true;
+
+        // 消息右键菜单
+        chatMessages.addEventListener('contextmenu', (e) => {
+            const messageElement = e.target.closest('.message');
+            if (messageElement) {
+                e.preventDefault();
+                this.showMessageContextMenu(e, messageElement);
+            }
+        });
+
+        // 删除按钮点击事件
+        chatMessages.addEventListener('click', (e) => {
+            if (e.target.closest('.delete-message-btn')) {
+                const messageId = e.target.closest('.delete-message-btn').dataset.messageId;
+                if (messageId && messageId !== 'undefined') {
+                    this.showDeleteConfirmation([messageId]);
+                } else {
+                    console.warn('⚠️ 无法获取消息ID，跳过删除操作');
+                }
+            }
+        });
+
+        // 消息选择框变化事件
+        chatMessages.addEventListener('change', (e) => {
+            if (e.target.classList.contains('message-checkbox')) {
+                this.updateDeleteToolbar();
+            }
+        });
+    }
+
+    /**
+     * 显示消息右键菜单
+     */
+    showMessageContextMenu(event, messageElement) {
+        const messageId = messageElement.dataset.messageId;
+        const currentUserId = this.getCurrentUserId();
+        const isOwnMessage = messageElement.classList.contains('message-user');
+
+        // 创建右键菜单
+        const contextMenu = document.createElement('div');
+        contextMenu.className = 'message-context-menu';
+        contextMenu.innerHTML = `
+            <div class="dropdown-menu show" style="position: absolute; z-index: 1000;">
+                <button class="dropdown-item" onclick="window.friendsManager.toggleMessageSelection('${messageId}')">
+                    <i class="fas fa-check-square"></i> 选择消息
+                </button>
+                ${isOwnMessage ? `
+                    <button class="dropdown-item text-danger" onclick="window.friendsManager.showDeleteConfirmation(['${messageId}'])">
+                        <i class="fas fa-trash"></i> 删除消息
+                    </button>
+                ` : ''}
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item" onclick="window.friendsManager.enterSelectionMode()">
+                    <i class="fas fa-tasks"></i> 多选模式
+                </button>
+            </div>
+        `;
+
+        // 定位菜单
+        contextMenu.style.left = event.clientX + 'px';
+        contextMenu.style.top = event.clientY + 'px';
+        
+        document.body.appendChild(contextMenu);
+
+        // 点击其他地方关闭菜单
+        const closeMenu = (e) => {
+            if (!contextMenu.contains(e.target)) {
+                document.body.removeChild(contextMenu);
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    }
+
+    /**
+     * 切换消息选择状态
+     */
+    toggleMessageSelection(messageId) {
+        const checkbox = document.querySelector(`input[data-message-id="${messageId}"]`);
+        if (checkbox) {
+            checkbox.checked = !checkbox.checked;
+            this.updateDeleteToolbar();
+        }
+    }
+
+    /**
+     * 进入选择模式
+     */
+    enterSelectionMode() {
+        this.selectionMode = true;
+        
+        // 显示所有复选框
+        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
+            checkbox.style.display = 'block';
+        });
+
+        // 显示工具栏
+        this.showSelectionToolbar();
+    }
+
+    /**
+     * 退出选择模式
+     */
+    exitSelectionMode() {
+        this.selectionMode = false;
+        
+        // 隐藏所有复选框
+        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
+            checkbox.style.display = 'none';
+            checkbox.checked = false;
+        });
+
+        // 隐藏工具栏
+        this.hideSelectionToolbar();
+    }
+
+    /**
+     * 显示选择工具栏
+     */
+    showSelectionToolbar() {
+        let toolbar = document.getElementById('messageSelectionToolbar');
+        if (!toolbar) {
+            toolbar = document.createElement('div');
+            toolbar.id = 'messageSelectionToolbar';
+            toolbar.className = 'message-selection-toolbar';
+            toolbar.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center p-2 bg-light border">
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="window.friendsManager.selectAllMessages()">
+                            <i class="fas fa-check-double"></i> 全选
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="window.friendsManager.clearSelection()">
+                            <i class="fas fa-times"></i> 清除
+                        </button>
+                    </div>
+                    <div>
+                        <span id="selectedCount" class="me-3">已选择: 0 条</span>
+                        <button class="btn btn-sm btn-danger" onclick="window.friendsManager.deleteSelectedMessages()" disabled>
+                            <i class="fas fa-trash"></i> 删除选中
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="window.friendsManager.exitSelectionMode()">
+                            <i class="fas fa-times"></i> 取消
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            const chatContainer = document.querySelector('.chat-container');
+            if (chatContainer) {
+                chatContainer.insertBefore(toolbar, chatContainer.firstChild);
+            }
+        }
+        toolbar.style.display = 'block';
+    }
+
+    /**
+     * 隐藏选择工具栏
+     */
+    hideSelectionToolbar() {
+        const toolbar = document.getElementById('messageSelectionToolbar');
+        if (toolbar) {
+            toolbar.style.display = 'none';
+        }
+    }
+
+    /**
+     * 更新删除工具栏状态
+     */
+    updateDeleteToolbar() {
+        const selectedCheckboxes = document.querySelectorAll('.message-checkbox:checked');
+        const selectedCount = selectedCheckboxes.length;
+        
+        const countElement = document.getElementById('selectedCount');
+        const deleteButton = document.querySelector('#messageSelectionToolbar .btn-danger');
+        
+        if (countElement) {
+            countElement.textContent = `已选择: ${selectedCount} 条`;
+        }
+        
+        if (deleteButton) {
+            deleteButton.disabled = selectedCount === 0;
+        }
+    }
+
+    /**
+     * 全选消息
+     */
+    selectAllMessages() {
+        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
+            checkbox.checked = true;
+        });
+        this.updateDeleteToolbar();
+    }
+
+    /**
+     * 清除选择
+     */
+    clearSelection() {
+        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        this.updateDeleteToolbar();
+    }
+
+    /**
+     * 删除选中的消息
+     */
+    deleteSelectedMessages() {
+        const selectedCheckboxes = document.querySelectorAll('.message-checkbox:checked');
+        const messageIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.messageId);
+        
+        if (messageIds.length > 0) {
+            this.showDeleteConfirmation(messageIds);
+        }
+    }
+
+    /**
+     * 显示删除确认对话框
+     */
+    showDeleteConfirmation(messageIds) {
+        const messageCount = messageIds.length;
+        const message = messageCount === 1 ? '确定要删除这条消息吗？' : `确定要删除选中的 ${messageCount} 条消息吗？`;
+        
+        if (confirm(message)) {
+            this.deleteMessages(messageIds);
+        }
+    }
+
+    /**
+     * 删除消息
+     */
+    async deleteMessages(messageIds) {
+        try {
+            if (messageIds.length === 1) {
+                await this.friendsApi.deleteMessage(messageIds[0]);
+            } else {
+                await this.friendsApi.deleteMessages(messageIds);
+            }
+
+            // 从DOM中移除消息元素
+            messageIds.forEach(messageId => {
+                const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+                if (messageElement) {
+                    messageElement.remove();
+                }
+            });
+
+            // 如果是选择模式，更新工具栏
+            if (this.selectionMode) {
+                this.updateDeleteToolbar();
+            }
+
+            console.log(`✅ 成功删除 ${messageIds.length} 条消息`);
+        } catch (error) {
+            console.error('❌ 删除消息失败:', error);
+            alert('删除消息失败，请重试');
+        }
+    }
+
+    /**
+     * 显示搜索对话框
+     */
+    showSearchDialog() {
+        if (!this.currentPrivateChat) {
+            alert('请先选择一个好友开始聊天');
+            return;
+        }
+
+        // 创建搜索对话框
+        const searchDialog = document.createElement('div');
+        searchDialog.className = 'modal fade';
+        searchDialog.innerHTML = `
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">搜索聊天记录</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="searchKeyword" placeholder="输入搜索关键词...">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">时间范围（可选）</label>
+                            <div class="row">
+                                <div class="col-6">
+                                    <input type="date" class="form-control" id="searchStartDate">
+                                </div>
+                                <div class="col-6">
+                                    <input type="date" class="form-control" id="searchEndDate">
+                                </div>
+                            </div>
+                        </div>
+                        <div id="searchResults" class="border rounded p-3" style="max-height: 300px; overflow-y: auto; display: none;">
+                            <!-- 搜索结果将在这里显示 -->
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" onclick="window.friendsManager.performSearch()">搜索</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(searchDialog);
+        
+        // 显示对话框
+        const modal = new bootstrap.Modal(searchDialog);
+        modal.show();
+
+        // 对话框关闭时移除DOM元素
+        searchDialog.addEventListener('hidden.bs.modal', () => {
+            document.body.removeChild(searchDialog);
+        });
+
+        // 回车搜索
+        const keywordInput = searchDialog.querySelector('#searchKeyword');
+        keywordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                this.performSearch();
+            }
+        });
+    }
+
+    /**
+     * 执行搜索
+     */
+    async performSearch() {
+        const keyword = document.getElementById('searchKeyword').value.trim();
+        const startDate = document.getElementById('searchStartDate').value;
+        const endDate = document.getElementById('searchEndDate').value;
+        const resultsDiv = document.getElementById('searchResults');
+
+        if (!keyword) {
+            alert('请输入搜索关键词');
+            return;
+        }
+
+        try {
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = '<div class="text-center"><div class="spinner"></div><p>搜索中...</p></div>';
+
+            const options = {};
+            if (startDate || endDate) {
+                options.dateRange = { start: startDate, end: endDate };
+            }
+
+            const response = await this.friendsApi.searchMessages(this.currentPrivateChat.friendId, keyword, options);
+            
+            if (response.data && response.data.messages) {
+                this.renderSearchResults(response.data.messages, keyword);
+            } else {
+                resultsDiv.innerHTML = '<div class="text-center text-muted"><p>没有找到匹配的消息</p></div>';
+            }
+        } catch (error) {
+            console.error('❌ 搜索失败:', error);
+            resultsDiv.innerHTML = '<div class="text-center text-danger"><p>搜索失败，请重试</p></div>';
+        }
+    }
+
+    /**
+     * 渲染搜索结果
+     */
+    renderSearchResults(messages, keyword) {
+        const resultsDiv = document.getElementById('searchResults');
+        const currentUserId = this.getCurrentUserId();
+
+        if (messages.length === 0) {
+            resultsDiv.innerHTML = '<div class="text-center text-muted"><p>没有找到匹配的消息</p></div>';
+            return;
+        }
+
+        const highlightKeyword = (text, keyword) => {
+            const regex = new RegExp(`(${keyword})`, 'gi');
+            return text.replace(regex, '<mark>$1</mark>');
+        };
+
+        resultsDiv.innerHTML = messages.map(message => {
+            const isCurrentUser = message.senderId === currentUserId;
+            const senderName = isCurrentUser ? '我' : message.senderInfo?.username || this.currentPrivateChat.friendName;
+            const highlightedContent = highlightKeyword(this.escapeHtml(message.content), keyword);
+            
+            return `
+                <div class="search-result-item mb-2 p-2 border rounded">
+                    <div class="d-flex justify-content-between">
+                        <small class="text-primary">${senderName}</small>
+                        <small class="text-muted">${this.formatTime(new Date(message.createdAt))}</small>
+                    </div>
+                    <div class="search-result-content">${highlightedContent}</div>
+                </div>
+            `;
+        }).join('');
+
+        console.log(`✅ 搜索完成，找到 ${messages.length} 条匹配的消息`);
     }
 
     /**
