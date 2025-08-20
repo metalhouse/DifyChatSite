@@ -415,9 +415,6 @@ class FriendsManager {
             new Date(a.createdAt) - new Date(b.createdAt)
         );
 
-        // 调试：检查消息数据结构
-        console.log('🔍 消息数据结构调试:', sortedMessages[0]);
-
         // 渲染消息
         chatMessages.innerHTML = sortedMessages.map(message => {
             const isCurrentUser = message.senderId === currentUserId;
@@ -426,9 +423,6 @@ class FriendsManager {
             
             // 兼容不同的ID字段名
             const messageId = message.id || message._id || message.messageId || message.message_id;
-            
-            // 调试：检查消息ID
-            console.log('🔍 消息ID调试:', messageId, '完整消息:', message);
             
             return `
                 <div class="message ${messageClass}" data-message-id="${messageId}">
@@ -1218,16 +1212,16 @@ class FriendsManager {
         contextMenu.className = 'message-context-menu';
         contextMenu.innerHTML = `
             <div class="dropdown-menu show" style="position: absolute; z-index: 1000;">
-                <button class="dropdown-item" onclick="window.friendsManager.toggleMessageSelection('${messageId}')">
+                <button class="dropdown-item" onclick="window.friendsManager.toggleMessageSelection('${messageId}'); window.friendsManager.closeContextMenu(this);">
                     <i class="fas fa-check-square"></i> 选择消息
                 </button>
                 ${isOwnMessage ? `
-                    <button class="dropdown-item text-danger" onclick="window.friendsManager.showDeleteConfirmation(['${messageId}'])">
+                    <button class="dropdown-item text-danger" onclick="window.friendsManager.showDeleteConfirmation(['${messageId}']); window.friendsManager.closeContextMenu(this);">
                         <i class="fas fa-trash"></i> 删除消息
                     </button>
                 ` : ''}
                 <div class="dropdown-divider"></div>
-                <button class="dropdown-item" onclick="window.friendsManager.enterSelectionMode()">
+                <button class="dropdown-item" onclick="window.friendsManager.enterSelectionMode(); window.friendsManager.closeContextMenu(this);">
                     <i class="fas fa-tasks"></i> 多选模式
                 </button>
             </div>
@@ -1247,6 +1241,16 @@ class FriendsManager {
             }
         };
         setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    }
+
+    /**
+     * 关闭右键菜单
+     */
+    closeContextMenu(buttonElement) {
+        const contextMenu = buttonElement.closest('.message-context-menu');
+        if (contextMenu) {
+            document.body.removeChild(contextMenu);
+        }
     }
 
     /**
@@ -1273,6 +1277,17 @@ class FriendsManager {
 
         // 显示工具栏
         this.showSelectionToolbar();
+        
+        // 显示快捷按钮
+        const quickDeleteBtn = document.getElementById('quickDeleteBtn');
+        const exitSelectionBtn = document.getElementById('exitSelectionBtn');
+        if (quickDeleteBtn) {
+            quickDeleteBtn.style.display = 'inline-block';
+            quickDeleteBtn.disabled = true; // 初始状态禁用
+        }
+        if (exitSelectionBtn) exitSelectionBtn.style.display = 'inline-block';
+        
+        console.log('✅ 进入多选模式');
     }
 
     /**
@@ -1289,6 +1304,14 @@ class FriendsManager {
 
         // 隐藏工具栏
         this.hideSelectionToolbar();
+        
+        // 隐藏快捷按钮
+        const quickDeleteBtn = document.getElementById('quickDeleteBtn');
+        const exitSelectionBtn = document.getElementById('exitSelectionBtn');
+        if (quickDeleteBtn) quickDeleteBtn.style.display = 'none';
+        if (exitSelectionBtn) exitSelectionBtn.style.display = 'none';
+        
+        console.log('✅ 退出多选模式');
     }
 
     /**
@@ -1322,9 +1345,15 @@ class FriendsManager {
                 </div>
             `;
             
-            const chatContainer = document.querySelector('.chat-container');
+            const chatContainer = document.querySelector('.chat-container') || document.querySelector('.chat-area');
             if (chatContainer) {
                 chatContainer.insertBefore(toolbar, chatContainer.firstChild);
+            } else {
+                // 备用方案：插入到聊天消息区域上方
+                const chatMessages = document.getElementById('chatMessages');
+                if (chatMessages && chatMessages.parentElement) {
+                    chatMessages.parentElement.insertBefore(toolbar, chatMessages);
+                }
             }
         }
         toolbar.style.display = 'block';
@@ -1349,6 +1378,7 @@ class FriendsManager {
         
         const countElement = document.getElementById('selectedCount');
         const deleteButton = document.querySelector('#messageSelectionToolbar .btn-danger');
+        const quickDeleteBtn = document.getElementById('quickDeleteBtn');
         
         if (countElement) {
             countElement.textContent = `已选择: ${selectedCount} 条`;
@@ -1356,6 +1386,15 @@ class FriendsManager {
         
         if (deleteButton) {
             deleteButton.disabled = selectedCount === 0;
+        }
+        
+        // 同时更新快捷删除按钮
+        if (quickDeleteBtn) {
+            quickDeleteBtn.disabled = selectedCount === 0;
+            quickDeleteBtn.textContent = selectedCount > 0 ? ` 删除 (${selectedCount})` : ' 删除';
+            quickDeleteBtn.innerHTML = selectedCount > 0 
+                ? `<i class="fas fa-trash"></i> 删除 (${selectedCount})`
+                : `<i class="fas fa-trash"></i> 删除`;
         }
     }
 

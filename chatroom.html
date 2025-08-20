@@ -1118,6 +1118,23 @@
             color: white;
             background-color: rgba(255, 255, 255, 0.1);
         }
+
+        /* 快捷删除按钮特殊样式 */
+        .private-chat-actions .btn-outline-danger {
+            border-color: rgba(220, 53, 69, 0.8);
+            color: rgba(220, 53, 69, 0.9);
+        }
+
+        .private-chat-actions .btn-outline-danger:hover:not(:disabled) {
+            border-color: #dc3545;
+            color: white;
+            background-color: #dc3545;
+        }
+
+        .private-chat-actions .btn-outline-danger:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -1282,6 +1299,13 @@
                         </button>
                         <button class="btn btn-outline-light btn-sm ms-2" onclick="window.friendsManager.enterSelectionMode()" title="管理消息">
                             <i class="fas fa-tasks"></i>
+                        </button>
+                        <!-- 多选模式下显示的按钮 -->
+                        <button class="btn btn-outline-danger btn-sm ms-2" id="quickDeleteBtn" style="display: none;" onclick="window.friendsManager.deleteSelectedMessages()" title="删除选中的消息">
+                            <i class="fas fa-trash"></i> 删除
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm ms-1" id="exitSelectionBtn" style="display: none;" onclick="window.friendsManager.exitSelectionMode()" title="退出选择模式">
+                            <i class="fas fa-times"></i>
                         </button>
                     </div>
                     
