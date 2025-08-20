@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP配置测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .config-info { background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>IP配置测试页面</h1>
+    
+    <div class="config-info">
+        <h3>当前环境信息</h3>
+        <p><strong>主机名:</strong> <span id="hostname">-</span></p>
+        <p><strong>完整地址:</strong> <span id="fullUrl">-</span></p>
+        <p><strong>端口:</strong> <span id="port">-</span></p>
+    </div>
+    
+    <div class="config-info">
+        <h3>配置信息</h3>
+        <p><strong>API Base URL:</strong> <span id="apiBaseUrl">-</span></p>
+        <p><strong>WebSocket URL:</strong> <span id="wsUrl">-</span></p>
+        <p><strong>示例API URL:</strong> <span id="sampleApiUrl">-</span></p>
+    </div>
+    
+    <button onclick="testBackendConnection()">测试后端连接</button>
+    <div id="testResults"></div>
+
+    <!-- 加载环境配置 -->
+    <script src="config/env.js"></script>
+    
+    <script>
+        // 显示环境信息
+        document.getElementById('hostname').textContent = window.location.hostname;
+        document.getElementById('fullUrl').textContent = window.location.href;
+        document.getElementById('port').textContent = window.location.port;
+        
+        // 等待配置加载
+        setTimeout(() => {
+            if (window.ENV_CONFIG) {
+                document.getElementById('apiBaseUrl').textContent = window.ENV_CONFIG.API_BASE_URL || 'N/A';
+                document.getElementById('wsUrl').textContent = window.ENV_CONFIG.getWsUrl() || 'N/A';
+                document.getElementById('sampleApiUrl').textContent = window.ENV_CONFIG.getApiUrl('/test') || 'N/A';
+            } else {
+                document.getElementById('apiBaseUrl').textContent = '配置未加载';
+            }
+        }, 100);
+        
+        async function testBackendConnection() {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<p>正在测试连接...</p>';
+            
+            if (!window.ENV_CONFIG) {
+                resultsDiv.innerHTML = '<div class="test-result error">❌ 环境配置未加载</div>';
+                return;
+            }
+            
+            const testUrl = window.ENV_CONFIG.getApiUrl('/health');
+            
+            try {
+                console.log('Testing connection to:', testUrl);
+                const response = await fetch(testUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 5000
+                });
+                
+                if (response.ok) {
+                    const data = await response.text();
+                    resultsDiv.innerHTML = `
+                        <div class="test-result success">
+                            ✅ 后端连接成功<br>
+                            状态码: ${response.status}<br>
+                            响应: ${data.substring(0, 100)}...
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="test-result warning">
+                            ⚠️ 后端响应异常<br>
+                            状态码: ${response.status}<br>
+                            URL: ${testUrl}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                resultsDiv.innerHTML = `
+                    <div class="test-result error">
+                        ❌ 连接失败<br>
+                        错误: ${error.message}<br>
+                        URL: ${testUrl}
+                    </div>
+                `;
+            }
+        }
+        
+        // 自动显示调试信息
+        console.log('=== IP配置测试页面 ===');
+        console.log('当前地址:', window.location.href);
+        console.log('主机名:', window.location.hostname);
+        console.log('端口:', window.location.port);
+    </script>
+</body>
+</html>

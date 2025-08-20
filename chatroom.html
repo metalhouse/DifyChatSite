@@ -60,9 +60,9 @@
             max-width: 100%;
         }
 
-        /* 侧边栏 - 房间列表 */
+        /* 侧边栏 - 聊天室和好友列表 */
         .room-sidebar {
-            width: clamp(250px, 25vw, 350px);
+            width: clamp(280px, 25vw, 380px);
             background: rgba(255, 255, 255, 0.95);
             border-right: 1px solid rgba(0, 0, 0, 0.1);
             display: flex;
@@ -71,25 +71,77 @@
         }
 
         .sidebar-header {
-            padding: clamp(0.5rem, 2vw, 1rem);
+            padding: clamp(0.5rem, 1.5vw, 0.75rem);
             border-bottom: 1px solid rgba(0, 0, 0, 0.1);
             background: transparent;
             color: #1A1A1A;
-            height: clamp(60px, 8vh, 80px);
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-shrink: 0;
         }
 
-        .sidebar-header h6 {
-            margin: 0;
-            font-weight: 600;
-            font-size: clamp(0.9rem, 2.5vw, 1.25rem);
-            line-height: 1.2;
-            color: #1A1A1A;
+        /* 侧边栏标签页 */
+        .sidebar-tabs {
+            border: none;
+            flex: 1;
         }
 
-        .create-room-btn {
+        .sidebar-tabs .nav-link {
+            border: none;
+            color: #666;
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            margin-right: 0.25rem;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-tabs .nav-link:hover {
+            background: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+        }
+
+        .sidebar-tabs .nav-link.active {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+        }
+
+        /* 好友tab通知红点 */
+        .friend-notification-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 8px;
+            height: 8px;
+            background: #dc3545;
+            border-radius: 50%;
+            border: 2px solid white;
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { 
+                transform: scale(1); 
+                opacity: 1; 
+            }
+            50% { 
+                transform: scale(1.2); 
+                opacity: 0.7; 
+            }
+            100% { 
+                transform: scale(1); 
+                opacity: 1; 
+            }
+        }
+
+        .sidebar-actions {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .create-btn {
             background: #28a745;
             color: white;
             border: none;
@@ -103,15 +155,176 @@
             transition: all 0.2s ease;
         }
 
-        .create-room-btn:hover {
+        .create-btn:hover {
             background: #20c997;
-            transform: scale(1.1);
+            transform: scale(1.05);
         }
 
-        .room-list {
+        /* 标签页内容区域 */
+        .tab-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .tab-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        /* 好友搜索 */
+        .friend-search {
+            padding: 0.75rem;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .friend-search .form-control {
+            border-radius: 20px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            font-size: 0.85rem;
+        }
+
+        .friend-search .form-control:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+        }
+
+        .friend-search .btn {
+            border-radius: 0 20px 20px 0;
+        }
+
+        /* 好友请求提示 */
+        .friend-requests-badge {
+            padding: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .friend-requests-badge .alert {
+            padding: 0.5rem;
+            margin: 0;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            border: none;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            color: #1565c0;
+        }
+
+        .room-list, .friend-list {
             flex: 1;
             overflow-y: auto;
             padding: 0.5rem;
+            min-height: 0;
+        }
+
+        /* 好友项目样式 */
+        .friend-item {
+            display: flex;
+            align-items: center;
+            padding: clamp(0.5rem, 1.5vw, 0.75rem);
+            margin-bottom: clamp(0.3rem, 1vw, 0.5rem);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid transparent;
+            color: #1A1A1A;
+            position: relative;
+        }
+
+        .friend-item:hover {
+            background: rgba(40, 167, 69, 0.1);
+            border-color: rgba(40, 167, 69, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .friend-item.active {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            color: white;
+            box-shadow: 0 4px 12px rgba(23, 162, 184, 0.3);
+        }
+
+        .friend-avatar {
+            width: clamp(40px, 6vw, 45px);
+            height: clamp(40px, 6vw, 45px);
+            border-radius: 50%;
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            margin-right: clamp(0.5rem, 1.5vw, 0.75rem);
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
+            position: relative;
+        }
+
+        .friend-item.active .friend-avatar {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .friend-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .friend-name {
+            font-weight: 600;
+            margin: 0;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            color: #1A1A1A;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .friend-item.active .friend-name {
+            color: white !important;
+        }
+
+        .friend-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 0.25rem;
+        }
+
+        .friend-status {
+            font-size: clamp(0.65rem, 1.8vw, 0.7rem);
+            opacity: 0.7;
+            color: #666;
+        }
+
+        .friend-item.active .friend-status {
+            color: rgba(255, 255, 255, 0.8) !important;
+        }
+
+        .online-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #28a745;
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            border: 2px solid white;
+        }
+
+        .offline-indicator {
+            background: #6c757d;
+        }
+
+        .unread-badge {
+            background: #dc3545;
+            color: white;
+            border-radius: 10px;
+            padding: 0.2rem 0.4rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            min-width: 18px;
+            text-align: center;
         }
 
         /* 房间项目 */
@@ -335,6 +548,20 @@
             justify-content: flex-start;
         }
 
+        /* 发送中消息样式 */
+        .message.sending {
+            opacity: 0.6;
+        }
+
+        .message.sending .message-bubble {
+            background: linear-gradient(135deg, #ffc107, #fd7e14) !important;
+        }
+
+        .message.sending .message-time {
+            color: #856404;
+            font-style: italic;
+        }
+
         .message-bubble {
             max-width: clamp(250px, 75vw, 600px);
             padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(0.75rem, 2vw, 1rem);
@@ -348,6 +575,22 @@
         .message-user .message-bubble {
             background: linear-gradient(135deg, #28a745, #20c997);
             color: white;
+        }
+
+        /* 发送中的消息样式 */
+        .message.sending .message-bubble {
+            opacity: 0.7;
+            background: linear-gradient(135deg, #6c757d, #495057) !important;
+        }
+
+        .message.sending .message-time {
+            font-style: italic;
+            animation: pulse-sending 1.5s infinite;
+        }
+
+        @keyframes pulse-sending {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
         }
 
         .message-other .message-bubble {
@@ -527,12 +770,141 @@
         }
 
         /* 加载状态 */
+        /* 模态框和好友功能样式 */
+        .user-search-result {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .user-search-result:hover {
+            background: rgba(40, 167, 69, 0.05);
+            border-color: #28a745;
+        }
+
+        .search-result-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #6c757d, #495057);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            margin-right: 0.75rem;
+            font-weight: 600;
+        }
+
+        .search-result-info {
+            flex: 1;
+        }
+
+        .search-result-name {
+            font-weight: 600;
+            margin: 0;
+            color: #212529;
+        }
+
+        .search-result-status {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+
+        .friend-request-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            background: white;
+            transition: all 0.2s ease;
+        }
+
+        .friend-request-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .request-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #17a2b8, #138496);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            margin-right: 1rem;
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+
+        .request-info {
+            flex: 1;
+        }
+
+        .request-name {
+            font-weight: 600;
+            margin: 0 0 0.25rem 0;
+            color: #212529;
+        }
+
+        .request-message {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin: 0 0 0.25rem 0;
+        }
+
+        .request-time {
+            font-size: 0.8rem;
+            color: #adb5bd;
+        }
+
+        .request-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.pending {
+            background: rgba(255, 193, 7, 0.2);
+            color: #856404;
+        }
+
+        .status-badge.accepted {
+            background: rgba(40, 167, 69, 0.2);
+            color: #155724;
+        }
+
+        .status-badge.declined {
+            background: rgba(220, 53, 69, 0.2);
+            color: #721c24;
+        }
+
+        .status-badge.none {
+            background: rgba(108, 117, 125, 0.2);
+            color: #495057;
+        }
+
         .loading {
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 2rem;
-            color: #666;
+            color: #6c757d;
         }
 
         .spinner {
@@ -738,21 +1110,75 @@
         <!-- 移动端侧边栏遮罩 -->
         <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
         
-        <!-- 房间列表侧边栏 -->
+        <!-- 聊天侧边栏 -->
         <div class="room-sidebar" id="roomSidebar">
+            <!-- 侧边栏标签头 -->
             <div class="sidebar-header">
-                <h6 class="mb-0">
-                    <i class="fas fa-comments me-2"></i>
-                    聊天室
-                </h6>
-                <button class="create-room-btn" onclick="showCreateRoomModal()" title="创建聊天室">
-                    <i class="fas fa-plus"></i>
-                </button>
+                <ul class="nav nav-tabs sidebar-tabs" id="sidebarTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="rooms-tab" data-bs-toggle="tab" data-bs-target="#rooms-panel" type="button" role="tab">
+                            <i class="fas fa-comments me-1"></i>
+                            <span class="d-none d-sm-inline">聊天室</span>
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="friends-tab" data-bs-toggle="tab" data-bs-target="#friends-panel" type="button" role="tab">
+                            <i class="fas fa-user-friends me-1"></i>
+                            <span class="d-none d-sm-inline">好友</span>
+                            <span class="friend-notification-badge" id="friendNotificationBadge" style="display: none;"></span>
+                        </button>
+                    </li>
+                </ul>
+                <div class="sidebar-actions">
+                    <button class="create-btn" id="createRoomBtn" onclick="showCreateRoomModal()" title="创建聊天室">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <button class="create-btn" id="addFriendBtn" onclick="showAddFriendModal()" title="添加好友" style="display:none;">
+                        <i class="fas fa-user-plus"></i>
+                    </button>
+                </div>
             </div>
-            <div class="room-list" id="roomList">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <span>加载聊天室...</span>
+
+            <!-- 标签页内容 -->
+            <div class="tab-content" id="sidebarTabContent">
+                <!-- 聊天室列表 -->
+                <div class="tab-pane fade show active" id="rooms-panel" role="tabpanel">
+                    <div class="room-list" id="roomList">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <span>加载聊天室...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 好友列表 -->
+                <div class="tab-pane fade" id="friends-panel" role="tabpanel">
+                    <!-- 好友搜索 -->
+                    <div class="friend-search">
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" id="friendSearchInput" placeholder="搜索好友...">
+                            <button class="btn btn-outline-secondary" type="button" id="friendSearchBtn">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 好友请求提示 -->
+                    <div class="friend-requests-badge" id="friendRequestsBadge" style="display:none;">
+                        <div class="alert alert-info alert-sm">
+                            <i class="fas fa-user-clock me-2"></i>
+                            <span id="requestsCount">0</span> 个好友请求
+                            <button class="btn btn-link btn-sm p-0 ms-2" onclick="showFriendRequestsModal()">查看</button>
+                        </div>
+                    </div>
+
+                    <!-- 好友列表 -->
+                    <div class="friend-list" id="friendList">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <span>加载好友列表...</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -865,6 +1291,96 @@
         </div>
     </div>
 
+    <!-- 添加好友模态框 -->
+    <div class="modal fade" id="addFriendModal" tabindex="-1" aria-labelledby="addFriendModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addFriendModalLabel">
+                        <i class="fas fa-user-plus me-2"></i>
+                        添加好友
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- 搜索用户 -->
+                    <div class="mb-3">
+                        <label for="userSearchInput" class="form-label">搜索用户</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="userSearchInput" placeholder="输入用户名搜索...">
+                            <button class="btn btn-outline-primary" type="button" id="userSearchBtn">
+                                <i class="fas fa-search"></i> 搜索
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 搜索结果 -->
+                    <div id="userSearchResults" style="display:none;">
+                        <h6 class="mb-3">搜索结果</h6>
+                        <div id="searchResultsList">
+                            <!-- 搜索结果将动态添加 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 好友请求管理模态框 -->
+    <div class="modal fade" id="friendRequestsModal" tabindex="-1" aria-labelledby="friendRequestsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="friendRequestsModalLabel">
+                        <i class="fas fa-user-clock me-2"></i>
+                        好友请求
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" id="requestTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="received-tab" data-bs-toggle="tab" data-bs-target="#received-requests" type="button" role="tab">
+                                <i class="fas fa-inbox me-1"></i>
+                                收到的请求
+                                <span class="badge bg-primary ms-2" id="receivedCount">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="sent-tab" data-bs-toggle="tab" data-bs-target="#sent-requests" type="button" role="tab">
+                                <i class="fas fa-paper-plane me-1"></i>
+                                发送的请求
+                                <span class="badge bg-secondary ms-2" id="sentCount">0</span>
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="requestTabContent">
+                        <!-- 收到的好友请求 -->
+                        <div class="tab-pane fade show active" id="received-requests" role="tabpanel">
+                            <div id="receivedRequestsList">
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    <span>加载中...</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 发送的好友请求 -->
+                        <div class="tab-pane fade" id="sent-requests" role="tabpanel">
+                            <div id="sentRequestsList">
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    <span>加载中...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- @智能体选择模态框 -->
     <div class="modal fade" id="mentionAgentModal" tabindex="-1" aria-labelledby="mentionAgentModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -905,6 +1421,12 @@
     <script src="js/utils/error-handler-simple.js"></script>
     <script src="js/services/auth-service-simple.js"></script>
     
+    <!-- 好友API服务 -->
+    <script src="js/api/friends-api.js"></script>
+    
+    <!-- 好友管理器 -->
+    <script src="js/services/friends-manager.js"></script>
+    
     <!-- 聊天室页面控制器 -->
     <script src="js/controllers/chatroom-controller.js"></script>
 
@@ -941,6 +1463,9 @@
                 return;
             }
 
+            // 初始化标签页切换处理
+            handleTabSwitch();
+
             // 等待环境配置加载完成后初始化
             waitForEnvConfig(function() {
                 try {
@@ -953,7 +1478,80 @@
                     showToast('聊天室初始化失败: ' + error.message, 'error');
                 }
             });
+
+            // 好友搜索功能
+            const userSearchBtn = document.getElementById('userSearchBtn');
+            const userSearchInput = document.getElementById('userSearchInput');
+            
+            if (userSearchBtn && userSearchInput) {
+                userSearchBtn.addEventListener('click', handleUserSearch);
+                userSearchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        handleUserSearch();
+                    }
+                });
+            }
+
+            // 好友列表搜索
+            const friendSearchBtn = document.getElementById('friendSearchBtn');
+            const friendSearchInput = document.getElementById('friendSearchInput');
+            
+            if (friendSearchBtn && friendSearchInput) {
+                friendSearchBtn.addEventListener('click', handleFriendSearch);
+                friendSearchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        handleFriendSearch();
+                    }
+                });
+            }
         });
+
+        // 用户搜索处理函数
+        async function handleUserSearch() {
+            const searchInput = document.getElementById('userSearchInput');
+            const searchResults = document.getElementById('userSearchResults');
+            const resultsList = document.getElementById('searchResultsList');
+            
+            if (!searchInput || !searchResults || !resultsList) return;
+            
+            const username = searchInput.value.trim();
+            if (!username) {
+                showToast('请输入用户名进行搜索', 'warning');
+                return;
+            }
+            
+            try {
+                resultsList.innerHTML = '<div class="loading"><div class="spinner"></div><span>搜索中...</span></div>';
+                searchResults.style.display = 'block';
+                
+                // 调用好友管理器的搜索功能
+                if (window.chatroomController && window.chatroomController.friendsManager) {
+                    await window.chatroomController.friendsManager.searchUsers(username, resultsList);
+                } else {
+                    throw new Error('好友管理器未初始化');
+                }
+            } catch (error) {
+                console.error('搜索用户失败:', error);
+                resultsList.innerHTML = '<div class="text-danger">搜索失败: ' + error.message + '</div>';
+            }
+        }
+
+        // 好友搜索处理函数
+        async function handleFriendSearch() {
+            const searchInput = document.getElementById('friendSearchInput');
+            if (!searchInput) return;
+            
+            const keyword = searchInput.value.trim();
+            
+            try {
+                if (window.chatroomController && window.chatroomController.friendsManager) {
+                    await window.chatroomController.friendsManager.searchFriends(keyword);
+                }
+            } catch (error) {
+                console.error('搜索好友失败:', error);
+                showToast('搜索好友失败: ' + error.message, 'error');
+            }
+        }
 
         // 侧边栏切换函数
         function toggleSidebar() {
@@ -968,8 +1566,59 @@
             modal.show();
         }
 
+        // 添加好友模态框
+        function showAddFriendModal() {
+            console.log('显示添加好友模态框');
+            const modal = new bootstrap.Modal(document.getElementById('addFriendModal'));
+            modal.show();
+            
+            // 清空搜索结果
+            document.getElementById('userSearchResults').style.display = 'none';
+            document.getElementById('userSearchInput').value = '';
+        }
+
+        // 显示好友请求模态框
+        function showFriendRequestsModal() {
+            console.log('显示好友请求模态框');
+            const modal = new bootstrap.Modal(document.getElementById('friendRequestsModal'));
+            modal.show();
+            
+            // 加载好友请求
+            if (window.chatroomController && window.chatroomController.friendsManager) {
+                window.chatroomController.friendsManager.loadFriendRequests();
+            }
+        }
+
+        // 标签页切换处理
+        function handleTabSwitch() {
+            const friendsTab = document.getElementById('friends-tab');
+            const roomsTab = document.getElementById('rooms-tab');
+            const createRoomBtn = document.getElementById('createRoomBtn');
+            const addFriendBtn = document.getElementById('addFriendBtn');
+            
+            if (friendsTab && roomsTab && createRoomBtn && addFriendBtn) {
+                friendsTab.addEventListener('shown.bs.tab', function () {
+                    createRoomBtn.style.display = 'none';
+                    addFriendBtn.style.display = 'block';
+                    
+                    // 加载好友列表
+                    if (window.chatroomController && window.chatroomController.friendsManager) {
+                        window.chatroomController.friendsManager.loadFriendsList();
+                        window.chatroomController.friendsManager.loadFriendRequests();
+                    }
+                });
+
+                roomsTab.addEventListener('shown.bs.tab', function () {
+                    createRoomBtn.style.display = 'block';
+                    addFriendBtn.style.display = 'none';
+                });
+            }
+        }
+
         // 全局函数供HTML调用
         window.showCreateRoomModal = showCreateRoomModal;
+        window.showAddFriendModal = showAddFriendModal;
+        window.showFriendRequestsModal = showFriendRequestsModal;
 
         // Toast通知函数
         function showToast(message, type = 'info') {

@@ -17,6 +17,9 @@ class ChatroomController {
         // 消息去重：记录已处理的消息ID
         this.processedMessages = new Set();
         
+        // 初始化好友管理器
+        this.friendsManager = null;
+        
         // DOM 元素
         this.elements = {
             roomList: document.getElementById('roomList'),
@@ -51,6 +54,10 @@ class ChatroomController {
         try {
             // 获取当前用户信息
             await this.loadUserInfo();
+            
+            // 初始化好友管理器
+            this.friendsManager = new FriendsManager(this);
+            await this.friendsManager.initialize();
             
             // 初始化WebSocket连接
             this.initializeWebSocket();
@@ -290,6 +297,22 @@ class ChatroomController {
         this.websocket.on('newMessage', (message) => {
             console.log('📨 [前端] 收到新消息 (兼容格式):', message);
             this.handleNewMessage(message);
+        });
+
+        // 私聊消息相关事件
+        this.websocket.on('private_message', (message) => {
+            console.log('📨 [前端] 收到私聊消息:', message);
+            this.handlePrivateMessage(message);
+        });
+
+        this.websocket.on('privateMessage', (message) => {
+            console.log('📨 [前端] 收到私聊消息 (兼容格式):', message);
+            this.handlePrivateMessage(message);
+        });
+
+        this.websocket.on('private-message-sent', (data) => {
+            console.log('✅ [前端] 私聊消息发送成功:', data);
+            this.handlePrivateMessageSent(data);
         });
 
         this.websocket.on('message', (message) => {
@@ -538,6 +561,11 @@ class ChatroomController {
             return; // 已在当前房间
         }
 
+        // 清除私聊状态
+        if (this.friendsManager) {
+            this.friendsManager.clearPrivateChat();
+        }
+
         console.log('📍 [前端] 加入房间:', roomId);
         
         // 查找房间信息
@@ -623,13 +651,21 @@ class ChatroomController {
      * 发送消息
      */
     sendMessage() {
-        if (!this.currentRoom) {
-            this.showError('请先选择一个聊天室');
+        const content = this.elements.messageInput.value.trim();
+        if (!content) {
             return;
         }
 
-        const content = this.elements.messageInput.value.trim();
-        if (!content) {
+        // 检查是否在私聊模式
+        if (this.friendsManager && this.friendsManager.isPrivateChatMode()) {
+            this.friendsManager.sendPrivateMessage(content);
+            this.elements.messageInput.value = '';
+            return;
+        }
+
+        // 群聊模式
+        if (!this.currentRoom) {
+            this.showError('请先选择一个聊天室');
             return;
         }
 
@@ -952,6 +988,57 @@ class ChatroomController {
             clearTimeout(this.typingTimer);
             this.typingTimer = null;
         }
+    }
+
+    /**
+     * 处理私聊消息
+     */
+    handlePrivateMessage(message) {
+        console.log('📨 [前端] 处理私聊消息:', message);
+        
+        // 如果当前正在与发送者私聊，直接显示消息
+        if (this.friendsManager && this.friendsManager.currentPrivateChat && 
+            this.friendsManager.currentPrivateChat.friendId === message.senderId) {
+            this.friendsManager.displayReceivedMessage(message);
+        }
+        
+        // 更新未读消息数
+        if (this.friendsManager) {
+            this.friendsManager.updateUnreadCount(message.senderId, 1);
+        }
+        
+        // 显示新消息提示（如果不在当前私聊窗口）
+        if (!this.friendsManager?.currentPrivateChat || 
+            this.friendsManager.currentPrivateChat.friendId !== message.senderId) {
+            this.showNewMessageNotification(message);
+        }
+    }
+
+    /**
+     * 处理私聊消息发送成功
+     */
+    handlePrivateMessageSent(data) {
+        console.log('✅ [前端] 私聊消息发送成功:', data);
+        
+        // 如果当前正在私聊窗口，显示发送成功的消息
+        if (this.friendsManager && this.friendsManager.currentPrivateChat && 
+            this.friendsManager.currentPrivateChat.friendId === data.receiverId) {
+            this.friendsManager.displaySentMessage(data);
+        }
+        
+        // 移除发送中状态
+        if (this.friendsManager) {
+            this.friendsManager.removeSendingMessage();
+        }
+    }
+
+    /**
+     * 显示新消息通知
+     */
+    showNewMessageNotification(message) {
+        // 简单的通知提示
+        const senderName = message.senderInfo?.nickname || message.senderInfo?.username || '好友';
+        this.showInfo(`${senderName} 发来新消息`);
     }
 
     /**
