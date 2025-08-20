@@ -222,8 +222,10 @@
             createDevToolsPanel();
             addKeyboardShortcuts();
             
-            // 显示开发工具提示
-            showConfigMessage('开发工具已加载，按 Ctrl+Shift+D 显示工具面板', 'info');
+            // 只在环境变量明确启用时才显示开发工具提示
+            if (window.ENV_CONFIG?.SHOW_DEV_TOOLS_NOTIFICATION) {
+                showConfigMessage('开发工具已加载，按 Ctrl+Shift+D 显示工具面板', 'info');
+            }
         }, 1000);
     }
 

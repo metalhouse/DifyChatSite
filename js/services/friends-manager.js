@@ -358,7 +358,7 @@ class FriendsManager {
             const response = await this.friendsApi.getChatHistory(friendId, 1, 50);
             
             if (response.data && response.data.messages) {
-                this.renderChatMessages(response.data.messages);
+                this.renderChatMessages(response.data.messages, friendId);
                 
                 // 注意：不在这里标记已读，由startPrivateChat统一处理
                 console.log(`✅ 加载了 ${response.data.messages.length} 条聊天记录`);
@@ -391,8 +391,10 @@ class FriendsManager {
 
     /**
      * 渲染聊天消息列表
+     * @param {Array} messages 消息数组
+     * @param {string} friendId 好友ID
      */
-    renderChatMessages(messages) {
+    renderChatMessages(messages, friendId) {
         const chatMessages = document.getElementById('chatMessages');
         if (!chatMessages || !Array.isArray(messages)) return;
 
@@ -424,6 +426,10 @@ class FriendsManager {
             // 兼容不同的ID字段名
             const messageId = message.id || message._id || message.messageId || message.message_id;
             
+            // 已读状态指示器（只对当前用户发送的消息显示）
+            const readStatusIndicator = isCurrentUser && message.isRead ? 
+                '<div class="message-read-status"><span class="message-read-indicator" title="对方已读"></span></div>' : '';
+            
             return `
                 <div class="message ${messageClass}" data-message-id="${messageId}">
                     <div class="message-select-wrapper">
@@ -440,6 +446,7 @@ class FriendsManager {
                                 </div>
                             </div>
                             <div class="message-content">${this.escapeHtml(message.content)}</div>
+                            ${readStatusIndicator}
                         </div>
                     </div>
                 </div>
@@ -449,6 +456,13 @@ class FriendsManager {
         // 重置事件附加标志并附加事件
         this.eventsAttached = false;
         this.attachMessageEvents();
+
+        // 加载已读状态（异步加载，不阻塞消息显示）
+        if (friendId) {
+            this.loadMessageReadStatus(friendId, sortedMessages);
+        } else if (this.currentPrivateChat?.friendId) {
+            this.loadMessageReadStatus(this.currentPrivateChat.friendId, sortedMessages);
+        }
 
         // 滚动到底部
         setTimeout(() => {
@@ -1496,6 +1510,68 @@ class FriendsManager {
             checkbox.checked = false;
         });
         this.updateDeleteToolbar();
+    }
+
+    /**
+     * 加载消息的已读状态
+     * @param {string} friendId 好友ID
+     * @param {Array} messages 消息列表
+     */
+    async loadMessageReadStatus(friendId, messages) {
+        try {
+            const currentUserId = this.getCurrentUserId();
+            
+            // 只获取当前用户发送的消息的已读状态
+            const userMessages = messages.filter(msg => msg.senderId === currentUserId);
+            if (userMessages.length === 0) return;
+            
+            const messageIds = userMessages.map(msg => msg.id || msg._id || msg.messageId || msg.message_id);
+            
+            // 调用API获取已读状态
+            const response = await this.friendsApi.getMessageReadStatus(friendId, messageIds);
+            
+            if (response.success && response.data) {
+                this.updateMessageReadIndicators(response.data);
+            }
+        } catch (error) {
+            console.error('❌ 加载消息已读状态失败:', error.message);
+        }
+    }
+
+    /**
+     * 更新消息的已读指示器
+     * @param {Object} readStatusData 已读状态数据
+     */
+    updateMessageReadIndicators(readStatusData) {
+        Object.entries(readStatusData).forEach(([messageId, isRead]) => {
+            if (isRead) {
+                this.addReadIndicator(messageId);
+            }
+        });
+    }
+
+    /**
+     * 为消息添加已读指示器
+     * @param {string} messageId 消息ID
+     */
+    addReadIndicator(messageId) {
+        const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (!messageElement || !messageElement.classList.contains('message-user')) return;
+        
+        // 检查是否已经有已读指示器
+        const existingIndicator = messageElement.querySelector('.message-read-status');
+        if (existingIndicator) return;
+        
+        // 创建已读指示器
+        const readIndicator = document.createElement('div');
+        readIndicator.className = 'message-read-status';
+        readIndicator.innerHTML = '<span class="message-read-indicator" title="对方已读"></span>';
+        
+        // 添加到消息气泡中
+        const messageBubble = messageElement.querySelector('.message-bubble');
+        if (messageBubble) {
+            messageBubble.appendChild(readIndicator);
+        }
     }
 
     /**

@@ -635,6 +635,57 @@
             margin-bottom: 0.25rem;
         }
 
+        /* 消息已读状态指示器 */
+        .message-read-status {
+            position: relative;
+            display: inline-block;
+            margin-left: 0.5rem;
+        }
+
+        .message-read-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #28a745;
+            display: inline-block;
+            position: relative;
+            animation: read-pulse 2s ease-in-out;
+        }
+
+        @keyframes read-pulse {
+            0% {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .message-read-indicator::after {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.8);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* 只在用户自己发送的消息上显示已读指示器 */
+        .message-user .message-read-status {
+            position: absolute;
+            bottom: 4px;
+            right: 8px;
+        }
+
         .reply-preview {
             background: rgba(0, 0, 0, 0.1);
             padding: 0.25rem 0.5rem;

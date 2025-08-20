@@ -318,6 +318,12 @@ class ChatroomController {
             this.handlePrivateMessageSent(data);
         });
 
+        // 监听消息已读状态更新
+        this.websocket.on('message-read', (data) => {
+            console.log('👀 [前端] 消息已读状态更新:', data);
+            this.handleMessageRead(data);
+        });
+
         this.websocket.on('message', (message) => {
             console.log('📨 [前端] 收到新消息 (简单格式):', message);
             this.handleNewMessage(message);
@@ -1032,6 +1038,18 @@ class ChatroomController {
         // 移除发送中状态
         if (this.friendsManager) {
             this.friendsManager.removeSendingMessage();
+        }
+    }
+
+    /**
+     * 处理消息已读状态更新
+     */
+    handleMessageRead(data) {
+        console.log('👀 [前端] 处理消息已读状态:', data);
+        
+        if (this.friendsManager && data.messageId) {
+            // 为消息添加已读指示器
+            this.friendsManager.addReadIndicator(data.messageId);
         }
     }
 

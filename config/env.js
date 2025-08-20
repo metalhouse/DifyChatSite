@@ -37,6 +37,7 @@ const developmentConfig = {
   ENABLE_WEBSOCKET: true,
   ENABLE_ENCRYPTION: true,
   DEBUG_MODE: true,
+  SHOW_DEV_TOOLS_NOTIFICATION: false, // 是否显示开发工具通知
   
   // 超时配置 - 基于指南第3.6节按场景区分
   API_TIMEOUT: 30000,        // 通用API超时 30秒
@@ -63,6 +64,7 @@ const productionConfig = {
   ENABLE_WEBSOCKET: true,
   ENABLE_ENCRYPTION: true,
   DEBUG_MODE: false,
+  SHOW_DEV_TOOLS_NOTIFICATION: false, // 是否显示开发工具通知
   
   // 超时配置 - 生产环境可能需要更长超时
   API_TIMEOUT: 30000,        // 通用API超时 30秒

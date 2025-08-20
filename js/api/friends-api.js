@@ -24,6 +24,7 @@ class FriendsApiService {
                 HISTORY: '/api/friends/messages/history',
                 MARK_READ: '/api/friends/messages/mark-read',
                 UNREAD_COUNTS: '/api/friends/messages/unread-counts',
+                READ_STATUS: '/api/friends/messages/read-status',
                 DELETE: '/api/friends/messages',
                 SEARCH: '/api/friends/messages/search'
             },
@@ -504,6 +505,23 @@ class FriendsApiService {
             return response;
         } catch (error) {
             console.error('❌ 标记消息已读失败:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 获取消息的已读状态
+     * @param {string} friendId 好友ID
+     * @param {Array} messageIds 消息ID数组
+     * @returns {Promise<Object>} 已读状态信息
+     */
+    async getMessageReadStatus(friendId, messageIds) {
+        try {
+            const url = `${this.endpoints.MESSAGES.READ_STATUS}?friendId=${friendId}&messageIds=${messageIds.join(',')}`;
+            const response = await this.request('GET', url);
+            return response;
+        } catch (error) {
+            console.error('❌ 获取消息已读状态失败:', error.message);
             throw error;
         }
     }
