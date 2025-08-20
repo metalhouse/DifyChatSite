@@ -76,7 +76,7 @@ class FriendsApiService {
             headers: this.getHeaders()
         };
 
-        if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+        if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE')) {
             config.body = JSON.stringify(data);
         }
 
@@ -534,10 +534,7 @@ class FriendsApiService {
     async deleteMessage(messageId) {
         try {
             const url = `${this.endpoints.MESSAGES.DELETE}/${messageId}`;
-            
-            console.log(`🗑️ 删除消息: ${messageId}`);
             const response = await this.request('DELETE', url);
-            console.log('✅ 消息删除成功');
             return response;
         } catch (error) {
             console.error('❌ 删除消息失败:', error.message);
@@ -554,10 +551,7 @@ class FriendsApiService {
         try {
             const url = `${this.endpoints.MESSAGES.DELETE}/batch`;
             const data = { messageIds };
-            
-            console.log(`🗑️ 批量删除消息: ${messageIds.length} 条`);
             const response = await this.request('DELETE', url, data);
-            console.log('✅ 批量删除消息成功');
             return response;
         } catch (error) {
             console.error('❌ 批量删除消息失败:', error.message);

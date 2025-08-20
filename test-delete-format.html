@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>消息删除功能测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>消息删除功能测试</h1>
+    <div id="test-results"></div>
+
+    <script>
+        // 模拟测试环境
+        window.ENV_CONFIG = { API_BASE_URL: 'http://localhost:4005' };
+        
+        function addTestResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            document.getElementById('test-results').appendChild(div);
+        }
+
+        // 测试数据格式
+        function testDeleteMessageFormat() {
+            addTestResult('开始测试删除消息数据格式...', 'info');
+            
+            // 测试单个消息ID
+            const singleId = ['msg123'];
+            addTestResult(`单个消息ID格式: ${JSON.stringify(singleId)}`, 'success');
+            
+            // 测试多个消息ID
+            const multipleIds = ['msg123', 'msg456', 'msg789'];
+            addTestResult(`多个消息ID格式: ${JSON.stringify(multipleIds)}`, 'success');
+            
+            // 测试批量删除请求体
+            const batchData = { messageIds: multipleIds };
+            addTestResult(`批量删除请求体: ${JSON.stringify(batchData)}`, 'success');
+            
+            addTestResult('数据格式测试完成！', 'success');
+        }
+
+        // 运行测试
+        testDeleteMessageFormat();
+    </script>
+</body>
+</html>

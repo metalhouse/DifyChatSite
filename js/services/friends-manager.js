@@ -1236,18 +1236,41 @@ class FriendsManager {
         contextMenu.className = 'message-context-menu';
         contextMenu.innerHTML = `
             <div class="dropdown-menu show" style="position: absolute; z-index: 1000;">
-                <button class="dropdown-item" onclick="window.friendsManager.toggleMessageSelection('${messageId}'); window.friendsManager.closeContextMenu(this);">
+                <button class="dropdown-item" data-action="select" data-message-id="${messageId}">
                     <i class="fas fa-check-square"></i> 选择消息
                 </button>
-                <button class="dropdown-item text-danger" onclick="window.friendsManager.showDeleteConfirmation(['${messageId}']); window.friendsManager.closeContextMenu(this);">
+                <button class="dropdown-item text-danger" data-action="delete" data-message-id="${messageId}">
                     <i class="fas fa-trash"></i> 删除消息
                 </button>
                 <div class="dropdown-divider"></div>
-                <button class="dropdown-item" onclick="window.friendsManager.enterSelectionMode(); window.friendsManager.closeContextMenu(this);">
+                <button class="dropdown-item" data-action="multi-select">
                     <i class="fas fa-tasks"></i> 多选模式
                 </button>
             </div>
         `;
+
+        // 添加事件监听器
+        contextMenu.addEventListener('click', (e) => {
+            const button = e.target.closest('button');
+            if (!button) return;
+
+            const action = button.dataset.action;
+            const msgId = button.dataset.messageId;
+
+            switch (action) {
+                case 'select':
+                    this.toggleMessageSelection(msgId);
+                    break;
+                case 'delete':
+                    this.showDeleteConfirmation([msgId]);
+                    break;
+                case 'multi-select':
+                    this.enterSelectionMode();
+                    break;
+            }
+            
+            this.closeContextMenu(button);
+        });
 
         // 定位菜单并防止超出屏幕
         contextMenu.style.position = 'fixed';
@@ -1486,8 +1509,6 @@ class FriendsManager {
             .map(cb => cb.dataset.messageId)
             .filter(id => id && id !== 'undefined' && id !== 'null');
         
-        console.log('🔍 选中的消息ID:', messageIds);
-        
         if (messageIds.length > 0) {
             this.showDeleteConfirmation(messageIds);
         } else {
@@ -1512,6 +1533,17 @@ class FriendsManager {
      */
     async deleteMessages(messageIds) {
         try {
+            // 记录要删除的消息详情
+            const messageElements = messageIds.map(id => {
+                const element = document.querySelector(`[data-message-id="${id}"]`);
+                return {
+                    id,
+                    exists: !!element,
+                    isOwnMessage: element ? element.classList.contains('message-user') : false,
+                    element: element
+                };
+            });
+
             if (messageIds.length === 1) {
                 await this.friendsApi.deleteMessage(messageIds[0]);
             } else {
@@ -1519,10 +1551,12 @@ class FriendsManager {
             }
 
             // 从DOM中移除消息元素
+            let removedCount = 0;
             messageIds.forEach(messageId => {
                 const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
                 if (messageElement) {
                     messageElement.remove();
+                    removedCount++;
                 }
             });
 
@@ -1531,10 +1565,39 @@ class FriendsManager {
                 this.updateDeleteToolbar();
             }
 
-            console.log(`✅ 成功删除 ${messageIds.length} 条消息`);
+            // 显示成功提示
+            if (removedCount > 0) {
+                const message = removedCount === 1 ? '消息删除成功' : `成功删除 ${removedCount} 条消息`;
+                showToast(message, 'success');
+            }
+
         } catch (error) {
             console.error('❌ 删除消息失败:', error);
-            alert('删除消息失败，请重试');
+            
+            // 根据错误类型提供具体的用户提示
+            let errorMessage = '删除消息失败';
+            
+            if (error.message.includes('网络错误') || error.message.includes('fetch')) {
+                errorMessage = '网络连接失败，请检查网络后重试';
+            } else if (error.message.includes('未授权') || error.message.includes('401')) {
+                errorMessage = '登录已过期，请重新登录';
+                setTimeout(() => {
+                    window.location.href = './login.html';
+                }, 2000);
+            } else if (error.message.includes('权限') || error.message.includes('403')) {
+                errorMessage = '权限不足，无法删除此消息';
+            } else if (error.message.includes('不存在') || error.message.includes('404')) {
+                errorMessage = '消息不存在或已被删除';
+                // 如果消息不存在，仍然从DOM中移除
+                messageIds.forEach(messageId => {
+                    const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+                    if (messageElement) {
+                        messageElement.remove();
+                    }
+                });
+            }
+            
+            alert(errorMessage);
         }
     }
 
