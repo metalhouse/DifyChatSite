@@ -1175,9 +1175,21 @@ class FriendsManager {
             const messageElement = e.target.closest('.message');
             if (messageElement) {
                 e.preventDefault();
+                // 先关闭所有现有的右键菜单
+                this.closeAllContextMenus();
                 this.showMessageContextMenu(e, messageElement);
             }
         });
+
+        // 全局点击事件：点击其他地方关闭右键菜单
+        if (!this.globalClickAttached) {
+            this.globalClickAttached = true;
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.message-context-menu')) {
+                    this.closeAllContextMenus();
+                }
+            });
+        }
 
         // 删除按钮点击事件
         chatMessages.addEventListener('click', (e) => {
@@ -1203,7 +1215,19 @@ class FriendsManager {
      * 显示消息右键菜单
      */
     showMessageContextMenu(event, messageElement) {
+        // 防抖：如果刚刚显示过菜单，则忽略
+        const now = Date.now();
+        if (this.lastMenuTime && now - this.lastMenuTime < 100) {
+            return;
+        }
+        this.lastMenuTime = now;
+        
         const messageId = messageElement.dataset.messageId;
+        if (!messageId || messageId === 'undefined') {
+            console.warn('⚠️ 无效的消息ID，无法显示右键菜单');
+            return;
+        }
+        
         const currentUserId = this.getCurrentUserId();
         const isOwnMessage = messageElement.classList.contains('message-user');
 
@@ -1215,11 +1239,9 @@ class FriendsManager {
                 <button class="dropdown-item" onclick="window.friendsManager.toggleMessageSelection('${messageId}'); window.friendsManager.closeContextMenu(this);">
                     <i class="fas fa-check-square"></i> 选择消息
                 </button>
-                ${isOwnMessage ? `
-                    <button class="dropdown-item text-danger" onclick="window.friendsManager.showDeleteConfirmation(['${messageId}']); window.friendsManager.closeContextMenu(this);">
-                        <i class="fas fa-trash"></i> 删除消息
-                    </button>
-                ` : ''}
+                <button class="dropdown-item text-danger" onclick="window.friendsManager.showDeleteConfirmation(['${messageId}']); window.friendsManager.closeContextMenu(this);">
+                    <i class="fas fa-trash"></i> 删除消息
+                </button>
                 <div class="dropdown-divider"></div>
                 <button class="dropdown-item" onclick="window.friendsManager.enterSelectionMode(); window.friendsManager.closeContextMenu(this);">
                     <i class="fas fa-tasks"></i> 多选模式
@@ -1227,30 +1249,56 @@ class FriendsManager {
             </div>
         `;
 
-        // 定位菜单
-        contextMenu.style.left = event.clientX + 'px';
-        contextMenu.style.top = event.clientY + 'px';
+        // 定位菜单并防止超出屏幕
+        contextMenu.style.position = 'fixed';
         
+        // 临时添加到页面以获取尺寸
+        contextMenu.style.visibility = 'hidden';
         document.body.appendChild(contextMenu);
+        
+        const menuRect = contextMenu.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // 计算菜单位置，防止超出边界
+        let left = event.clientX;
+        let top = event.clientY;
+        
+        if (left + menuRect.width > viewportWidth) {
+            left = viewportWidth - menuRect.width - 10;
+        }
+        
+        if (top + menuRect.height > viewportHeight) {
+            top = viewportHeight - menuRect.height - 10;
+        }
+        
+        contextMenu.style.left = left + 'px';
+        contextMenu.style.top = top + 'px';
+        contextMenu.style.visibility = 'visible';
+    }
 
-        // 点击其他地方关闭菜单
-        const closeMenu = (e) => {
-            if (!contextMenu.contains(e.target)) {
-                document.body.removeChild(contextMenu);
-                document.removeEventListener('click', closeMenu);
+    /**
+     * 关闭所有右键菜单
+     */
+    closeAllContextMenus() {
+        const contextMenus = document.querySelectorAll('.message-context-menu');
+        contextMenus.forEach(menu => {
+            if (document.body.contains(menu)) {
+                try {
+                    document.body.removeChild(menu);
+                } catch (error) {
+                    console.warn('右键菜单已被移除:', error);
+                }
             }
-        };
-        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+        });
     }
 
     /**
      * 关闭右键菜单
      */
     closeContextMenu(buttonElement) {
-        const contextMenu = buttonElement.closest('.message-context-menu');
-        if (contextMenu) {
-            document.body.removeChild(contextMenu);
-        }
+        // 直接关闭所有右键菜单
+        this.closeAllContextMenus();
     }
 
     /**
@@ -1270,9 +1318,15 @@ class FriendsManager {
     enterSelectionMode() {
         this.selectionMode = true;
         
-        // 显示所有复选框
+        // 关闭右键菜单
+        this.closeAllContextMenus();
+        
+        // 显示所有复选框，允许选择所有消息
         document.querySelectorAll('.message-checkbox').forEach(checkbox => {
             checkbox.style.display = 'block';
+            checkbox.disabled = false;
+            checkbox.style.opacity = '1';
+            checkbox.title = '';
         });
 
         // 显示工具栏
@@ -1295,6 +1349,9 @@ class FriendsManager {
      */
     exitSelectionMode() {
         this.selectionMode = false;
+        
+        // 关闭右键菜单
+        this.closeAllContextMenus();
         
         // 隐藏所有复选框
         document.querySelectorAll('.message-checkbox').forEach(checkbox => {
@@ -1423,10 +1480,18 @@ class FriendsManager {
      */
     deleteSelectedMessages() {
         const selectedCheckboxes = document.querySelectorAll('.message-checkbox:checked');
-        const messageIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.messageId);
+        
+        // 获取消息ID
+        const messageIds = Array.from(selectedCheckboxes)
+            .map(cb => cb.dataset.messageId)
+            .filter(id => id && id !== 'undefined' && id !== 'null');
+        
+        console.log('🔍 选中的消息ID:', messageIds);
         
         if (messageIds.length > 0) {
             this.showDeleteConfirmation(messageIds);
+        } else {
+            alert('未选择有效的消息');
         }
     }
 
