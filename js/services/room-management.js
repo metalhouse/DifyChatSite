@@ -218,21 +218,21 @@ class RoomManagementService {
             };
 
             const response = await httpClient.get(
-                API_ENDPOINTS.CHAT_ROOMS.MEMBERS.LIST.replace(':roomId', roomId),
+                API_ENDPOINTS.CHAT_ROOMS.MEMBERS.replace('{id}', roomId),
                 { params }
             );
 
             // 缓存成员列表
             this.roomMembers.set(roomId, {
-                data: response.data.members,
+                data: response.data.members || response.data,
                 cachedAt: Date.now()
             });
 
             if (ENV_CONFIG.isDebug()) {
-                console.log('👥 获取房间成员:', roomId, response.data.total);
+                console.log('👥 获取房间成员:', roomId, response.data.total || response.data.length);
             }
 
-            return response.data;
+            return response.data.members || response.data;
         } catch (error) {
             console.error('❌ 获取房间成员失败:', error.message);
             throw error;
@@ -250,22 +250,50 @@ class RoomManagementService {
         try {
             if (ENV_CONFIG.isDebug()) {
                 console.log('📧 邀请用户加入房间:', { roomId, userIds, role });
+                console.log('📤 请求数据结构:', {
+                    endpoint: API_ENDPOINTS.FRIENDS.INVITE_TO_ROOM,
+                    requestBody: {
+                        roomId: roomId,
+                        friendIds: userIds,
+                        // 尝试不同的参数名
+                        room_id: roomId,
+                        friend_ids: userIds
+                    }
+                });
             }
 
+            // 使用好友API端点邀请用户到房间（后端已修复参数兼容性）
+            const requestData = {
+                roomId: roomId,
+                friendIds: userIds
+            };
+            
+            // 确保参数不为空
+            if (!roomId || !userIds || userIds.length === 0) {
+                throw new Error('房间ID或好友列表为空');
+            }
+            
+            console.log('🚀 最终发送的请求数据:', requestData);
+            console.log('🌐 API端点:', API_ENDPOINTS.FRIENDS.INVITE_TO_ROOM);
+            
             const response = await httpClient.post(
-                API_ENDPOINTS.CHAT_ROOMS.MEMBERS.INVITE.replace(':roomId', roomId),
-                {
-                    userIds,
-                    role
-                }
+                API_ENDPOINTS.FRIENDS.INVITE_TO_ROOM,
+                requestData
             );
+
+            // 检查响应是否成功
+            if (response && response.success === false) {
+                // API返回了错误
+                throw new Error(response.message || '邀请失败');
+            }
 
             // 清除成员缓存，强制重新获取
             this.roomMembers.delete(roomId);
 
-            return response.data;
+            return response;
         } catch (error) {
             console.error('❌ 邀请用户失败:', error.message);
+            console.error('❌ 完整错误信息:', error);
             throw error;
         }
     }
@@ -283,9 +311,10 @@ class RoomManagementService {
             }
 
             await httpClient.delete(
-                API_ENDPOINTS.CHAT_ROOMS.MEMBERS.REMOVE
-                    .replace(':roomId', roomId)
-                    .replace(':userId', userId)
+                API_ENDPOINTS.CHAT_ROOMS.KICK.replace('{id}', roomId),
+                {
+                    data: { userId }
+                }
             );
 
             // 清除成员缓存

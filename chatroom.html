@@ -1186,6 +1186,145 @@
             opacity: 0.5;
             cursor: not-allowed;
         }
+
+        /* 房间成员管理相关样式 */
+        .room-members-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .member-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .member-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-color: #28a745;
+        }
+
+        .member-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+
+        .member-info {
+            flex: 1;
+        }
+
+        .member-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 2px;
+        }
+
+        .member-role {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .member-role.admin {
+            color: #dc3545;
+        }
+
+        .member-role.moderator {
+            color: #fd7e14;
+        }
+
+        .member-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .friends-to-invite-list {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .friend-invite-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .friend-invite-item:hover {
+            background-color: #f8f9fa;
+            border-color: #28a745;
+        }
+
+        .friend-invite-item.selected {
+            background-color: #d4edda;
+            border-color: #28a745;
+        }
+
+        .friend-avatar {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #6c757d, #495057);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .selected-friends-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .selected-friend-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            background-color: #28a745;
+            color: white;
+            border-radius: 20px;
+            font-size: 0.8rem;
+        }
+
+        .selected-friend-tag .remove-btn {
+            margin-left: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .member-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-left: 8px;
+        }
+
+        .member-status.online {
+            background-color: #28a745;
+        }
+
+        .member-status.offline {
+            background-color: #6c757d;
+        }
     </style>
 </head>
 <body>
@@ -1341,6 +1480,9 @@
                         <div class="member-avatars" id="memberAvatars">
                             <!-- 在线成员头像将动态添加 -->
                         </div>
+                        <button class="btn btn-outline-light btn-sm ms-2" onclick="showRoomMembersModal()" title="管理房间成员" id="manageMembersBtn">
+                            <i class="fas fa-cog"></i>
+                        </button>
                     </div>
                     
                     <!-- 私聊模式：搜索和管理按钮 -->
@@ -1559,6 +1701,93 @@
         </div>
     </div>
 
+    <!-- 房间成员管理模态框 -->
+    <div class="modal fade" id="roomMembersModal" tabindex="-1" aria-labelledby="roomMembersModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="roomMembersModalLabel">
+                        <i class="fas fa-users me-2"></i>房间成员管理
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- 功能标签页 -->
+                    <ul class="nav nav-tabs mb-3" id="memberManagementTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="members-list-tab" data-bs-toggle="tab" data-bs-target="#members-list" type="button" role="tab">
+                                <i class="fas fa-users me-1"></i>
+                                当前成员
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="invite-friends-tab" data-bs-toggle="tab" data-bs-target="#invite-friends" type="button" role="tab">
+                                <i class="fas fa-user-plus me-1"></i>
+                                邀请好友
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="memberManagementTabContent">
+                        <!-- 当前成员标签页 -->
+                        <div class="tab-pane fade show active" id="members-list" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="text-muted">房间成员列表</span>
+                                <button class="btn btn-outline-primary btn-sm" onclick="refreshRoomMembers()">
+                                    <i class="fas fa-sync-alt me-1"></i>刷新
+                                </button>
+                            </div>
+                            <div class="room-members-list" id="roomMembersList">
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    <span>加载成员列表...</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 邀请好友标签页 -->
+                        <div class="tab-pane fade" id="invite-friends" role="tabpanel">
+                            <div class="mb-3">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="inviteFriendSearch" placeholder="搜索好友...">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="searchFriendsToInvite()">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="selected-friends mb-3" id="selectedFriendsContainer" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="text-muted">已选择的好友:</span>
+                                    <button class="btn btn-link btn-sm p-0" onclick="clearSelectedFriends()">清空选择</button>
+                                </div>
+                                <div class="selected-friends-list" id="selectedFriendsList"></div>
+                            </div>
+                            
+                            <div class="friends-to-invite-list" id="friendsToInviteList">
+                                <div class="loading">
+                                    <div class="spinner"></div>
+                                    <span>加载好友列表...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="d-flex justify-content-between w-100">
+                        <div id="inviteActionButtons" style="display: none;">
+                            <button type="button" class="btn btn-success" onclick="inviteSelectedFriends()" id="inviteBtn">
+                                <i class="fas fa-paper-plane me-1"></i>
+                                邀请选中的好友 (<span id="selectedCount">0</span>)
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
@@ -1576,6 +1805,9 @@
     <script src="js/utils/token-manager.js"></script>
     <script src="js/utils/error-handler-simple.js"></script>
     <script src="js/services/auth-service-simple.js"></script>
+    
+    <!-- 房间管理服务 (ES模块) -->
+    <script type="module" src="js/services/room-management.js"></script>
     
     <!-- 好友API服务 -->
     <script src="js/api/friends-api.js"></script>
@@ -1778,6 +2010,393 @@
         window.showCreateRoomModal = showCreateRoomModal;
         window.showAddFriendModal = showAddFriendModal;
         window.showFriendRequestsModal = showFriendRequestsModal;
+        
+        // 房间成员管理功能
+        let selectedFriends = [];
+        let currentRoomMembers = [];
+        
+        // 显示房间成员管理模态框
+        function showRoomMembersModal() {
+            const modal = new bootstrap.Modal(document.getElementById('roomMembersModal'));
+            modal.show();
+            
+            // 加载房间成员列表
+            loadRoomMembers();
+            // 加载可邀请的好友列表
+            loadFriendsToInvite();
+        }
+        
+        // 加载房间成员列表
+        async function loadRoomMembers() {
+            const membersList = document.getElementById('roomMembersList');
+            
+            if (!window.chatroomController?.currentRoom?.id) {
+                membersList.innerHTML = '<div class="text-muted">请先选择一个聊天室</div>';
+                return;
+            }
+            
+            try {
+                membersList.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <span>加载成员列表...</span>
+                    </div>
+                `;
+                
+                const roomService = window.chatroomController.roomManagementService;
+                if (!roomService) {
+                    throw new Error('房间管理服务未初始化');
+                }
+                
+                const members = await roomService.getRoomMembers(window.chatroomController.currentRoom.id);
+                currentRoomMembers = members;
+                renderRoomMembers(members);
+                
+            } catch (error) {
+                console.error('加载房间成员失败:', error);
+                membersList.innerHTML = `<div class="text-danger">加载成员列表失败: ${error.message}</div>`;
+            }
+        }
+        
+        // 渲染房间成员列表
+        function renderRoomMembers(members) {
+            const membersList = document.getElementById('roomMembersList');
+            
+            if (!members || members.length === 0) {
+                membersList.innerHTML = '<div class="text-muted">暂无成员</div>';
+                return;
+            }
+            
+            const membersHTML = members.map(member => {
+                const initial = (member.username || '?').charAt(0).toUpperCase();
+                const isCurrentUser = member.userId === window.chatroomController?.currentUser?.id;
+                const canKick = !isCurrentUser && (member.role !== 'admin');
+                
+                return `
+                    <div class="member-item">
+                        <div class="member-avatar">${initial}</div>
+                        <div class="member-info">
+                            <div class="member-name">${member.username || '未知用户'}</div>
+                            <div class="member-role ${member.role || 'member'}">${getRoleDisplayName(member.role || 'member')}</div>
+                        </div>
+                        <div class="member-status ${member.isOnline ? 'online' : 'offline'}"></div>
+                        <div class="member-actions">
+                            ${canKick ? `
+                                <button class="btn btn-outline-danger btn-sm" onclick="kickMember('${member.userId}', '${member.username}')" title="踢出成员">
+                                    <i class="fas fa-user-times"></i>
+                                </button>
+                            ` : ''}
+                            ${isCurrentUser ? '<span class="badge bg-primary">我</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            membersList.innerHTML = membersHTML;
+        }
+        
+        // 获取角色显示名称
+        function getRoleDisplayName(role) {
+            const roleNames = {
+                'admin': '管理员',
+                'moderator': '版主',
+                'member': '成员'
+            };
+            return roleNames[role] || '成员';
+        }
+        
+        // 踢出成员
+        async function kickMember(userId, username) {
+            if (!confirm(`确定要踢出成员 "${username}" 吗？`)) {
+                return;
+            }
+            
+            try {
+                const roomService = window.chatroomController.roomManagementService;
+                await roomService.removeMember(window.chatroomController.currentRoom.id, userId);
+                
+                showToast(`成功踢出成员 "${username}"`, 'success');
+                loadRoomMembers(); // 重新加载成员列表
+                
+            } catch (error) {
+                console.error('踢出成员失败:', error);
+                showToast(`踢出成员失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 刷新房间成员
+        function refreshRoomMembers() {
+            loadRoomMembers();
+        }
+        
+        // 加载可邀请的好友列表
+        async function loadFriendsToInvite() {
+            const friendsList = document.getElementById('friendsToInviteList');
+            
+            try {
+                friendsList.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <span>加载好友列表...</span>
+                    </div>
+                `;
+                
+                const friendsManager = window.chatroomController?.friendsManager;
+                if (!friendsManager) {
+                    throw new Error('好友管理器未初始化');
+                }
+                
+                // 确保好友列表已加载
+                if (!friendsManager.friends || friendsManager.friends.length === 0) {
+                    await friendsManager.loadFriendsList();
+                }
+                
+                // 使用已经处理好的好友数据
+                const friends = friendsManager.friends || [];
+                
+                // 过滤已经在房间里的好友
+                const availableFriends = friends.filter(friend => 
+                    !currentRoomMembers.some(member => member.userId === friend.id)
+                );
+                
+                renderFriendsToInvite(availableFriends);
+                
+            } catch (error) {
+                console.error('加载好友列表失败:', error);
+                friendsList.innerHTML = `<div class="text-danger">加载好友列表失败: ${error.message}</div>`;
+            }
+        }
+        
+        // 渲染可邀请的好友列表
+        function renderFriendsToInvite(friends) {
+            const friendsList = document.getElementById('friendsToInviteList');
+            
+            if (!friends || friends.length === 0) {
+                friendsList.innerHTML = '<div class="text-muted">暂无可邀请的好友或所有好友都已在房间中</div>';
+                return;
+            }
+            
+            const friendsHTML = friends.map(friend => {
+                const initial = (friend.username || '?').charAt(0).toUpperCase();
+                const isSelected = selectedFriends.includes(friend.id);
+                
+                return `
+                    <div class="friend-invite-item ${isSelected ? 'selected' : ''}" onclick="toggleFriendSelection('${friend.id}', '${friend.username}')">
+                        <div class="friend-avatar">${initial}</div>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold">${friend.username || '未知用户'}</div>
+                            <div class="text-muted small">${friend.email || ''}</div>
+                        </div>
+                        <div class="ms-2">
+                            <i class="fas fa-check-circle text-success" style="display: ${isSelected ? 'block' : 'none'}"></i>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            friendsList.innerHTML = friendsHTML;
+        }
+        
+        // 切换好友选择状态
+        function toggleFriendSelection(friendId, friendName) {
+            const index = selectedFriends.findIndex(f => f.id === friendId);
+            
+            if (index > -1) {
+                // 取消选择
+                selectedFriends.splice(index, 1);
+            } else {
+                // 添加选择
+                selectedFriends.push({ id: friendId, name: friendName });
+            }
+            
+            updateSelectedFriendsDisplay();
+            updateInviteButton();
+        }
+        
+        // 更新选中好友的显示
+        function updateSelectedFriendsDisplay() {
+            const container = document.getElementById('selectedFriendsContainer');
+            const list = document.getElementById('selectedFriendsList');
+            
+            if (selectedFriends.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'block';
+            
+            const tagsHTML = selectedFriends.map(friend => `
+                <span class="selected-friend-tag">
+                    ${friend.name}
+                    <span class="remove-btn" onclick="removeFriendSelection('${friend.id}')">&times;</span>
+                </span>
+            `).join('');
+            
+            list.innerHTML = tagsHTML;
+            
+            // 更新UI中的选中状态
+            document.querySelectorAll('.friend-invite-item').forEach(item => {
+                const friendId = item.getAttribute('onclick').match(/'([^']+)'/)[1];
+                const isSelected = selectedFriends.some(f => f.id === friendId);
+                
+                item.classList.toggle('selected', isSelected);
+                const checkIcon = item.querySelector('.fa-check-circle');
+                if (checkIcon) {
+                    checkIcon.style.display = isSelected ? 'block' : 'none';
+                }
+            });
+        }
+        
+        // 移除好友选择
+        function removeFriendSelection(friendId) {
+            const index = selectedFriends.findIndex(f => f.id === friendId);
+            if (index > -1) {
+                selectedFriends.splice(index, 1);
+                updateSelectedFriendsDisplay();
+                updateInviteButton();
+            }
+        }
+        
+        // 清空选择
+        function clearSelectedFriends() {
+            selectedFriends = [];
+            updateSelectedFriendsDisplay();
+            updateInviteButton();
+        }
+        
+        // 更新邀请按钮状态
+        function updateInviteButton() {
+            const actionButtons = document.getElementById('inviteActionButtons');
+            const countSpan = document.getElementById('selectedCount');
+            const inviteBtn = document.getElementById('inviteBtn');
+            
+            if (selectedFriends.length === 0) {
+                actionButtons.style.display = 'none';
+            } else {
+                actionButtons.style.display = 'block';
+                countSpan.textContent = selectedFriends.length;
+                inviteBtn.disabled = false;
+            }
+        }
+        
+        // 邀请选中的好友
+        async function inviteSelectedFriends() {
+            if (selectedFriends.length === 0) {
+                showToast('请先选择要邀请的好友', 'warning');
+                return;
+            }
+            
+            const inviteBtn = document.getElementById('inviteBtn');
+            const originalText = inviteBtn.innerHTML;
+            
+            try {
+                inviteBtn.disabled = true;
+                inviteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>邀请中...';
+                
+                const friendIds = selectedFriends.map(f => f.id);
+                
+                console.log('📋 选中的好友数据:', selectedFriends);
+                console.log('📤 提取的好友IDs:', friendIds);
+                
+                const roomService = window.chatroomController?.roomManagementService;
+                
+                if (!roomService) {
+                    throw new Error('房间管理服务未初始化');
+                }
+                
+                // 使用房间管理服务邀请用户
+                const currentRoomId = window.chatroomController.currentRoom.id || 
+                                    window.chatroomController.currentRoom.roomId;
+                
+                if (!currentRoomId) {
+                    throw new Error('无法获取当前房间ID');
+                }
+                
+                console.log('🏠 邀请到房间ID:', currentRoomId, '邀请好友IDs:', friendIds);
+                
+                const result = await roomService.inviteUsers(
+                    currentRoomId, 
+                    friendIds,
+                    'member'
+                );
+                
+                console.log('📥 API响应结果:', result);
+                
+                // 根据后端API响应格式处理结果
+                if (result && result.success && result.data) {
+                    const { invited_count, failed_invites } = result.data;
+                    
+                    if (invited_count > 0) {
+                        showToast(`成功邀请 ${invited_count} 位好友加入房间`, 'success');
+                    }
+                    
+                    if (failed_invites && failed_invites.length > 0) {
+                        console.warn('部分邀请失败:', failed_invites);
+                        const failedCount = failed_invites.length;
+                        showToast(`已邀请 ${invited_count} 位好友，${failedCount} 位邀请失败`, 'warning');
+                    }
+                    
+                    if (invited_count === 0 && (!failed_invites || failed_invites.length === 0)) {
+                        showToast('没有好友被邀请', 'info');
+                    }
+                } else if (result && result.success) {
+                    // 处理只有success标志的情况
+                    showToast(result.message || '邀请发送成功', 'success');
+                } else {
+                    throw new Error(result?.message || '邀请响应格式异常');
+                }
+                
+                // 重置选择状态
+                clearSelectedFriends();
+                // 重新加载成员列表和好友列表
+                loadRoomMembers();
+                loadFriendsToInvite();
+                
+            } catch (error) {
+                console.error('邀请好友失败:', error);
+                
+                // 尝试提取具体的API错误信息
+                let errorMessage = error.message;
+                if (error.response && error.response.data) {
+                    errorMessage = error.response.data.message || error.message;
+                }
+                
+                showToast(`邀请好友失败: ${errorMessage}`, 'error');
+            } finally {
+                inviteBtn.disabled = false;
+                inviteBtn.innerHTML = originalText;
+            }
+        }
+        
+        // 搜索可邀请的好友
+        function searchFriendsToInvite() {
+            const searchInput = document.getElementById('inviteFriendSearch');
+            const keyword = searchInput.value.trim().toLowerCase();
+            
+            const friendItems = document.querySelectorAll('.friend-invite-item');
+            friendItems.forEach(item => {
+                const name = item.querySelector('.fw-bold').textContent.toLowerCase();
+                const email = item.querySelector('.text-muted').textContent.toLowerCase();
+                
+                if (name.includes(keyword) || email.includes(keyword)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+        
+        // 将房间成员管理功能添加到全局
+        window.showRoomMembersModal = showRoomMembersModal;
+        window.loadRoomMembers = loadRoomMembers;
+        window.loadFriendsToInvite = loadFriendsToInvite;
+        window.refreshRoomMembers = refreshRoomMembers;
+        window.kickMember = kickMember;
+        window.toggleFriendSelection = toggleFriendSelection;
+        window.removeFriendSelection = removeFriendSelection;
+        window.clearSelectedFriends = clearSelectedFriends;
+        window.inviteSelectedFriends = inviteSelectedFriends;
+        window.searchFriendsToInvite = searchFriendsToInvite;
 
         // Toast通知函数
         function showToast(message, type = 'info') {

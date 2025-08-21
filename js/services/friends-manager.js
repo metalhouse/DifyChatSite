@@ -128,6 +128,7 @@ class FriendsManager {
                     return {
                         id: friendship.addressee.id,
                         username: friendship.addressee.username,
+                        email: friendship.addressee.email || '',
                         nickname: friendship.addressee.nickname,
                         avatar_url: friendship.addressee.avatar_url,
                         status: friendship.addressee.status,
@@ -139,6 +140,7 @@ class FriendsManager {
                     return {
                         id: friendship.requester.id,
                         username: friendship.requester.username,
+                        email: friendship.requester.email || '',
                         nickname: friendship.requester.nickname,
                         avatar_url: friendship.requester.avatar_url,
                         status: friendship.requester.status,

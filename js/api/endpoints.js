@@ -72,6 +72,18 @@ const API_ENDPOINTS = {
         STATS: '/agents/{id}/stats'              // 智能体统计
     },
 
+    // 好友系统模块端点 - 基于指南第6章
+    FRIENDS: {
+        LIST: '/friends',                         // 获取好友列表
+        REQUESTS: '/friends/requests',            // 好友请求列表
+        SEND_REQUEST: '/friends/request',         // 发送好友请求
+        ACCEPT_REQUEST: '/friends/accept/{requestId}', // 接受好友请求
+        REJECT_REQUEST: '/friends/reject/{requestId}', // 拒绝好友请求
+        REMOVE_FRIEND: '/friends/{friendshipId}', // 删除好友
+        INVITE_TO_ROOM: '/friends/invite-to-room', // 邀请好友到房间
+        SEARCH_USERS: '/users/search'            // 搜索用户
+    },
+
     // 用户相关端点
     // 系统健康检查端点 - 基于指南第7章
     SYSTEM: {

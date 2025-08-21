@@ -55,6 +55,9 @@ class ChatroomController {
             // 获取当前用户信息
             await this.loadUserInfo();
             
+            // 初始化房间管理服务
+            this.roomManagementService = new RoomManagementService();
+            
             // 初始化好友管理器
             this.friendsManager = new FriendsManager(this);
             await this.friendsManager.initialize();

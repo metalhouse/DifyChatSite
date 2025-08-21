@@ -149,6 +149,14 @@ class HttpClient {
                     const contentType = response.headers.get('content-type');
                     if (contentType && contentType.includes('application/json')) {
                         errorData = await response.json();
+                        // 详细记录错误响应内容
+                        if (ENV_CONFIG.isDebug()) {
+                            console.error('❌ API错误响应详情:', {
+                                status: response.status,
+                                url: fullUrl,
+                                errorData: JSON.stringify(errorData, null, 2)
+                            });
+                        }
                     } else {
                         // 非JSON响应，可能是HTML错误页面
                         const text = await response.text();
