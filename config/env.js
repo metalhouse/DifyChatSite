@@ -39,6 +39,12 @@ const developmentConfig = {
   DEBUG_MODE: true,
   SHOW_DEV_TOOLS_NOTIFICATION: false, // 是否显示开发工具通知
   
+  // WebSocket优化开关 - 后端WebSocket实时通知修复后的优化配置
+  ENABLE_PERIODIC_REFRESH: false,     // 禁用定期刷新（WebSocket实时通知已正常工作）
+  ENABLE_FOCUS_REFRESH: false,        // 禁用焦点刷新（WebSocket实时通知已正常工作）
+  WEBSOCKET_REALTIME_READY: true,     // WebSocket实时通知已修复标识
+  SHOW_READ_NOTIFICATIONS: false,     // 禁用已读消息弹窗通知（避免过多干扰）
+  
   // 超时配置 - 基于指南第3.6节按场景区分
   API_TIMEOUT: 30000,        // 通用API超时 30秒
   DIFY_TIMEOUT: 120000,      // Dify AI专用超时 120秒（2分钟）
@@ -65,6 +71,11 @@ const productionConfig = {
   ENABLE_ENCRYPTION: true,
   DEBUG_MODE: false,
   SHOW_DEV_TOOLS_NOTIFICATION: false, // 是否显示开发工具通知
+  
+  // WebSocket优化开关 - 生产环境配置
+  ENABLE_PERIODIC_REFRESH: false,     // 禁用定期刷新（WebSocket实时通知正常工作）
+  ENABLE_FOCUS_REFRESH: false,        // 禁用焦点刷新（WebSocket实时通知正常工作）
+  WEBSOCKET_REALTIME_READY: true,     // WebSocket实时通知已修复标识
   
   // 超时配置 - 生产环境可能需要更长超时
   API_TIMEOUT: 30000,        // 通用API超时 30秒

@@ -23,6 +23,7 @@ class FriendsApiService {
                 SEND: '/api/friends/messages/send',
                 HISTORY: '/api/friends/messages/history',
                 MARK_READ: '/api/friends/messages/mark-read',
+                MARK_AS_READ: '/api/friends/messages/mark-as-read',
                 UNREAD_COUNTS: '/api/friends/messages/unread-counts',
                 READ_STATUS: '/api/friends/messages/read-status',
                 DELETE: '/api/friends/messages',
@@ -502,6 +503,25 @@ class FriendsApiService {
             console.log(`✅ 标记与 ${friendId} 的消息为已读`);
             const response = await this.request('POST', url, data);
             console.log('✅ 消息标记已读成功');
+            return response;
+        } catch (error) {
+            console.error('❌ 标记消息已读失败:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 标记消息为已读(新版API)
+     * @param {Array} messageIds 消息ID数组
+     * @returns {Promise<Object>} 标记结果
+     */
+    async markMessagesAsReadNew(messageIds) {
+        try {
+            const url = this.endpoints.MESSAGES.MARK_AS_READ;
+            const data = { messageIds };
+            
+            const response = await this.request('POST', url, data);
+            console.log(`✅ 成功标记 ${response.data?.updatedCount || messageIds.length} 条消息为已读`);
             return response;
         } catch (error) {
             console.error('❌ 标记消息已读失败:', error.message);

@@ -1045,11 +1045,29 @@ class ChatroomController {
      * 处理消息已读状态更新
      */
     handleMessageRead(data) {
-        console.log('👀 [前端] 处理消息已读状态:', data);
+        console.log('👀 [前端] 收到消息已读通知:', data);
+        console.log('📊 [前端] 已读数据详情:', {
+            messageId: data.messageId,
+            senderId: data.senderId,
+            readerId: data.readerId,
+            readAt: data.readAt
+        });
         
         if (this.friendsManager && data.messageId) {
-            // 为消息添加已读指示器
-            this.friendsManager.addReadIndicator(data.messageId);
+            // 检查当前用户是否是消息发送者
+            const currentUserId = this.currentUser?.id;
+            if (currentUserId === data.senderId) {
+                console.log('✅ [前端] 当前用户是发送者，添加已读指示器');
+                this.friendsManager.addReadIndicator(data.messageId);
+                
+                // 静默处理已读状态，不显示弹窗通知（避免过多干扰）
+                // WebSocket实时通知修复后，已读状态会频繁更新，弹窗会影响用户体验
+                console.log('📱 [前端] 已读状态已静默更新，无弹窗提示');
+            } else {
+                console.log('ℹ️ [前端] 当前用户不是发送者，忽略已读通知');
+            }
+        } else {
+            console.warn('⚠️ [前端] 无法处理已读状态 - friendsManager或messageId缺失');
         }
     }
 

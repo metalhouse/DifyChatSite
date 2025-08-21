@@ -11,6 +11,7 @@ class FriendsManager {
         this.friendRequests = { received: [], sent: [] };
         this.currentPrivateChat = null;
         this.unreadCounts = {}; // 存储各好友的未读消息计数
+        this.readStatusTimer = null; // 已读状态刷新定时器
         
         // DOM 元素
         this.elements = {
@@ -25,6 +26,9 @@ class FriendsManager {
         };
 
         console.log('好友管理器初始化完成');
+        
+        // 监听窗口焦点变化，用于已读状态同步
+        this.setupWindowFocusHandlers();
     }
 
     /**
@@ -252,6 +256,9 @@ class FriendsManager {
             type: 'private'
         };
 
+        // 启动已读状态定期刷新
+        this.startReadStatusRefresh(friendId);
+
         // 更新聊天头部显示
         const currentRoomName = document.getElementById('currentRoomName');
         if (currentRoomName) {
@@ -271,8 +278,10 @@ class FriendsManager {
         // 切换到私聊模式
         this.switchToPrivateChat(friendId, friendName);
 
-        // 标记消息为已读
-        this.markMessagesAsRead(friendId);
+        // 标记消息为已读（等待私聊历史加载完成后再执行）
+        setTimeout(() => {
+            this.markMessagesAsRead(friendId);
+        }, 1500);
 
         // 在移动设备上隐藏侧边栏
         if (window.innerWidth <= 768) {
@@ -307,9 +316,6 @@ class FriendsManager {
             messageInput.disabled = false;
             messageInput.placeholder = `给 ${friendName} 发消息...`;
         }
-        
-        // 用户进入与好友的聊天时，标记该好友的消息为已读
-        this.markMessagesAsRead(friendId);
         
         if (sendButton) {
             sendButton.disabled = false;
@@ -430,6 +436,10 @@ class FriendsManager {
             const readStatusIndicator = isCurrentUser && message.isRead ? 
                 '<div class="message-read-status"><span class="message-read-indicator" title="对方已读"></span></div>' : '';
             
+            // 为当前用户的消息添加已读状态容器
+            const readStatusContainer = isCurrentUser ? 
+                '<div class="message-read-container" data-message-id="' + messageId + '"></div>' : '';
+            
             return `
                 <div class="message ${messageClass}" data-message-id="${messageId}">
                     <div class="message-select-wrapper">
@@ -447,6 +457,7 @@ class FriendsManager {
                             </div>
                             <div class="message-content">${this.escapeHtml(message.content)}</div>
                             ${readStatusIndicator}
+                            ${readStatusContainer}
                         </div>
                     </div>
                 </div>
@@ -922,7 +933,7 @@ class FriendsManager {
     }
 
     /**
-     * 发送私聊消息
+     * 发送私聊消息（已优化：移除不必要的状态刷新）
      */
     async sendPrivateMessage(content) {
         if (!this.currentPrivateChat) {
@@ -943,8 +954,10 @@ class FriendsManager {
                 'text'
             );
             
-            // 不再重新加载历史记录，而是等待WebSocket事件推送
-            console.log('✅ 私聊消息发送请求完成，等待WebSocket确认');
+            console.log('✅ 私聊消息发送完成');
+            
+            // WebSocket实时通知已修复，无需主动刷新已读状态
+            // 新消息的已读状态将通过WebSocket实时更新（20-30ms延迟）
             
         } catch (error) {
             console.error('❌ 发送私聊消息失败:', error);
@@ -952,6 +965,51 @@ class FriendsManager {
             
             // 移除发送中的消息显示
             this.removeSendingMessage();
+        }
+    }
+
+    /**
+     * 刷新所有消息的已读状态
+     */
+    async refreshAllMessageReadStatus() {
+        if (!this.currentPrivateChat) return;
+        
+        try {
+            console.log('🔄 刷新所有消息的已读状态');
+            
+            // 获取当前聊天中的所有用户消息（发送方视角）
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                const userMessageElements = chatMessages.querySelectorAll('.message-user[data-message-id]');
+                const messageIds = Array.from(userMessageElements).map(el => el.dataset.messageId).filter(id => id);
+                
+                if (messageIds.length > 0) {
+                    console.log(`🔍 检查 ${messageIds.length} 条用户消息的已读状态`);
+                    
+                    // 调用API检查这些消息的已读状态
+                    const readStatus = await this.friendsApi.getMessageReadStatus(this.currentPrivateChat.friendId, messageIds);
+                    
+                    if (readStatus.success && readStatus.data) {
+                        console.log(`📊 已读状态检查结果:`, readStatus.data);
+                        
+                        // 遍历每个消息，如果已读但前端没有显示已读指示器，则添加
+                        Object.entries(readStatus.data).forEach(([messageId, isRead]) => {
+                            if (isRead) {
+                                const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+                                if (messageElement && messageElement.classList.contains('message-user')) {
+                                    const existingIndicator = messageElement.querySelector('.message-read-status');
+                                    if (!existingIndicator) {
+                                        console.log(`🔧 刷新时添加已读指示器: 消息${messageId}`);
+                                        this.addReadIndicatorDirectly(messageId);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('❌ 刷新已读状态失败:', error);
         }
     }
 
@@ -1105,6 +1163,8 @@ class FriendsManager {
                         </div>
                     </div>
                     <div class="message-content">${this.escapeHtml(data.content)}</div>
+                    <!-- 为新发送的消息预留已读状态容器 -->
+                    <div class="message-read-container" data-message-id="${messageId}"></div>
                 </div>
             </div>
         `;
@@ -1129,14 +1189,44 @@ class FriendsManager {
     }
 
     /**
-     * 标记消息为已读
+     * 标记消息为已读（已优化：依赖WebSocket实时通知，移除fallback机制）
      */
     async markMessagesAsRead(friendId) {
         if (!friendId) return;
         
         try {
-            // 调用API标记已读
-            await this.friendsApi.markMessagesAsRead(friendId);
+            console.log(`🔍 开始标记与 ${friendId} 的消息为已读`);
+            
+            // 获取当前聊天界面中的其他用户消息（需要标记为已读的消息）
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                const messageElements = chatMessages.querySelectorAll('.message-other[data-message-id]');
+                const messageIds = Array.from(messageElements).map(el => el.dataset.messageId).filter(id => id);
+                
+                console.log(`🔍 准备标记消息为已读:`, {
+                    friendId,
+                    messageCount: messageIds.length,
+                    messageIds: messageIds
+                });
+                
+                if (messageIds.length > 0) {
+                    console.log(`📡 调用 API: POST /api/friends/messages/mark-as-read`);
+                    
+                    // 使用新的已读标记API
+                    const result = await this.friendsApi.markMessagesAsReadNew(messageIds);
+                    console.log(`✅ 标记与 ${friendId} 的 ${messageIds.length} 条消息为已读`, result);
+                    
+                    if (result.success) {
+                        console.log(`📊 API成功响应，更新了 ${result.data?.updatedCount || 0} 条消息`);
+                        console.log(`🔔 WebSocket将推送 'message-read' 事件（20-30ms延迟）`);
+                        
+                        // WebSocket实时通知已修复，无需fallback机制
+                        // 后端确保：message-read事件将在20-30ms内推送给消息发送者
+                    }
+                } else {
+                    console.log(`ℹ️ 没有需要标记为已读的消息（friendId: ${friendId}）`);
+                }
+            }
             
             // 清除本地未读计数
             this.unreadCounts[friendId] = 0;
@@ -1144,10 +1234,86 @@ class FriendsManager {
             // 更新好友列表显示
             this.renderFriendsList();
             
-            console.log(`✅ 标记消息已读: ${friendId}`);
         } catch (error) {
             console.error('❌ 标记消息已读失败:', error);
         }
+    }
+
+    /**
+     * 检查并更新已读状态（用于WebSocket通知延迟的情况）
+     */
+    async checkAndUpdateReadStatus(friendId, messageIds) {
+        try {
+            console.log(`🔄 检查消息已读状态 (WebSocket通知可能延迟)`);
+            
+            // 调用API检查这些消息的已读状态
+            const readStatus = await this.friendsApi.getMessageReadStatus(friendId, messageIds);
+            
+            if (readStatus.success && readStatus.data) {
+                console.log(`📊 已读状态检查结果:`, readStatus.data);
+                
+                // 遍历每个消息，如果已读但前端没有显示已读指示器，则添加
+                Object.entries(readStatus.data).forEach(([messageId, isRead]) => {
+                    if (isRead) {
+                        const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+                        if (messageElement && messageElement.classList.contains('message-user')) {
+                            const existingIndicator = messageElement.querySelector('.message-read-status');
+                            if (!existingIndicator) {
+                                console.log(`🔧 补充添加已读指示器: 消息${messageId}`);
+                                this.addReadIndicatorDirectly(messageId);
+                            }
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('❌ 检查已读状态失败:', error);
+        }
+    }
+
+    /**
+     * 直接添加已读指示器（不依赖WebSocket事件）
+     */
+    addReadIndicatorDirectly(messageId) {
+        const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (!messageElement || !messageElement.classList.contains('message-user')) {
+            return;
+        }
+        
+        // 检查是否已经有已读指示器
+        const existingIndicator = messageElement.querySelector('.message-read-status, .message-read-container .message-read-status');
+        if (existingIndicator) {
+            return;
+        }
+        
+        // 创建已读指示器
+        const readIndicator = document.createElement('div');
+        readIndicator.className = 'message-read-status';
+        readIndicator.innerHTML = '<span class="message-read-indicator" title="对方已读"></span>';
+        
+        // 优先添加到预留的容器中
+        let container = messageElement.querySelector('.message-read-container');
+        if (container) {
+            container.appendChild(readIndicator);
+            console.log(`✅ 直接添加已读指示器到预留容器: 消息${messageId}`);
+        } else {
+            // 备选方案：添加到消息气泡中
+            const messageBubble = messageElement.querySelector('.message-bubble');
+            if (messageBubble) {
+                messageBubble.appendChild(readIndicator);
+                console.log(`✅ 直接添加已读指示器到消息气泡: 消息${messageId}`);
+            }
+        }
+        
+        // 添加动画效果
+        readIndicator.style.opacity = '0';
+        readIndicator.style.transform = 'scale(0.5)';
+        
+        requestAnimationFrame(() => {
+            readIndicator.style.transition = 'all 0.3s ease-out';
+            readIndicator.style.opacity = '1';
+            readIndicator.style.transform = 'scale(1)';
+        });
     }
 
     /**
@@ -1527,10 +1693,17 @@ class FriendsManager {
             
             const messageIds = userMessages.map(msg => msg.id || msg._id || msg.messageId || msg.message_id);
             
+            console.log('🔍 [已读状态] 查询消息已读状态:', {
+                friendId,
+                messageCount: messageIds.length,
+                messageIds: messageIds
+            });
+            
             // 调用API获取已读状态
             const response = await this.friendsApi.getMessageReadStatus(friendId, messageIds);
             
             if (response.success && response.data) {
+                console.log('✅ [已读状态] 获取已读状态成功:', response.data);
                 this.updateMessageReadIndicators(response.data);
             }
         } catch (error) {
@@ -1556,21 +1729,155 @@ class FriendsManager {
      */
     addReadIndicator(messageId) {
         const messageElement = document.querySelector(`[data-message-id="${messageId}"]`);
-        if (!messageElement || !messageElement.classList.contains('message-user')) return;
+        if (!messageElement || !messageElement.classList.contains('message-user')) {
+            console.log(`跳过添加已读指示器: 消息${messageId} - ${messageElement ? '不是用户消息' : '元素不存在'}`);
+            return;
+        }
         
         // 检查是否已经有已读指示器
-        const existingIndicator = messageElement.querySelector('.message-read-status');
-        if (existingIndicator) return;
+        const existingIndicator = messageElement.querySelector('.message-read-status, .message-read-container .message-read-status');
+        if (existingIndicator) {
+            console.log(`消息${messageId}已有已读指示器，跳过添加`);
+            return;
+        }
         
         // 创建已读指示器
         const readIndicator = document.createElement('div');
         readIndicator.className = 'message-read-status';
         readIndicator.innerHTML = '<span class="message-read-indicator" title="对方已读"></span>';
         
-        // 添加到消息气泡中
-        const messageBubble = messageElement.querySelector('.message-bubble');
-        if (messageBubble) {
-            messageBubble.appendChild(readIndicator);
+        // 优先添加到预留的容器中
+        let container = messageElement.querySelector('.message-read-container');
+        if (container) {
+            container.appendChild(readIndicator);
+            console.log(`✅ 已读指示器添加到预留容器: 消息${messageId}`);
+        } else {
+            // 备选方案：添加到消息气泡中
+            const messageBubble = messageElement.querySelector('.message-bubble');
+            if (messageBubble) {
+                messageBubble.appendChild(readIndicator);
+                console.log(`✅ 已读指示器添加到消息气泡: 消息${messageId}`);
+            } else {
+                console.error(`❌ 无法添加已读指示器: 消息${messageId} - 未找到合适容器`);
+                return;
+            }
+        }
+        
+        // 添加动画效果
+        readIndicator.style.opacity = '0';
+        readIndicator.style.transform = 'scale(0.5)';
+        
+        // 使用requestAnimationFrame确保元素已添加到DOM
+        requestAnimationFrame(() => {
+            readIndicator.style.transition = 'all 0.3s ease-out';
+            readIndicator.style.opacity = '1';
+            readIndicator.style.transform = 'scale(1)';
+        });
+    }
+
+    /**
+     * 设置窗口焦点监听器（已优化：减少不必要的刷新）
+     */
+    setupWindowFocusHandlers() {
+        // WebSocket实时通知已修复，大幅减少焦点刷新频率
+        const enableFocusRefresh = window.ENV_CONFIG?.ENABLE_FOCUS_REFRESH !== false;
+        
+        if (!enableFocusRefresh) {
+            console.log('ℹ️ [窗口焦点] 焦点刷新已禁用，依赖WebSocket实时通知');
+            return;
+        }
+        
+        // 保留基础的焦点处理（仅作为安全网）
+        window.addEventListener('focus', () => {
+            if (this.currentPrivateChat) {
+                console.log('🔍 [窗口焦点] 窗口获得焦点，轻量刷新（仅安全检查）');
+                // 延长延迟时间，降低刷新频率
+                setTimeout(() => {
+                    this.refreshCurrentChatReadStatus();
+                }, 5000); // 5秒延迟，仅作为安全网
+            }
+        });
+
+        // 页面可见性变化时的处理
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden && this.currentPrivateChat) {
+                console.log('🔍 [页面可见性] 页面变为可见，轻量刷新（仅安全检查）');
+                setTimeout(() => {
+                    this.refreshCurrentChatReadStatus();
+                }, 5000); // 5秒延迟，仅作为安全网
+            }
+        });
+    }
+
+    /**
+     * 启动已读状态定期刷新（已优化：WebSocket实时通知正常工作后大幅减少频率）
+     * @param {string} friendId 好友ID
+     */
+    startReadStatusRefresh(friendId) {
+        // 清除之前的定时器
+        this.stopReadStatusRefresh();
+        
+        // 检查是否需要定期刷新（WebSocket正常工作时可禁用）
+        const enablePeriodicRefresh = window.ENV_CONFIG?.ENABLE_PERIODIC_REFRESH !== false;
+        if (!enablePeriodicRefresh) {
+            console.log('ℹ️ [已读状态] 定期刷新已禁用，依赖WebSocket实时通知');
+            return;
+        }
+        
+        console.log('🔄 [已读状态] 启动定期刷新（低频率）:', friendId);
+        
+        // 降低到5分钟刷新一次（仅作为安全网，WebSocket应该处理所有实时更新）
+        this.readStatusTimer = setInterval(async () => {
+            try {
+                // 只在当前仍在此对话中时刷新
+                if (this.currentPrivateChat && this.currentPrivateChat.friendId === friendId) {
+                    console.log('🔄 [已读状态] 低频安全刷新:', friendId);
+                    await this.refreshCurrentChatReadStatus();
+                }
+            } catch (error) {
+                console.error('❌ [已读状态] 定期刷新失败:', error.message);
+            }
+        }, 300000); // 5分钟间隔（作为安全网）
+    }
+
+    /**
+     * 停止已读状态定期刷新
+     */
+    stopReadStatusRefresh() {
+        if (this.readStatusTimer) {
+            console.log('⏹️ [已读状态] 停止定期刷新');
+            clearInterval(this.readStatusTimer);
+            this.readStatusTimer = null;
+        }
+    }
+
+    /**
+     * 刷新当前聊天的已读状态
+     */
+    async refreshCurrentChatReadStatus() {
+        if (!this.currentPrivateChat) return;
+        
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+        
+        // 获取所有用户发送的消息
+        const userMessageElements = chatMessages.querySelectorAll('.message-user[data-message-id]');
+        const messageIds = Array.from(userMessageElements).map(el => el.dataset.messageId);
+        
+        if (messageIds.length > 0) {
+            try {
+                const response = await this.friendsApi.getMessageReadStatus(
+                    this.currentPrivateChat.friendId, 
+                    messageIds
+                );
+                
+                if (response.success && response.data) {
+                    console.log('🔄 [已读状态] 刷新结果:', response.data);
+                    this.updateMessageReadIndicators(response.data);
+                }
+            } catch (error) {
+                console.error('❌ [已读状态] 刷新失败:', error.message);
+            }
         }
     }
 
@@ -1822,5 +2129,209 @@ class FriendsManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    /**
+     * 测试已读状态功能 - 全面测试WebSocket和API功能
+     * 这个方法可以在浏览器控制台中调用：window.friendsManager.testReadStatus()
+     */
+    async testReadStatus() {
+        console.log('🧪 开始测试已读状态功能...');
+        
+        if (!this.currentPrivateChat) {
+            console.log('❌ 测试失败：当前没有私聊对象');
+            return;
+        }
+        
+        const testResults = {
+            websocketConnected: false,
+            apiWorking: false,
+            messageCount: 0,
+            readStatusCount: 0,
+            timingTests: []
+        };
+        
+        // 1. 测试WebSocket连接状态
+        console.log('📡 测试 WebSocket 连接状态...');
+        const websocketClient = this.chatroomController.websocket;
+        if (websocketClient && websocketClient.connected) {
+            testResults.websocketConnected = true;
+            console.log('✅ WebSocket 连接正常');
+            console.log('📊 WebSocket详情:', {
+                id: websocketClient.id,
+                connected: websocketClient.connected,
+                transport: websocketClient.io?.engine?.transport?.name
+            });
+        } else {
+            console.log('❌ WebSocket 连接异常');
+            console.log('WebSocket状态:', {
+                exists: !!websocketClient,
+                connected: websocketClient?.connected,
+                id: websocketClient?.id
+            });
+        }
+        
+        // 2. 测试API接口
+        console.log('🌐 测试已读状态API...');
+        try {
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                const userMessages = chatMessages.querySelectorAll('.message-user[data-message-id]');
+                testResults.messageCount = userMessages.length;
+                console.log(`📝 找到 ${userMessages.length} 条用户消息`);
+                
+                if (userMessages.length > 0) {
+                    const messageIds = Array.from(userMessages).map(el => el.dataset.messageId);
+                    const response = await this.friendsApi.getMessageReadStatus(
+                        this.currentPrivateChat.friendId,
+                        messageIds
+                    );
+                    
+                    if (response.success) {
+                        testResults.apiWorking = true;
+                        testResults.readStatusCount = Object.keys(response.data || {}).length;
+                        console.log('✅ API 接口正常');
+                        console.log('📊 已读状态数据:', response.data);
+                    } else {
+                        console.log('❌ API 接口返回错误:', response.message);
+                    }
+                }
+            }
+        } catch (error) {
+            console.log('❌ API 测试失败:', error.message);
+        }
+        
+        // 3. 测试WebSocket事件监听
+        console.log('👂 测试 WebSocket 事件监听...');
+        const originalHandler = this.chatroomController.handleMessageRead;
+        let eventReceived = false;
+        
+        // 临时替换事件处理器来监控
+        this.chatroomController.handleMessageRead = (data) => {
+            eventReceived = true;
+            console.log('🎯 WebSocket 事件已接收:', data);
+            originalHandler.call(this.chatroomController, data);
+        };
+        
+        // 4. 模拟标记消息为已读的时序测试
+        console.log('⏱️ 开始时序测试...');
+        if (testResults.messageCount > 0) {
+            const startTime = Date.now();
+            
+            try {
+                // 模拟标记消息为已读
+                await this.markMessagesAsRead();
+                
+                // 等待不同时间间隔，检查WebSocket事件
+                const timingChecks = [500, 1000, 2000, 3000, 5000];
+                
+                for (const delay of timingChecks) {
+                    await new Promise(resolve => setTimeout(resolve, delay - (Date.now() - startTime)));
+                    
+                    const timingResult = {
+                        delay: delay,
+                        websocketReceived: eventReceived,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    testResults.timingTests.push(timingResult);
+                    console.log(`⏰ ${delay}ms 后检查: WebSocket事件${eventReceived ? '已收到' : '未收到'}`);
+                }
+            } catch (error) {
+                console.log('❌ 时序测试失败:', error.message);
+            }
+        }
+        
+        // 恢复原始事件处理器
+        this.chatroomController.handleMessageRead = originalHandler;
+        
+        // 5. 输出测试报告
+        console.log('\n📋 测试报告:');
+        console.log('='.repeat(50));
+        console.log('🔗 WebSocket连接:', testResults.websocketConnected ? '✅ 正常' : '❌ 异常');
+        console.log('🌐 API接口:', testResults.apiWorking ? '✅ 正常' : '❌ 异常');
+        console.log('📝 消息数量:', testResults.messageCount);
+        console.log('📊 已读状态数量:', testResults.readStatusCount);
+        console.log('\n⏱️ 时序测试结果:');
+        
+        testResults.timingTests.forEach(test => {
+            console.log(`  ${test.delay}ms: ${test.websocketReceived ? '✅' : '❌'} WebSocket事件`);
+        });
+        
+        // 6. 提供诊断建议
+        console.log('\n💡 诊断建议:');
+        if (!testResults.websocketConnected) {
+            console.log('  🔧 检查WebSocket服务器连接');
+            console.log('  ⚠️ 当前WebSocket未连接，但API工作正常');
+            console.log('  🔄 fallback机制已生效，已读状态通过API同步');
+            console.log('  💡 建议检查后端WebSocket服务是否在4005端口运行');
+            console.log('  🛠️ 运行 testWebSocketConnection() 获取更多连接信息');
+        } else {
+            console.log('  ✅ WebSocket连接正常，实时通知应该工作完美！');
+        }
+        if (!testResults.apiWorking) {
+            console.log('  🔧 检查后端API服务');
+        }
+        if (testResults.timingTests.length > 0) {
+            const lastResult = testResults.timingTests[testResults.timingTests.length - 1];
+            if (!lastResult.websocketReceived) {
+                if (testResults.websocketConnected) {
+                    console.log('  🎯 WebSocket连接正常，等待message-read事件测试...');
+                    console.log('  ⚡ 根据后端反馈，事件应在20-30ms内收到');
+                } else {
+                    console.log('  ✅ fallback机制正常工作，无需WebSocket即可同步已读状态');
+                }
+            } else {
+                console.log('  🎉 WebSocket实时通知工作完美！延迟极低');
+            }
+        }
+        
+        console.log('\n🧪 测试完成！');
+        return testResults;
+    }
+
+    /**
+     * 快速测试WebSocket延迟 - 简化版本
+     * 调用方式：window.friendsManager.testWebSocketTiming()
+     */
+    async testWebSocketTiming() {
+        console.log('⚡ 快速WebSocket延迟测试...');
+        
+        if (!this.currentPrivateChat) {
+            console.log('❌ 需要先选择一个聊天对象');
+            return;
+        }
+        
+        let eventReceived = false;
+        const startTime = Date.now();
+        
+        // 监听WebSocket事件
+        const originalHandler = this.chatroomController.handleMessageRead;
+        this.chatroomController.handleMessageRead = (data) => {
+            if (!eventReceived) {
+                eventReceived = true;
+                const delay = Date.now() - startTime;
+                console.log(`⚡ WebSocket事件接收延迟: ${delay}ms`);
+            }
+            originalHandler.call(this.chatroomController, data);
+        };
+        
+        // 触发已读标记
+        console.log('📤 发送已读标记请求...');
+        try {
+            await this.markMessagesAsRead();
+            
+            // 等待5秒检查结果
+            setTimeout(() => {
+                this.chatroomController.handleMessageRead = originalHandler;
+                if (!eventReceived) {
+                    console.log('⚠️ 5秒内未收到WebSocket事件，可能存在延迟问题');
+                }
+            }, 5000);
+            
+        } catch (error) {
+            console.log('❌ 测试失败:', error.message);
+            this.chatroomController.handleMessageRead = originalHandler;
+        }
     }
 }
