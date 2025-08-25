@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>反代配置诊断</title>
+    <style>
+        body { font-family: monospace; margin: 20px; background-color: #f5f5f5; }
+        .section { background: white; padding: 20px; margin: 10px 0; border-radius: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+        pre { background: #eee; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>🔧 反代配置诊断工具</h1>
+    
+    <div class="section">
+        <h2>1. 环境配置检查</h2>
+        <div id="env-config"></div>
+        <button onclick="checkEnvConfig()">检查环境配置</button>
+    </div>
+
+    <div class="section">
+        <h2>2. API地址测试</h2>
+        <div id="api-urls"></div>
+        <button onclick="testApiUrls()">测试API地址</button>
+    </div>
+
+    <div class="section">
+        <h2>3. 健康检查测试</h2>
+        <div id="health-check"></div>
+        <button onclick="testHealthCheck()">执行健康检查</button>
+    </div>
+
+    <div class="section">
+        <h2>4. 实时日志</h2>
+        <div id="logs" style="max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;"></div>
+        <button onclick="clearLogs()">清除日志</button>
+    </div>
+
+    <!-- 加载配置文件 -->
+    <script type="module">
+        // 加载环境配置
+        import('./config/env.js').then(module => {
+            window.ENV_CONFIG = module.ENV_CONFIG;
+            console.log('✅ ENV_CONFIG 加载成功');
+            addLog('✅ ENV_CONFIG 加载成功');
+        }).catch(error => {
+            console.error('❌ ENV_CONFIG 加载失败:', error);
+            addLog(`❌ ENV_CONFIG 加载失败: ${error.message}`, 'error');
+        });
+
+        // 尝试加载反代配置
+        import('./config/reverse-proxy-config.js').then(module => {
+            console.log('✅ 反代配置加载成功');
+            addLog('✅ 反代配置加载成功');
+        }).catch(error => {
+            console.error('❌ 反代配置加载失败:', error);
+            addLog(`❌ 反代配置加载失败: ${error.message}`, 'error');
+        });
+    </script>
+
+    <script>
+        // 日志功能
+        function addLog(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : (type === 'success' ? 'success' : 'info');
+            logs.innerHTML += `<div class="${className}">[${time}] ${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        // 检查环境配置
+        function checkEnvConfig() {
+            const container = document.getElementById('env-config');
+            try {
+                if (!window.ENV_CONFIG) {
+                    throw new Error('ENV_CONFIG 未加载');
+                }
+
+                const config = window.ENV_CONFIG;
+                const info = `
+                    <pre>
+环境信息:
+- 环境类型: ${config.ENVIRONMENT}
+- 是否生产环境: ${config.isProduction()}
+- 是否调试模式: ${config.isDebug()}
+
+API配置:
+- API_BASE_URL: ${config.API_BASE_URL}
+- API_PREFIX: ${config.API_PREFIX}
+- getApiUrl(): ${config.getApiUrl()}
+- getApiUrl('/health'): ${config.getApiUrl('/health')}
+
+WebSocket配置:
+- WS_URL: ${config.WS_URL}
+- getWsUrl(): ${config.getWsUrl()}
+
+当前域名: ${window.location.hostname}
+当前协议: ${window.location.protocol}
+当前端口: ${window.location.port}
+完整地址: ${window.location.href}
+                    </pre>
+                `;
+                container.innerHTML = `<div class="success">${info}</div>`;
+                addLog('环境配置检查完成');
+            } catch (error) {
+                container.innerHTML = `<div class="error">配置检查失败: ${error.message}</div>`;
+                addLog(`配置检查失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 测试API地址
+        function testApiUrls() {
+            const container = document.getElementById('api-urls');
+            try {
+                if (!window.ENV_CONFIG) {
+                    throw new Error('ENV_CONFIG 未加载');
+                }
+
+                const urls = [
+                    { name: 'Base API URL', url: window.ENV_CONFIG.getApiUrl() },
+                    { name: 'Health Check', url: window.ENV_CONFIG.getApiUrl('/health') },
+                    { name: 'Auth Login', url: window.ENV_CONFIG.getApiUrl('/auth/login') },
+                    { name: 'Chat Completions', url: window.ENV_CONFIG.getApiUrl('/dify/chat-messages') }
+                ];
+
+                let html = '<h3>生成的API地址:</h3><ul>';
+                urls.forEach(item => {
+                    html += `<li><strong>${item.name}</strong>: <code>${item.url}</code></li>`;
+                });
+                html += '</ul>';
+
+                container.innerHTML = `<div class="info">${html}</div>`;
+                addLog('API地址测试完成');
+            } catch (error) {
+                container.innerHTML = `<div class="error">API地址测试失败: ${error.message}</div>`;
+                addLog(`API地址测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 健康检查测试
+        async function testHealthCheck() {
+            const container = document.getElementById('health-check');
+            container.innerHTML = '<div class="info">正在执行健康检查...</div>';
+            addLog('开始健康检查测试');
+
+            try {
+                if (!window.ENV_CONFIG) {
+                    throw new Error('ENV_CONFIG 未加载');
+                }
+
+                const healthUrl = window.ENV_CONFIG.getApiUrl('/health');
+                addLog(`健康检查地址: ${healthUrl}`);
+
+                const startTime = Date.now();
+                const response = await fetch(healthUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    },
+                    cache: 'no-cache'
+                });
+                const endTime = Date.now();
+                const responseTime = endTime - startTime;
+
+                let result = `
+                    <h3>健康检查结果:</h3>
+                    <ul>
+                        <li><strong>URL</strong>: <code>${healthUrl}</code></li>
+                        <li><strong>状态码</strong>: ${response.status}</li>
+                        <li><strong>状态文本</strong>: ${response.statusText}</li>
+                        <li><strong>响应时间</strong>: ${responseTime}ms</li>
+                        <li><strong>Content-Type</strong>: ${response.headers.get('content-type')}</li>
+                    </ul>
+                `;
+
+                if (response.ok) {
+                    try {
+                        const data = await response.json();
+                        result += `<h4>响应数据:</h4><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                        container.innerHTML = `<div class="success">${result}</div>`;
+                        addLog('✅ 健康检查成功', 'success');
+                    } catch (jsonError) {
+                        const text = await response.text();
+                        result += `<h4>响应文本:</h4><pre>${text}</pre>`;
+                        container.innerHTML = `<div class="success">${result}</div>`;
+                        addLog('✅ 健康检查成功（非JSON响应）', 'success');
+                    }
+                } else {
+                    try {
+                        const errorText = await response.text();
+                        result += `<h4>错误响应:</h4><pre>${errorText}</pre>`;
+                    } catch (e) {
+                        result += `<h4>无法读取错误响应</h4>`;
+                    }
+                    container.innerHTML = `<div class="error">${result}</div>`;
+                    addLog(`❌ 健康检查失败: ${response.status} ${response.statusText}`, 'error');
+                }
+
+            } catch (error) {
+                const errorInfo = `
+                    <h3>健康检查异常:</h3>
+                    <ul>
+                        <li><strong>错误类型</strong>: ${error.name}</li>
+                        <li><strong>错误消息</strong>: ${error.message}</li>
+                    </ul>
+                `;
+                container.innerHTML = `<div class="error">${errorInfo}</div>`;
+                addLog(`❌ 健康检查异常: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载完成后自动执行基础检查
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                addLog('页面加载完成，开始自动诊断');
+                checkEnvConfig();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

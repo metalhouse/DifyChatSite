@@ -18,7 +18,8 @@ export class SimpleAgentService {
      */
     async checkHealth() {
         try {
-            const response = await fetch(`${this.baseURL}/health`, {
+            const healthUrl = ENV_CONFIG?.getApiUrl('/health') || `${this.baseURL}${this.apiPrefix}/health`;
+            const response = await fetch(healthUrl, {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',

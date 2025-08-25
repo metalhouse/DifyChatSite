@@ -33,7 +33,7 @@
                     throw new Error('环境配置未加载');
                 }
 
-                const healthUrl = `${window.ENV_CONFIG.API_BASE_URL}/health`;
+                const healthUrl = window.ENV_CONFIG.getApiUrl('/health');
                 result.url = healthUrl;
 
                 !silent && console.log('🔍 检查后端健康状态:', healthUrl);

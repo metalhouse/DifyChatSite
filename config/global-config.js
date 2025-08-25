@@ -30,6 +30,8 @@ const IS_DEVELOPMENT = window.location.hostname === 'localhost' ||
                       window.location.hostname.startsWith('10.') ||
                       window.location.hostname.startsWith('172.');
 
+const IS_REVERSE_PROXY = window.location.hostname === 'nas.pznas.com';
+
 /**
  * 获取后端基础地址
  * 优先级：localStorage > 环境变量 > 自动检测

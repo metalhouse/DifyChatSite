@@ -129,8 +129,12 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
     window.APP_CONFIG.DEBUG.ENABLED = true;
     // 从全局配置继承，避免硬编码
     window.APP_CONFIG.API.BASE_URL = window.GLOBAL_CONFIG?.BACKEND?.BASE_URL || (window.getApiUrl ? window.getApiUrl('') : window.location.origin);
+} else if (window.location.hostname === 'nas.pznas.com') {
+    // 反代生产环境配置
+    window.APP_CONFIG.DEBUG.ENABLED = false;
+    window.APP_CONFIG.API.BASE_URL = 'https://nas.pznas.com:7990/api';
 } else {
-    // 生产环境配置
+    // 其他生产环境配置
     window.APP_CONFIG.DEBUG.ENABLED = false;
     window.APP_CONFIG.API.BASE_URL = 'https://your-production-api.com';
 }

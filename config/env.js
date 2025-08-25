@@ -16,6 +16,11 @@ const getEnvironment = () => {
     return 'development';
   }
   
+  // 反代部署特殊域名判断
+  if (hostname === 'nas.pznas.com') {
+    return 'production';
+  }
+  
   return 'production';
 };
 
@@ -61,10 +66,16 @@ const developmentConfig = {
 
 // 生产环境配置
 const productionConfig = {
-  // API配置
-  API_BASE_URL: window.PRODUCTION_API_URL || 'https://your-api-domain.com',
+  // API配置 - 支持反代部署
+  API_BASE_URL: window.PRODUCTION_API_URL || 
+                (window.location.hostname === 'nas.pznas.com' ? 
+                 'https://nas.pznas.com:7990' : 
+                 'https://your-api-domain.com'),
   API_PREFIX: '/api',
-  WS_URL: window.PRODUCTION_WS_URL || 'https://your-api-domain.com',
+  WS_URL: window.PRODUCTION_WS_URL || 
+          (window.location.hostname === 'nas.pznas.com' ? 
+           'wss://nas.pznas.com:7990' : 
+           'https://your-api-domain.com'),
   
   // 功能开关
   ENABLE_WEBSOCKET: true,

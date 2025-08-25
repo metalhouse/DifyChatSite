@@ -102,7 +102,7 @@
         // 健康检查
         async checkHealth() {
             try {
-                const response = await this.httpClient.get(`${this.baseURL}/health`);
+                const response = await this.httpClient.get('/health');
                 return response.ok;
             } catch (error) {
                 console.warn('健康检查失败:', error.message);
