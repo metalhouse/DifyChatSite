@@ -199,6 +199,35 @@ class RoomManagementService {
         }
     }
 
+    /**
+     * 离开房间
+     * @param {string} roomId 房间ID
+     * @returns {Promise<Object>} 操作结果
+     */
+    async leaveRoom(roomId) {
+        try {
+            if (ENV_CONFIG.isDebug()) {
+                console.log('🚪 离开房间:', roomId);
+            }
+
+            const response = await httpClient.post(
+                EndpointBuilder.build(API_ENDPOINTS.CHAT_ROOMS.LEAVE, { id: roomId })
+            );
+
+            // 清除本地缓存
+            this._clearRoomCache(roomId);
+
+            if (ENV_CONFIG.isDebug()) {
+                console.log('✅ 离开房间成功:', roomId);
+            }
+
+            return response.data;
+        } catch (error) {
+            console.error('❌ 离开房间失败:', error.message);
+            throw error;
+        }
+    }
+
     // ========================================
     // 👥 成员管理
     // ========================================

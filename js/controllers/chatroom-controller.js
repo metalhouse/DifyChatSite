@@ -398,6 +398,59 @@ class ChatroomController {
             this.showError('AI助手错误: ' + data.error);
         });
 
+        // 增强房间管理事件 - 基于后端报告
+        this.websocket.on('room-deleted', (data) => {
+            console.log('📢 [前端] 房间被删除:', data);
+            this.showWarning(`房间 "${data.roomName}" 已被房主删除`);
+            
+            // 如果当前在被删除的房间内，清空状态并返回房间列表
+            if (this.currentRoom && (this.currentRoom.id === data.roomId || this.currentRoom.roomId === data.roomId)) {
+                this.currentRoom = null;
+                this.updateRoomInfo(null);
+                this.clearChat();
+            }
+            
+            // 刷新房间列表
+            setTimeout(() => {
+                this.loadRooms();
+            }, 1000);
+        });
+
+        this.websocket.on('force-leave-room', (data) => {
+            console.log('🚪 [前端] 被强制离开房间:', data);
+            this.showWarning(`您已被强制离开房间: ${data.reason || '房间已删除'}`);
+            
+            // 清空当前房间状态
+            if (this.currentRoom && (this.currentRoom.id === data.roomId || this.currentRoom.roomId === data.roomId)) {
+                this.currentRoom = null;
+                this.updateRoomInfo(null);
+                this.clearChat();
+            }
+            
+            // 刷新房间列表
+            setTimeout(() => {
+                this.loadRooms();
+            }, 500);
+        });
+
+        this.websocket.on('user-kicked', (data) => {
+            console.log('👮 [前端] 用户被踢出:', data);
+            this.showWarning(`${data.username || '用户'} 被踢出房间`);
+            
+            // 如果是当前用户被踢出
+            if (this.currentUser && data.userId === this.currentUser.id) {
+                this.showError(`您已被踢出房间: ${data.reason || '无原因说明'}`);
+                this.currentRoom = null;
+                this.updateRoomInfo(null);
+                this.clearChat();
+                
+                // 刷新房间列表
+                setTimeout(() => {
+                    this.loadRooms();
+                }, 1000);
+            }
+        });
+
         this.websocket.on('agent-mentioned', (data) => {
             console.log('🤖 [前端] AI助手被提及:', data);
             this.showInfo(`AI助手 ${data.agentName} 被提及`);
@@ -679,9 +732,102 @@ class ChatroomController {
     }
 
     /**
+     * 离开房间
+     */
+    async leaveRoom() {
+        try {
+            if (!this.currentRoom) {
+                this.showWarning('您目前不在任何房间中');
+                return;
+            }
+
+            if (!this.currentUser) {
+                this.showError('用户未登录');
+                return;
+            }
+
+            const roomId = this.currentRoom.id || this.currentRoom.roomId;
+            const roomName = this.currentRoom.roomName || this.currentRoom.name;
+
+            // 检查是否为房主
+            const isOwner = this.currentRoom.creatorId === this.currentUser.id;
+            if (isOwner) {
+                this.showError('房主不能离开房间，如需解散房间请使用删除功能');
+                return;
+            }
+
+            console.log('🚪 [前端] 准备离开房间:', {
+                roomId: roomId,
+                roomName: roomName,
+                userId: this.currentUser.id
+            });
+
+            // 显示加载状态
+            this.showInfo('正在离开房间...');
+
+            // 调用后端API
+            await this.roomManagementService.leaveRoom(roomId);
+
+            // 通知WebSocket服务器
+            this.websocket.emit('leave-room', { roomId: roomId });
+
+            // 清空当前房间状态
+            this.currentRoom = null;
+            this.updateRoomInfo(null);
+            this.clearChat();
+
+            // 显示成功消息
+            this.showSuccess(`已离开房间: ${roomName}`);
+
+            // 刷新房间列表
+            setTimeout(() => {
+                this.loadRooms();
+            }, 500);
+
+        } catch (error) {
+            console.error('❌ [前端] 离开房间失败:', error);
+            this.showError('离开房间失败: ' + (error.message || '未知错误'));
+        }
+    }
+
+    /**
      * 更新房间信息
      */
     updateRoomInfo(roomData) {
+        if (!roomData) {
+            // 清空状态 - 没有选择房间
+            this.elements.currentRoomName.innerHTML = '<i class="fas fa-users me-2"></i>请选择聊天室';
+            
+            // 禁用输入控件
+            this.elements.messageInput.disabled = true;
+            this.elements.sendButton.disabled = true;
+            this.elements.mentionButton.disabled = true;
+            this.elements.messageInput.placeholder = '请先选择一个聊天室';
+
+            // 隐藏所有房间管理按钮
+            const onlineMembers = document.getElementById('onlineMembers');
+            const deleteRoomBtn = document.getElementById('deleteRoomBtn');
+            const manageMembersBtn = document.getElementById('manageMembersBtn');
+            const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+            
+            if (onlineMembers) onlineMembers.style.display = 'none';
+            if (deleteRoomBtn) deleteRoomBtn.style.display = 'none';
+            if (manageMembersBtn) manageMembersBtn.style.display = 'none';
+            if (leaveRoomBtn) leaveRoomBtn.style.display = 'none';
+
+            // 显示欢迎消息
+            this.elements.chatMessages.innerHTML = `
+                <div class="text-center text-muted mt-5">
+                    <i class="fas fa-users fa-3x mb-3"></i>
+                    <h5>欢迎使用 WebSocket 聊天室</h5>
+                    <p>请从左侧选择一个聊天室开始群聊，或创建新的聊天室</p>
+                </div>
+            `;
+            
+            this.processedMessages.clear();
+            return;
+        }
+
         // 更新房间名称
         this.elements.currentRoomName.innerHTML = `
             <i class="fas fa-users me-2"></i>
@@ -724,6 +870,22 @@ class ChatroomController {
             }
         }
 
+        // 显示/隐藏退出房间按钮
+        const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+        if (leaveRoomBtn && this.currentUser && roomData) {
+            const isOwner = roomData.creatorId === this.currentUser.id;
+            
+            if (isOwner) {
+                // 房主不能直接离开房间
+                leaveRoomBtn.style.display = 'none';
+                console.log('👑 [前端] 房主不能离开房间，隐藏退出按钮');
+            } else {
+                // 普通用户可以离开房间
+                leaveRoomBtn.style.display = 'inline-block';
+                console.log('👤 [前端] 显示退出房间按钮');
+            }
+        }
+
         // 清空消息区域和重置消息去重记录
         this.elements.chatMessages.innerHTML = '';
         this.processedMessages.clear(); // 清除消息去重记录
@@ -746,6 +908,20 @@ class ChatroomController {
 
         // 重新渲染房间列表以更新激活状态
         this.renderRoomList();
+    }
+
+    /**
+     * 清空聊天区域
+     */
+    clearChat() {
+        this.elements.chatMessages.innerHTML = `
+            <div class="text-center text-muted mt-5">
+                <i class="fas fa-users fa-3x mb-3"></i>
+                <h5>欢迎使用 WebSocket 聊天室</h5>
+                <p>请从左侧选择一个聊天室开始群聊，或创建新的聊天室</p>
+            </div>
+        `;
+        this.processedMessages.clear();
     }
 
     /**

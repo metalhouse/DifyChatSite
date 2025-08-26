@@ -620,6 +620,26 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
+        #leaveRoomBtn {
+            background: linear-gradient(135deg, #ffc107, #ffca2c) !important;
+            color: #212529 !important;
+            border: none !important;
+            transition: all 0.2s ease;
+            opacity: 0.9;
+        }
+
+        #leaveRoomBtn:hover {
+            background: linear-gradient(135deg, #ffca2c, #ffd43b) !important;
+            color: #212529 !important;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(255, 193, 7, 0.4);
+            opacity: 1;
+        }
+
+        #leaveRoomBtn:focus {
+            box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25) !important;
+        }
+
         /* 消息区域 */
         .chat-messages {
             flex: 1;
@@ -1600,6 +1620,9 @@
                         <button class="btn btn-outline-light btn-sm ms-2" onclick="showRoomMembersModal()" title="管理房间成员" id="manageMembersBtn">
                             <i class="fas fa-cog"></i>
                         </button>
+                        <button class="btn btn-warning btn-sm ms-2" onclick="confirmLeaveRoom()" title="离开房间" id="leaveRoomBtn" style="display: none;">
+                            <i class="fas fa-sign-out-alt"></i>
+                        </button>
                         <button class="btn btn-danger btn-sm ms-2" onclick="confirmDeleteRoom()" title="删除房间" id="deleteRoomBtn">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -1962,6 +1985,53 @@
         </div>
     </div>
 
+    <!-- 离开房间确认模态框 -->
+    <div class="modal fade" id="leaveRoomModal" tabindex="-1" aria-labelledby="leaveRoomModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="leaveRoomModalLabel">
+                        <i class="fas fa-sign-out-alt me-2"></i>
+                        离开房间确认
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>提示：</strong>您可以随时重新加入此房间。
+                    </div>
+                    <p>您即将离开房间：</p>
+                    <div class="border rounded p-3 mb-3 bg-light">
+                        <div class="d-flex align-items-center">
+                            <div class="room-avatar me-3" style="width: 40px; height: 40px; background: linear-gradient(135deg, #ffc107, #ffca2c);">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1" id="leaveRoomName">房间名称</h6>
+                                <small class="text-muted">
+                                    您将离开此房间
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        离开房间后，您将不再收到此房间的消息通知，但可以随时重新加入。
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>取消
+                    </button>
+                    <button type="button" class="btn btn-warning" id="confirmLeaveRoomBtn" onclick="executeLeaveRoom()">
+                        <i class="fas fa-sign-out-alt me-1"></i>确认离开房间
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 批量删除确认对话框 -->
     <div class="modal fade" id="confirmBatchDeleteModal" tabindex="-1" aria-labelledby="confirmBatchDeleteModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -2063,11 +2133,15 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('页面DOM加载完成');
             
-            // 初始时隐藏删除按钮
+            // 初始时隐藏所有房间管理按钮
             const deleteRoomBtn = document.getElementById('deleteRoomBtn');
+            const leaveRoomBtn = document.getElementById('leaveRoomBtn');
             const onlineMembers = document.getElementById('onlineMembers');
             if (deleteRoomBtn) {
                 deleteRoomBtn.style.display = 'none';
+            }
+            if (leaveRoomBtn) {
+                leaveRoomBtn.style.display = 'none';
             }
             if (onlineMembers) {
                 onlineMembers.style.display = 'none';
@@ -2752,6 +2826,7 @@
                     
                     // 隐藏删除按钮和其他房间相关按钮
                     document.getElementById('deleteRoomBtn').style.display = 'none';
+                    document.getElementById('leaveRoomBtn').style.display = 'none';
                     document.getElementById('manageMembersBtn').style.display = 'none';
                     document.getElementById('onlineMembers').style.display = 'none';
                     
@@ -2781,9 +2856,78 @@
             }
         }
         
+        // ========================================
+        // 🚪 离开房间功能
+        // ========================================
+        
+        // 确认离开房间 - 显示确认对话框
+        function confirmLeaveRoom() {
+            if (!window.chatroomController || !window.chatroomController.currentRoom) {
+                showToast('请先选择一个房间', 'warning');
+                return;
+            }
+            
+            const currentRoom = window.chatroomController.currentRoom;
+            const currentUser = window.chatroomController.currentUser;
+            
+            // 检查是否为房主
+            if (currentRoom.creatorId === currentUser?.id) {
+                showToast('房主不能离开房间，如需解散房间请使用删除功能', 'error');
+                return;
+            }
+            
+            // 填充模态框信息
+            document.getElementById('leaveRoomName').textContent = currentRoom.name || currentRoom.roomName || '未知房间';
+            
+            // 显示模态框
+            const leaveModal = new bootstrap.Modal(document.getElementById('leaveRoomModal'));
+            leaveModal.show();
+        }
+        
+        // 执行离开房间
+        async function executeLeaveRoom() {
+            try {
+                if (!window.chatroomController || !window.chatroomController.currentRoom) {
+                    showToast('请先选择一个房间', 'warning');
+                    return;
+                }
+
+                const confirmLeaveBtn = document.getElementById('confirmLeaveRoomBtn');
+                const originalText = confirmLeaveBtn.innerHTML;
+                
+                // 显示加载状态
+                confirmLeaveBtn.disabled = true;
+                confirmLeaveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>离开中...';
+
+                // 调用控制器的离开房间方法
+                await window.chatroomController.leaveRoom();
+
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('leaveRoomModal'));
+                if (modal) {
+                    modal.hide();
+                }
+
+                showToast('已成功离开房间', 'success');
+                
+            } catch (error) {
+                console.error('离开房间失败:', error);
+                showToast(`离开房间失败: ${error.message}`, 'error');
+                
+                // 恢复按钮状态
+                const confirmLeaveBtn = document.getElementById('confirmLeaveRoomBtn');
+                confirmLeaveBtn.disabled = false;
+                confirmLeaveBtn.innerHTML = '<i class="fas fa-sign-out-alt me-1"></i>确认离开房间';
+            }
+        }
+        
         // 将删除房间功能添加到全局
         window.confirmDeleteRoom = confirmDeleteRoom;
         window.executeDeleteRoom = executeDeleteRoom;
+        
+        // 将离开房间功能添加到全局
+        window.confirmLeaveRoom = confirmLeaveRoom;
+        window.executeLeaveRoom = executeLeaveRoom;
 
         // 调试：手动显示删除按钮
         window.showDeleteButton = function() {
