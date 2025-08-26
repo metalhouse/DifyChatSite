@@ -242,6 +242,13 @@ class ChatroomController {
             this.currentRoom = data;
             this.updateRoomInfo(data);
             this.showSuccess(`成功加入房间: ${data.roomName || data.name || data.roomId}`);
+            
+            // 主动请求房间状态和在线用户信息
+            setTimeout(() => {
+                const roomId = data.id || data.roomId;
+                console.log('🔄 [前端] 请求房间状态和在线用户信息:', roomId);
+                this.websocket.emit('get-room-state', { roomId: roomId });
+            }, 500);
         });
 
         this.websocket.on('join-room-error', (data) => {
@@ -252,6 +259,23 @@ class ChatroomController {
         this.websocket.on('room-state', (roomInfo) => {
             console.log('房间状态更新:', roomInfo);
             this.updateOnlineMembers(roomInfo.onlineUsers || []);
+        });
+
+        // 额外的在线用户更新事件
+        this.websocket.on('online-users', (data) => {
+            console.log('📊 [前端] 在线用户更新:', data);
+            if (data.users) {
+                this.updateOnlineMembers(data.users);
+            } else if (Array.isArray(data)) {
+                this.updateOnlineMembers(data);
+            }
+        });
+
+        this.websocket.on('room-users-updated', (data) => {
+            console.log('👥 [前端] 房间用户列表更新:', data);
+            if (data.onlineUsers) {
+                this.updateOnlineMembers(data.onlineUsers);
+            }
         });
 
         // 创建房间相关事件
@@ -341,11 +365,27 @@ class ChatroomController {
         this.websocket.on('user-joined', (data) => {
             console.log('用户加入房间:', data);
             this.showInfo(`${data.username} 加入了房间`);
+            
+            // 更新在线用户列表
+            if (data.onlineUsers) {
+                this.updateOnlineMembers(data.onlineUsers);
+            } else {
+                // 如果没有完整列表，请求房间状态更新
+                this.websocket.emit('get-room-state', { roomId: this.currentRoom?.id || this.currentRoom?.roomId });
+            }
         });
 
         this.websocket.on('user-left', (data) => {
             console.log('用户离开房间:', data);
             this.showInfo(`${data.username} 离开了房间`);
+            
+            // 更新在线用户列表
+            if (data.onlineUsers) {
+                this.updateOnlineMembers(data.onlineUsers);
+            } else {
+                // 如果没有完整列表，请求房间状态更新
+                this.websocket.emit('get-room-state', { roomId: this.currentRoom?.id || this.currentRoom?.roomId });
+            }
         });
 
         // 正在输入事件
@@ -724,6 +764,12 @@ class ChatroomController {
                 
                 this.updateRoomInfo(this.currentRoom);
                 this.showSuccess(`已选择房间: ${this.currentRoom.roomName}`);
+                
+                // 请求房间状态和在线用户信息
+                setTimeout(() => {
+                    console.log('🔄 [前端] 请求房间状态和在线用户信息 (临时方案):', roomId);
+                    this.websocket.emit('get-room-state', { roomId: roomId });
+                }, 500);
             }
         }, 2000);
 
@@ -1421,33 +1467,224 @@ class ChatroomController {
      * 更新在线成员
      */
     updateOnlineMembers(onlineUsers) {
+        console.log('👥 [前端] 更新在线成员:', onlineUsers);
         this.onlineUsers = onlineUsers;
         
         const memberAvatarsElement = this.elements.memberAvatars;
         if (!onlineUsers || onlineUsers.length === 0) {
+            console.log('👥 [前端] 没有在线用户，清空头像显示');
             memberAvatarsElement.innerHTML = '';
             return;
         }
 
-        const avatarsHTML = onlineUsers.slice(0, 5).map(user => {
+        const avatarsHTML = onlineUsers.slice(0, 5).map((user, index) => {
             const initial = (user.username || user.name || '?').charAt(0).toUpperCase();
+            const fullName = this.escapeHtml(user.username || user.name || '未知用户');
+            const userId = user.id || index;
+            
             return `
-                <div class="member-avatar" title="${this.escapeHtml(user.username || user.name || '未知用户')}">
+                <div class="member-avatar" 
+                     data-bs-toggle="tooltip" 
+                     data-bs-placement="top" 
+                     data-bs-title="${fullName}"
+                     data-user-id="${userId}"
+                     data-username="${fullName}"
+                     style="cursor: pointer;">
                     ${initial}
                 </div>
             `;
         }).join('');
 
         memberAvatarsElement.innerHTML = avatarsHTML;
+        
+        // 初始化 Bootstrap tooltips
+        const tooltipTriggerList = memberAvatarsElement.querySelectorAll('[data-bs-toggle="tooltip"]');
+        const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl, {
+            delay: { show: 200, hide: 100 }
+        }));
+        
+        // 添加点击事件显示用户详情
+        memberAvatarsElement.querySelectorAll('.member-avatar').forEach(avatar => {
+            avatar.addEventListener('click', (e) => {
+                const username = e.target.dataset.username;
+                const userId = e.target.dataset.userId;
+                this.showUserDetails(username, userId);
+            });
+        });
+        
+        console.log('👥 [前端] 已更新在线用户头像:', onlineUsers.length, '个用户');
 
         // 如果有更多用户，显示数量
         if (onlineUsers.length > 5) {
-            memberAvatarsElement.innerHTML += `
-                <div class="member-avatar" title="${onlineUsers.length - 5} 更多用户">
+            const moreUsersHTML = `
+                <div class="member-avatar more-users" 
+                     data-bs-toggle="tooltip" 
+                     data-bs-placement="top" 
+                     data-bs-title="还有 ${onlineUsers.length - 5} 位用户在线"
+                     style="background: linear-gradient(135deg, #6c757d, #495057); cursor: pointer;"
+                     onclick="chatController.showAllUsers()">
                     +${onlineUsers.length - 5}
                 </div>
             `;
+            memberAvatarsElement.innerHTML += moreUsersHTML;
+            
+            // 为"更多用户"按钮也初始化tooltip
+            const moreUsersTooltip = new bootstrap.Tooltip(memberAvatarsElement.querySelector('.more-users'), {
+                delay: { show: 200, hide: 100 }
+            });
         }
+    }
+
+    /**
+     * 显示所有在线用户
+     */
+    showAllUsers() {
+        console.log('👥 [前端] 显示所有在线用户:', this.onlineUsers);
+        
+        if (!this.onlineUsers || this.onlineUsers.length === 0) {
+            this.showError('当前没有在线用户');
+            return;
+        }
+
+        const allUsersHTML = `
+            <div class="modal fade" id="allUsersModal" tabindex="-1" aria-labelledby="allUsersModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="allUsersModalLabel">
+                                <i class="fas fa-users me-2"></i>在线成员 (${this.onlineUsers.length})
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row">
+                                ${this.onlineUsers.map((user, index) => {
+                                    const initial = (user.username || user.name || '?').charAt(0).toUpperCase();
+                                    const fullName = this.escapeHtml(user.username || user.name || '未知用户');
+                                    const userId = user.id || index;
+                                    
+                                    return `
+                                        <div class="col-md-6 mb-3">
+                                            <div class="d-flex align-items-center p-3 border rounded cursor-pointer user-item"
+                                                 data-user-id="${userId}" 
+                                                 data-username="${fullName}"
+                                                 onclick="chatController.showUserDetails('${fullName}', '${userId}')">
+                                                <div class="member-avatar me-3" style="cursor: pointer;">
+                                                    ${initial}
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <h6 class="mb-1">${fullName}</h6>
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-circle text-success me-1"></i>在线
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 移除已存在的所有用户模态框
+        const existingModal = document.getElementById('allUsersModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // 添加新的模态框到页面
+        document.body.insertAdjacentHTML('beforeend', allUsersHTML);
+
+        // 添加hover效果样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .user-item:hover {
+                background-color: rgba(0, 123, 255, 0.1);
+                border-color: #007bff !important;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+                transition: all 0.2s ease;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('allUsersModal'));
+        modal.show();
+
+        // 模态框隐藏后移除DOM
+        document.getElementById('allUsersModal').addEventListener('hidden.bs.modal', function () {
+            this.remove();
+            if (style.parentNode) {
+                style.parentNode.removeChild(style);
+            }
+        });
+    }
+
+    /**
+     * 显示用户详情
+     */
+    showUserDetails(username, userId) {
+        console.log('👤 [前端] 显示用户详情:', { username, userId });
+        
+        // 创建用户详情弹窗内容
+        const userDetailsHTML = `
+            <div class="modal fade" id="userDetailsModal" tabindex="-1" aria-labelledby="userDetailsModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="userDetailsModalLabel">
+                                <i class="fas fa-user me-2"></i>用户信息
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="member-avatar me-3" style="font-size: 2rem; width: 60px; height: 60px; line-height: 60px;">
+                                    ${(username || '?').charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <h5 class="mb-1">${this.escapeHtml(username || '未知用户')}</h5>
+                                    <small class="text-muted">用户ID: ${userId || '未知'}</small>
+                                </div>
+                            </div>
+                            <div class="user-status">
+                                <span class="badge bg-success">
+                                    <i class="fas fa-circle me-1"></i>在线
+                                </span>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // 移除已存在的用户详情模态框
+        const existingModal = document.getElementById('userDetailsModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // 添加新的模态框到页面
+        document.body.insertAdjacentHTML('beforeend', userDetailsHTML);
+
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('userDetailsModal'));
+        modal.show();
+
+        // 模态框隐藏后移除DOM
+        document.getElementById('userDetailsModal').addEventListener('hidden.bs.modal', function () {
+            this.remove();
+        });
     }
 
     /**
@@ -1955,6 +2192,22 @@ class ChatroomController {
         }
         
         console.log('聊天室控制器已销毁');
+    }
+
+    // 测试方法 - 手动请求在线用户信息
+    testRequestOnlineUsers() {
+        if (!this.currentRoom) {
+            console.warn('⚠️ [测试] 当前没有加入房间');
+            return;
+        }
+        
+        const roomId = this.currentRoom.id || this.currentRoom.roomId;
+        console.log('🔬 [测试] 手动请求房间状态和在线用户:', roomId);
+        this.websocket.emit('get-room-state', { roomId: roomId });
+        
+        // 也尝试其他可能的事件名称
+        this.websocket.emit('get-online-users', { roomId: roomId });
+        this.websocket.emit('room-info', { roomId: roomId });
     }
 }
 

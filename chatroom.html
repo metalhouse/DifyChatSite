@@ -570,21 +570,39 @@
 
         .member-avatars {
             display: flex;
-            margin-left: 0.5rem;
+            align-items: center;
+            margin: var(--space-2, 0.5rem) 0;
         }
 
         .member-avatar {
-            width: 24px;
-            height: 24px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
-            background: #28a745;
-            display: flex;
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 0.7rem;
-            margin-left: -0.25rem;
-            border: 2px solid white;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin: 0 4px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            position: relative;
+            z-index: 1;
+        }
+
+        .member-avatar:hover {
+            transform: translateY(-2px) scale(1.1);
+            box-shadow: 0 8px 25px rgba(0, 123, 255, 0.3);
+            z-index: 10;
+            border-color: #007bff;
+        }
+
+        .member-avatar:active {
+            transform: translateY(-1px) scale(1.05);
         }
 
         /* 房间管理按钮样式 */
@@ -3288,11 +3306,32 @@
             executeBtn.disabled = !this.checked;
         });
 
+        // 在线用户测试功能
+        window.testOnlineUsers = function() {
+            console.log('🔬 测试在线用户功能...');
+            if (!window.chatroomController) {
+                console.log('❌ ChatroomController 未初始化');
+                return;
+            }
+            
+            // 调用测试方法
+            window.chatroomController.testRequestOnlineUsers();
+            
+            // 显示当前在线用户状态
+            console.log('👥 当前在线用户:', window.chatroomController.onlineUsers);
+            
+            // 检查memberAvatars元素
+            const memberAvatars = document.getElementById('memberAvatars');
+            console.log('🎭 头像容器元素:', memberAvatars);
+            console.log('🎭 头像容器内容:', memberAvatars?.innerHTML);
+        };
+
         // 页面加载完成后显示测试提示
         setTimeout(() => {
             if (window.ENV_CONFIG && window.ENV_CONFIG.DEV_TOOLS_ENABLED) {
                 console.log('\n🔧 开发工具已启用');
                 console.log('输入 showTestHelp() 查看已读状态测试命令');
+                console.log('输入 testOnlineUsers() 测试在线用户功能');
             }
         }, 2000);
     </script>
