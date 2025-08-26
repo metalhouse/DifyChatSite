@@ -448,7 +448,7 @@ class ChatroomController {
         });
 
         // 创建房间按钮 - 在模态框中的实际创建按钮
-        const modalCreateBtn = document.getElementById('createRoomBtn');
+        const modalCreateBtn = document.getElementById('modalCreateRoomBtn');
         if (modalCreateBtn) {
             modalCreateBtn.addEventListener('click', () => {
                 console.log('🔧 [前端] 模态框中的创建房间按钮被点击');
@@ -457,6 +457,28 @@ class ChatroomController {
             console.log('✅ [前端] 创建房间按钮事件绑定成功');
         } else {
             console.error('❌ [前端] 创建房间按钮元素未找到');
+        }
+
+        // 防止创建房间表单的默认提交行为
+        const createRoomForm = document.getElementById('createRoomForm');
+        if (createRoomForm) {
+            createRoomForm.addEventListener('submit', (e) => {
+                e.preventDefault(); // 阻止表单默认提交
+                console.log('🔧 [前端] 创建房间表单提交被拦截');
+                this.createRoom(); // 手动调用创建函数
+            });
+            console.log('✅ [前端] 创建房间表单事件绑定成功');
+        }
+
+        // 创建房间输入框回车键支持
+        const roomNameInput = document.getElementById('roomName');
+        if (roomNameInput) {
+            roomNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // 防止表单提交
+                    this.createRoom();
+                }
+            });
         }
 
         // 消息输入框自动调整高度
@@ -541,10 +563,19 @@ class ChatroomController {
             return;
         }
 
-        const roomsHTML = this.rooms.map(room => `
+        const isDeleteMode = document.body.classList.contains('room-delete-mode');
+        const roomsHTML = this.rooms.map(room => {
+            const canDelete = this.canUserDeleteRoom(room);
+            
+            return `
             <div class="room-item ${room.id === this.currentRoom?.id || room.id === this.currentRoom?.roomId ? 'active' : ''}" 
-                 onclick="chatroomController.joinRoom('${room.id}')">
-                <div class="room-avatar">
+                 ${!isDeleteMode ? `onclick="chatroomController.joinRoom('${room.id}')"` : ''}>
+                ${isDeleteMode && canDelete ? `
+                    <div class="room-checkbox-wrapper">
+                        <input type="checkbox" class="room-checkbox" data-room-id="${room.id}" data-room-name="${this.escapeHtml(room.name || room.roomName || room.title)}" onchange="updateDeleteButtonState()">
+                    </div>
+                ` : ''}
+                <div class="room-avatar ${isDeleteMode && !canDelete ? 'disabled' : ''}">
                     <i class="fas fa-users"></i>
                 </div>
                 <div class="room-info">
@@ -552,12 +583,40 @@ class ChatroomController {
                     <div class="room-meta">
                         <span class="room-members">${room.memberCount || room.members_count || 0} 人</span>
                         <div class="room-status ${room.isActive !== false ? '' : 'inactive'}"></div>
+                        ${isDeleteMode && !canDelete ? '<span class="text-muted" style="font-size: 0.7rem;">(无权限)</span>' : ''}
                     </div>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         roomListElement.innerHTML = roomsHTML;
+    }
+
+    /**
+     * 检查用户是否可以删除房间
+     */
+    canUserDeleteRoom(room) {
+        if (!this.currentUser || !room) {
+            console.log('🔍 [权限检查] 用户或房间信息缺失:', { 
+                user: this.currentUser, 
+                room: room 
+            });
+            return false;
+        }
+        
+        // 使用 creatorId 字段（后端返回的驼峰命名格式）
+        const isOwner = room.creatorId === this.currentUser.id;
+        
+        console.log('🔍 [权限检查] 删除权限验证:', {
+            roomId: room.id || room.roomId,
+            roomName: room.name || room.roomName,
+            currentUserId: this.currentUser.id,
+            roomCreatorId: room.creatorId,
+            isOwner: isOwner
+        });
+        
+        return isOwner;
     }
 
     /**
@@ -634,6 +693,36 @@ class ChatroomController {
         this.elements.sendButton.disabled = false;
         this.elements.mentionButton.disabled = false;
         this.elements.messageInput.placeholder = '输入您的消息... (Shift+Enter换行，Enter发送，@智能体名 可以@智能体)';
+
+        // 显示/隐藏房间管理按钮
+        const onlineMembers = document.getElementById('onlineMembers');
+        const deleteRoomBtn = document.getElementById('deleteRoomBtn');
+        const manageMembersBtn = document.getElementById('manageMembersBtn');
+        
+        if (onlineMembers) onlineMembers.style.display = 'flex';
+        if (manageMembersBtn) manageMembersBtn.style.display = 'inline-block';
+        
+        // 检查用户是否有删除房间权限 (房间创建者)
+        if (deleteRoomBtn && this.currentUser && roomData) {
+            // 使用 creatorId 字段（后端返回的驼峰命名格式）
+            const isOwner = roomData.creatorId === this.currentUser.id;
+            
+            console.log('🔍 [权限检查] 房间信息:', {
+                roomId: roomData.id || roomData.roomId,
+                roomName: roomData.roomName || roomData.name,
+                creatorId: roomData.creatorId,
+                currentUserId: this.currentUser.id,
+                isOwner: isOwner
+            });
+            
+            if (isOwner) {
+                deleteRoomBtn.style.display = 'inline-block';
+                console.log('👑 [前端] 显示删除按钮');
+            } else {
+                deleteRoomBtn.style.display = 'none';
+                console.log('👤 [前端] 用户不是房间创建者，隐藏删除按钮');
+            }
+        }
 
         // 清空消息区域和重置消息去重记录
         this.elements.chatMessages.innerHTML = '';
@@ -1514,6 +1603,160 @@ class ChatroomController {
             showToast(message, 'info');
         } else {
             console.info('信息:', message);
+        }
+    }
+
+    /**
+     * 切换删除模式
+     */
+    toggleDeleteMode() {
+        const body = document.body;
+        const deleteBtn = document.getElementById('deleteModeBtn');
+        const cancelBtn = document.getElementById('cancelDeleteBtn');
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        
+        if (body.classList.contains('room-delete-mode')) {
+            // 退出删除模式
+            body.classList.remove('room-delete-mode');
+            deleteBtn.style.display = 'inline-block';
+            cancelBtn.style.display = 'none';
+            confirmBtn.style.display = 'none';
+            
+            // 重新渲染房间列表移除复选框
+            this.renderRoomList();
+            console.log('📤 [前端] 退出删除模式');
+        } else {
+            // 进入删除模式
+            body.classList.add('room-delete-mode');
+            deleteBtn.style.display = 'none';
+            cancelBtn.style.display = 'inline-block';
+            confirmBtn.style.display = 'none'; // 初始状态下隐藏，直到选择房间
+            
+            // 重新渲染房间列表添加复选框
+            this.renderRoomList();
+            console.log('📤 [前端] 进入删除模式');
+        }
+    }
+
+    /**
+     * 更新删除按钮状态
+     */
+    updateDeleteButtonState() {
+        const confirmBtn = document.getElementById('confirmDeleteBtn');
+        const checkboxes = document.querySelectorAll('.room-checkbox:checked');
+        
+        if (checkboxes.length > 0) {
+            confirmBtn.style.display = 'inline-block';
+            confirmBtn.textContent = `删除 (${checkboxes.length})`;
+        } else {
+            confirmBtn.style.display = 'none';
+        }
+    }
+
+    /**
+     * 确认批量删除
+     */
+    confirmBatchDelete() {
+        const checkboxes = document.querySelectorAll('.room-checkbox:checked');
+        
+        if (checkboxes.length === 0) {
+            this.showWarning('请先选择要删除的房间');
+            return;
+        }
+
+        // 收集要删除的房间信息
+        const selectedRooms = Array.from(checkboxes).map(checkbox => ({
+            id: checkbox.dataset.roomId,
+            name: checkbox.dataset.roomName
+        }));
+
+        // 显示确认对话框
+        const modal = new bootstrap.Modal(document.getElementById('confirmBatchDeleteModal'));
+        
+        // 填充房间列表
+        const roomListElement = document.getElementById('selectedRoomsList');
+        roomListElement.innerHTML = selectedRooms.map(room => `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>${this.escapeHtml(room.name)}</span>
+                <span class="badge bg-danger">删除</span>
+            </li>
+        `).join('');
+        
+        // 更新确认文本
+        const countElement = document.getElementById('deleteRoomCount');
+        countElement.textContent = selectedRooms.length;
+        
+        // 保存待删除房间数据供确认时使用
+        this.pendingDeleteRooms = selectedRooms;
+        
+        modal.show();
+    }
+
+    /**
+     * 执行批量删除
+     */
+    async executeBatchDelete() {
+        if (!this.pendingDeleteRooms || this.pendingDeleteRooms.length === 0) {
+            this.showError('没有要删除的房间');
+            return;
+        }
+
+        const deleteButton = document.getElementById('executeBatchDeleteBtn');
+        const originalText = deleteButton.textContent;
+        
+        try {
+            // 显示加载状态
+            deleteButton.disabled = true;
+            deleteButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 删除中...';
+            
+            let successCount = 0;
+            let errorCount = 0;
+            const errors = [];
+
+            // 逐个删除房间
+            for (const room of this.pendingDeleteRooms) {
+                try {
+                    await this.roomManagementService.deleteRoom(room.id);
+                    successCount++;
+                    console.log(`✅ [前端] 房间删除成功: ${room.name}`);
+                } catch (error) {
+                    errorCount++;
+                    errors.push(`${room.name}: ${error.message}`);
+                    console.error(`❌ [前端] 房间删除失败: ${room.name}`, error);
+                }
+            }
+
+            // 显示结果
+            if (successCount > 0) {
+                this.showSuccess(`成功删除 ${successCount} 个房间`);
+            }
+            
+            if (errorCount > 0) {
+                this.showError(`删除失败 ${errorCount} 个房间:\n${errors.join('\n')}`);
+            }
+
+            // 关闭确认对话框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('confirmBatchDeleteModal'));
+            if (modal) {
+                modal.hide();
+            }
+
+            // 退出删除模式
+            this.toggleDeleteMode();
+
+            // 刷新房间列表
+            this.loadRooms();
+
+        } catch (error) {
+            console.error('💥 [前端] 批量删除房间失败:', error);
+            this.showError('批量删除失败: ' + error.message);
+        } finally {
+            // 恢复按钮状态
+            deleteButton.disabled = false;
+            deleteButton.textContent = originalText;
+            
+            // 清除待删除数据
+            this.pendingDeleteRooms = null;
         }
     }
 

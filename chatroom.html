@@ -160,6 +160,33 @@
             transform: scale(1.05);
         }
 
+        .delete-mode-btn {
+            background: #dc3545 !important;
+        }
+
+        .delete-mode-btn:hover {
+            background: #c82333 !important;
+        }
+
+        .delete-mode-btn.active {
+            background: #bd2130 !important;
+            box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.3);
+        }
+
+        .confirm-delete-btn {
+            background: #dc3545 !important;
+            animation: pulse-red 2s infinite;
+        }
+
+        .confirm-delete-btn:hover {
+            background: #c82333 !important;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
         /* 标签页内容区域 */
         .tab-content {
             flex: 1;
@@ -414,6 +441,54 @@
             background: #6c757d;
         }
 
+        /* 房间删除模式样式 */
+        .room-delete-mode .room-item {
+            cursor: default !important;
+        }
+
+        .room-delete-mode .room-item:hover {
+            transform: none !important;
+        }
+
+        .room-checkbox-wrapper {
+            position: absolute;
+            top: 50%;
+            left: 10px;
+            transform: translateY(-50%);
+            z-index: 2;
+        }
+
+        .room-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #dc3545;
+        }
+
+        .room-delete-mode .room-item {
+            padding-left: 40px;
+            position: relative;
+        }
+
+        .room-delete-mode .room-avatar.disabled {
+            opacity: 0.5;
+            filter: grayscale(50%);
+        }
+
+        .room-delete-mode .room-item .room-info {
+            opacity: 1;
+        }
+
+        .room-delete-mode .room-item:has(.room-checkbox:checked) {
+            background: rgba(220, 53, 69, 0.1);
+            border-color: #dc3545;
+        }
+
+        .room-delete-mode .room-item:has(.room-checkbox:checked) .room-name {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
         /* 聊天区域 */
         .chat-area {
             flex: 1;
@@ -510,6 +585,39 @@
             font-size: 0.7rem;
             margin-left: -0.25rem;
             border: 2px solid white;
+        }
+
+        /* 房间管理按钮样式 */
+        #deleteRoomBtn {
+            background: linear-gradient(135deg, #dc3545, #c82333) !important;
+            color: white !important;
+            border: none !important;
+            transition: all 0.2s ease;
+            opacity: 0.9;
+        }
+
+        #deleteRoomBtn:hover {
+            background: linear-gradient(135deg, #c82333, #bd2130) !important;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+            opacity: 1;
+        }
+
+        #deleteRoomBtn:focus {
+            box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+        }
+
+        #manageMembersBtn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        #manageMembersBtn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
         /* 消息区域 */
@@ -1409,6 +1517,15 @@
                     <button class="create-btn" id="createRoomBtn" onclick="showCreateRoomModal()" title="创建聊天室">
                         <i class="fas fa-plus"></i>
                     </button>
+                    <button class="create-btn delete-mode-btn" id="deleteModeBtn" onclick="toggleDeleteMode()" title="删除房间模式" style="display: block; background: #dc3545;">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    <button class="create-btn" id="cancelDeleteBtn" onclick="toggleDeleteMode()" title="取消删除" style="display: none; background: #6c757d;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <button class="create-btn confirm-delete-btn" id="confirmDeleteBtn" onclick="confirmBatchDelete()" title="确认删除选中的房间" style="display: none; background: #dc3545;">
+                        <i class="fas fa-trash"></i>
+                    </button>
                     <button class="create-btn" id="addFriendBtn" onclick="showAddFriendModal()" title="添加好友" style="display:none;">
                         <i class="fas fa-user-plus"></i>
                     </button>
@@ -1482,6 +1599,9 @@
                         </div>
                         <button class="btn btn-outline-light btn-sm ms-2" onclick="showRoomMembersModal()" title="管理房间成员" id="manageMembersBtn">
                             <i class="fas fa-cog"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm ms-2" onclick="confirmDeleteRoom()" title="删除房间" id="deleteRoomBtn">
+                            <i class="fas fa-trash"></i>
                         </button>
                     </div>
                     
@@ -1581,7 +1701,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-success" id="createRoomBtn">
+                    <button type="button" class="btn btn-success" id="modalCreateRoomBtn">
                         <i class="fas fa-plus me-1"></i>创建
                     </button>
                 </div>
@@ -1788,6 +1908,102 @@
         </div>
     </div>
 
+    <!-- 删除房间确认模态框 -->
+    <div class="modal fade" id="deleteRoomModal" tabindex="-1" aria-labelledby="deleteRoomModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteRoomModalLabel">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        删除房间确认
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-warning me-2"></i>
+                        <strong>警告：</strong>此操作不可撤销！
+                    </div>
+                    <p>您即将删除房间：</p>
+                    <div class="border rounded p-3 mb-3 bg-light">
+                        <div class="d-flex align-items-center">
+                            <div class="room-avatar me-3" style="width: 40px; height: 40px; background: linear-gradient(135deg, #dc3545, #c82333);">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1" id="deleteRoomName">房间名称</h6>
+                                <small class="text-muted">
+                                    <span id="deleteRoomMemberCount">0</span> 个成员
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-danger">
+                        <i class="fas fa-info-circle me-1"></i>
+                        删除房间后，所有聊天记录和成员关系将被永久删除，无法恢复。
+                    </p>
+                    <div class="mb-3">
+                        <label for="confirmRoomName" class="form-label">
+                            为确认删除，请输入房间名称：
+                        </label>
+                        <input type="text" class="form-control" id="confirmRoomName" placeholder="输入房间名称确认删除">
+                        <div class="form-text">只有输入正确的房间名称才能删除</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>取消
+                    </button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteRoomBtn" disabled onclick="executeDeleteRoom()">
+                        <i class="fas fa-trash me-1"></i>确认删除房间
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量删除确认对话框 -->
+    <div class="modal fade" id="confirmBatchDeleteModal" tabindex="-1" aria-labelledby="confirmBatchDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="confirmBatchDeleteModalLabel">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        确认删除房间
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning d-flex align-items-center mb-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <div>
+                            <strong>警告：</strong>此操作将永久删除选中的房间及其所有消息记录，无法恢复！
+                        </div>
+                    </div>
+                    
+                    <p class="mb-2">您即将删除以下 <strong id="deleteRoomCount">0</strong> 个房间：</p>
+                    <ul class="list-group mb-3" id="selectedRoomsList">
+                        <!-- 动态填充房间列表 -->
+                    </ul>
+                    
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="confirmDeleteCheckbox">
+                        <label class="form-check-label text-danger" for="confirmDeleteCheckbox">
+                            <strong>我确认要删除这些房间</strong>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="executeBatchDeleteBtn" onclick="chatroomController.executeBatchDelete()" disabled>
+                        <i class="fas fa-trash-alt me-1"></i>
+                        确认删除
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
@@ -1846,6 +2062,16 @@
         // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
             console.log('页面DOM加载完成');
+            
+            // 初始时隐藏删除按钮
+            const deleteRoomBtn = document.getElementById('deleteRoomBtn');
+            const onlineMembers = document.getElementById('onlineMembers');
+            if (deleteRoomBtn) {
+                deleteRoomBtn.style.display = 'none';
+            }
+            if (onlineMembers) {
+                onlineMembers.style.display = 'none';
+            }
             
             // 检查用户登录状态
             if (!TokenManager || !TokenManager.getAccessToken()) {
@@ -1953,6 +2179,13 @@
         // 创建聊天室模态框
         function showCreateRoomModal() {
             console.log('显示创建房间模态框');
+            
+            // 清空表单内容
+            const form = document.getElementById('createRoomForm');
+            if (form) {
+                form.reset();
+            }
+            
             const modal = new bootstrap.Modal(document.getElementById('createRoomModal'));
             modal.show();
         }
@@ -2398,6 +2631,187 @@
         window.inviteSelectedFriends = inviteSelectedFriends;
         window.searchFriendsToInvite = searchFriendsToInvite;
 
+        // ========================================
+        // 🗑️ 删除房间功能
+        // ========================================
+        
+        // 确认删除房间 - 显示确认对话框
+        function confirmDeleteRoom() {
+            if (!window.chatroomController || !window.chatroomController.currentRoom) {
+                showToast('请先选择一个房间', 'warning');
+                return;
+            }
+            
+            const currentRoom = window.chatroomController.currentRoom;
+            const currentUser = window.chatroomController.currentUser;
+            
+            // 检查权限 - 只有房间创建者或管理员可以删除房间
+            if (currentRoom.createdBy !== currentUser?.id && 
+                currentRoom.owner !== currentUser?.id && 
+                currentRoom.ownerId !== currentUser?.id) {
+                showToast('只有房间创建者可以删除房间', 'error');
+                return;
+            }
+            
+            // 填充模态框信息
+            document.getElementById('deleteRoomName').textContent = currentRoom.name || currentRoom.roomName || '未知房间';
+            document.getElementById('deleteRoomMemberCount').textContent = currentRoom.memberCount || currentRoom.members?.length || 0;
+            
+            // 重置表单状态
+            const confirmInput = document.getElementById('confirmRoomName');
+            const confirmBtn = document.getElementById('confirmDeleteRoomBtn');
+            
+            confirmInput.value = '';
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<i class="fas fa-lock me-1"></i>输入房间名称确认';
+            confirmBtn.classList.remove('btn-danger');
+            confirmBtn.classList.add('btn-secondary');
+            
+            // 显示模态框
+            const deleteModal = new bootstrap.Modal(document.getElementById('deleteRoomModal'));
+            deleteModal.show();
+        }
+        
+        // 监听输入框变化，验证房间名称
+        document.addEventListener('DOMContentLoaded', function() {
+            const confirmRoomNameInput = document.getElementById('confirmRoomName');
+            const confirmDeleteBtn = document.getElementById('confirmDeleteRoomBtn');
+            
+            if (confirmRoomNameInput && confirmDeleteBtn) {
+                confirmRoomNameInput.addEventListener('input', function() {
+                    const inputName = this.value.trim();
+                    const actualRoomName = document.getElementById('deleteRoomName').textContent;
+                    
+                    if (inputName === actualRoomName) {
+                        confirmDeleteBtn.disabled = false;
+                        confirmDeleteBtn.innerHTML = '<i class="fas fa-trash me-1"></i>确认删除房间';
+                        confirmDeleteBtn.classList.remove('btn-secondary');
+                        confirmDeleteBtn.classList.add('btn-danger');
+                    } else {
+                        confirmDeleteBtn.disabled = true;
+                        confirmDeleteBtn.innerHTML = '<i class="fas fa-lock me-1"></i>输入房间名称确认';
+                        confirmDeleteBtn.classList.remove('btn-danger');
+                        confirmDeleteBtn.classList.add('btn-secondary');
+                    }
+                });
+            }
+        });
+        
+        // 执行删除房间
+        async function executeDeleteRoom() {
+            const confirmDeleteBtn = document.getElementById('confirmDeleteRoomBtn');
+            const currentRoom = window.chatroomController.currentRoom;
+            
+            if (!currentRoom) {
+                showToast('无法获取当前房间信息', 'error');
+                return;
+            }
+            
+            try {
+                // 更新按钮状态
+                confirmDeleteBtn.disabled = true;
+                confirmDeleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>删除中...';
+                
+                // 获取房间管理服务
+                const roomService = window.chatroomController.roomManagementService;
+                if (!roomService) {
+                    throw new Error('房间管理服务未初始化');
+                }
+                
+                console.log('🗑️ 正在删除房间:', currentRoom.id || currentRoom.roomId);
+                
+                // 调用删除房间API
+                const result = await roomService.deleteRoom(currentRoom.id || currentRoom.roomId);
+                
+                if (result === true) {
+                    showToast(`房间 "${currentRoom.name}" 已成功删除`, 'success');
+                    
+                    // 关闭模态框
+                    const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteRoomModal'));
+                    if (deleteModal) {
+                        deleteModal.hide();
+                    }
+                    
+                    // 断开WebSocket连接
+                    if (window.chatroomController.websocket) {
+                        window.chatroomController.websocket.emit('leave-room', { roomId: currentRoom.id || currentRoom.roomId });
+                    }
+                    
+                    // 清空当前房间状态
+                    window.chatroomController.currentRoom = null;
+                    
+                    // 更新UI
+                    document.getElementById('currentRoomName').innerHTML = '<i class="fas fa-users me-2"></i>请选择聊天室';
+                    document.getElementById('chatMessages').innerHTML = `
+                        <div class="text-center text-muted mt-5">
+                            <i class="fas fa-users fa-3x mb-3"></i>
+                            <h5>欢迎使用 WebSocket 聊天室</h5>
+                            <p>请从左侧选择一个聊天室开始群聊，或创建新的聊天室</p>
+                        </div>
+                    `;
+                    
+                    // 隐藏删除按钮和其他房间相关按钮
+                    document.getElementById('deleteRoomBtn').style.display = 'none';
+                    document.getElementById('manageMembersBtn').style.display = 'none';
+                    document.getElementById('onlineMembers').style.display = 'none';
+                    
+                    // 禁用输入
+                    document.getElementById('messageInput').disabled = true;
+                    document.getElementById('sendButton').disabled = true;
+                    document.getElementById('mentionButton').disabled = true;
+                    
+                    // 刷新房间列表
+                    setTimeout(() => {
+                        if (window.chatroomController && window.chatroomController.loadRooms) {
+                            window.chatroomController.loadRooms();
+                        }
+                    }, 1000);
+                    
+                } else {
+                    throw new Error('删除房间失败');
+                }
+                
+            } catch (error) {
+                console.error('删除房间失败:', error);
+                showToast(`删除房间失败: ${error.message}`, 'error');
+                
+                // 恢复按钮状态
+                confirmDeleteBtn.disabled = false;
+                confirmDeleteBtn.innerHTML = '<i class="fas fa-trash me-1"></i>确认删除房间';
+            }
+        }
+        
+        // 将删除房间功能添加到全局
+        window.confirmDeleteRoom = confirmDeleteRoom;
+        window.executeDeleteRoom = executeDeleteRoom;
+
+        // 调试：手动显示删除按钮
+        window.showDeleteButton = function() {
+            const deleteBtn = document.getElementById('deleteRoomBtn');
+            if (deleteBtn) {
+                deleteBtn.style.display = 'inline-block';
+                deleteBtn.style.visibility = 'visible';
+                console.log('🔧 [调试] 手动显示删除按钮');
+            } else {
+                console.log('❌ [调试] 未找到删除按钮元素');
+            }
+        };
+
+        // 调试：检查按钮状态
+        window.checkDeleteButton = function() {
+            const deleteBtn = document.getElementById('deleteRoomBtn');
+            if (deleteBtn) {
+                console.log('🔍 [调试] 删除按钮状态:', {
+                    display: getComputedStyle(deleteBtn).display,
+                    visibility: getComputedStyle(deleteBtn).visibility,
+                    opacity: getComputedStyle(deleteBtn).opacity,
+                    element: deleteBtn
+                });
+            } else {
+                console.log('❌ [调试] 删除按钮不存在');
+            }
+        };
+
         // Toast通知函数
         function showToast(message, type = 'info') {
             const toastContainer = document.getElementById('toastContainer');
@@ -2710,6 +3124,25 @@
                 message: '正在监听message-read事件，请让好友读取消息'
             };
         };
+
+        // 全局函数供HTML调用
+        window.toggleDeleteMode = () => {
+            chatroomController.toggleDeleteMode();
+        };
+
+        window.updateDeleteButtonState = () => {
+            chatroomController.updateDeleteButtonState();
+        };
+
+        window.confirmBatchDelete = () => {
+            chatroomController.confirmBatchDelete();
+        };
+
+        // 处理确认复选框
+        document.getElementById('confirmDeleteCheckbox').addEventListener('change', function() {
+            const executeBtn = document.getElementById('executeBatchDeleteBtn');
+            executeBtn.disabled = !this.checked;
+        });
 
         // 页面加载完成后显示测试提示
         setTimeout(() => {

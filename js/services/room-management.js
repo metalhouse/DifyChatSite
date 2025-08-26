@@ -7,7 +7,7 @@
 // 导入依赖
 import { ENV_CONFIG } from '../../config/env.js';
 import httpClient from '../api/api-client.js';
-import { API_ENDPOINTS } from '../api/endpoints.js';
+import { API_ENDPOINTS, EndpointBuilder } from '../api/endpoints.js';
 import difySdk from '../api/dify-api.js';
 
 /**
@@ -130,7 +130,7 @@ class RoomManagementService {
             }
 
             const response = await httpClient.get(
-                API_ENDPOINTS.CHAT_ROOMS.DETAILS.replace(':roomId', roomId)
+                EndpointBuilder.build(API_ENDPOINTS.CHAT_ROOMS.DETAIL, { id: roomId })
             );
 
             const room = response.data;
@@ -160,7 +160,7 @@ class RoomManagementService {
             }
 
             const response = await httpClient.put(
-                API_ENDPOINTS.CHAT_ROOMS.UPDATE.replace(':roomId', roomId),
+                EndpointBuilder.build(API_ENDPOINTS.CHAT_ROOMS.UPDATE, { id: roomId }),
                 updateData
             );
 
@@ -186,7 +186,7 @@ class RoomManagementService {
             }
 
             await httpClient.delete(
-                API_ENDPOINTS.CHAT_ROOMS.DELETE.replace(':roomId', roomId)
+                EndpointBuilder.build(API_ENDPOINTS.CHAT_ROOMS.DELETE, { id: roomId })
             );
 
             // 清除缓存
