@@ -323,7 +323,7 @@ class ChatroomController {
             this.handleMessageSentConfirmation(data);
         });
 
-        // 支持多种消息接收事件格式
+        // 支持多种消息接收事件格式（注意：这些可能会重复，由handleNewMessage内部去重）
         this.websocket.on('newMessage', (message) => {
             console.log('📨 [前端] 收到新消息 (兼容格式):', message);
             this.handleNewMessage(message);
@@ -351,9 +351,35 @@ class ChatroomController {
             this.handleMessageRead(data);
         });
 
+        // 通用消息事件 - 注意可能与其他事件重复
         this.websocket.on('message', (message) => {
-            console.log('📨 [前端] 收到新消息 (简单格式):', message);
-            this.handleNewMessage(message);
+            console.log('📨 [前端] 收到新消息 (通用格式，可能重复):', message);
+            // 为避免重复，先检查是否最近已处理过相同内容的消息
+            const recentKey = `recent_${message.content}_${message.senderId || message.userId}_${Date.now()}`;
+            const contentKey = `content_${message.content.trim()}_${message.senderId || message.userId}`;
+            
+            // 检查最近3秒内是否处理过相同内容
+            if (!this.recentProcessed) {
+                this.recentProcessed = new Map();
+            }
+            
+            const now = Date.now();
+            const cutoff = now - 3000; // 3秒前
+            
+            // 清理过期的记录
+            for (let [key, timestamp] of this.recentProcessed.entries()) {
+                if (timestamp < cutoff) {
+                    this.recentProcessed.delete(key);
+                }
+            }
+            
+            // 检查是否重复
+            if (!this.recentProcessed.has(contentKey)) {
+                this.recentProcessed.set(contentKey, now);
+                this.handleNewMessage(message);
+            } else {
+                console.log('🔄 [前端] 跳过可能重复的通用消息事件');
+            }
         });
 
         this.websocket.on('send-message-error', (data) => {
@@ -1013,8 +1039,9 @@ class ChatroomController {
             };
             
             // 先在本地显示消息（乐观更新）
+            const localMessageId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
             const localMessage = {
-                id: 'temp_' + Date.now(),
+                id: localMessageId,
                 content: content,
                 type: 'text',
                 senderId: this.currentUser.userId,
@@ -1027,27 +1054,22 @@ class ChatroomController {
             };
             
             this.addMessage(localMessage);
+            console.log('📤 [前端] 添加本地待确认消息:', localMessageId);
             
             // 发送到后端
             this.websocket.emit('send-message', messageData);
             
             // 设置超时检查：如果5秒内没有收到确认，显示警告
             const timeoutId = setTimeout(() => {
-                // 检查消息是否已经确认（通过检查是否有新消息ID在processedMessages中）
-                const hasConfirmed = Array.from(this.processedMessages).some(id => 
-                    id.startsWith('confirmation_') || 
-                    (messageData.content && this.elements.chatMessages.textContent.includes(messageData.content))
-                );
-                
-                if (localMessage.isLocalPending && !hasConfirmed) {
-                    console.warn('⚠️ [前端] 消息发送5秒内未收到后端确认');
+                if (localMessage.isLocalPending) {
+                    console.warn('⚠️ [前端] 消息发送5秒内未收到后端确认:', localMessageId);
                     console.warn('💡 [前端] 可能的原因:');
                     console.warn('   - 网络连接问题');
                     console.warn('   - 后端处理延迟');
                     console.warn('   - 消息过长或包含特殊内容');
                     this.showWarning('消息发送可能延迟，请稍候...');
                 } else {
-                    console.log('✅ [前端] 消息已确认，取消超时警告');
+                    console.log('✅ [前端] 消息已确认，取消超时警告:', localMessageId);
                 }
             }, 5000);
 
@@ -1236,34 +1258,43 @@ class ChatroomController {
         
         // 检查是否是自己发送的消息的确认（避免重复显示）
         if (message.senderId === this.currentUser.userId || message.userId === this.currentUser.userId) {
+            console.log('📨 [前端] 收到自己的消息确认:', message);
+            
             // 查找并移除本地待确认的消息
             const pendingMessages = this.elements.chatMessages.querySelectorAll('.message');
+            let foundPending = false;
+            
             for (let msg of pendingMessages) {
-                const contentDiv = msg.querySelector('.message-content');
-                if (contentDiv && contentDiv.textContent.trim() === message.content.trim()) {
-                    const statusDiv = msg.querySelector('.message-status');
-                    if (statusDiv && statusDiv.parentNode === msg) {
+                // 检查是否是待确认的本地消息
+                if (msg.localMessage && msg.localMessage.isLocalPending) {
+                    const contentDiv = msg.querySelector('.message-content');
+                    if (contentDiv && contentDiv.textContent.trim() === message.content.trim()) {
                         try {
                             // 清除对应的超时
-                            const messageData = msg.messageData;
-                            if (messageData && messageData.timeoutId) {
-                                clearTimeout(messageData.timeoutId);
+                            if (msg.localMessage.timeoutId) {
+                                clearTimeout(msg.localMessage.timeoutId);
+                                console.log('⏰ [前端] 清除本地消息超时:', msg.localMessage.timeoutId);
                             }
                             
-                            msg.removeChild(statusDiv); // 安全移除"发送中"状态
-                            console.log('✅ [前端] 消息发送确认，移除待发送状态');
-                            return; // 不重复添加消息
+                            // 移除整个本地消息元素，因为服务器会返回正式消息
+                            msg.remove();
+                            foundPending = true;
+                            console.log('✅ [前端] 移除本地待确认消息，使用服务器消息');
+                            break;
                         } catch (error) {
-                            console.warn('⚠️ [前端] 移除状态元素失败:', error);
-                            // 如果移除失败，隐藏状态元素
-                            statusDiv.style.display = 'none';
-                            return;
+                            console.warn('⚠️ [前端] 移除本地消息失败:', error);
                         }
                     }
                 }
             }
+            
+            // 如果没找到对应的本地待确认消息，可能是因为之前已经处理过了
+            if (!foundPending) {
+                console.log('🔍 [前端] 未找到对应的本地待确认消息，可能已处理');
+            }
         }
         
+        // 添加服务器返回的正式消息
         this.addMessage(message);
     }
 
