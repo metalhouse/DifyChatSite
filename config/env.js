@@ -66,22 +66,17 @@ const developmentConfig = {
 
 // 生产环境配置
 const productionConfig = {
-  // API配置 - 支持反代部署
-  API_BASE_URL: window.PRODUCTION_API_URL || 
-                (window.location.hostname === 'nas.pznas.com' ? 
-                 'https://nas.pznas.com:7990' : 
-                 'https://your-api-domain.com'),
+  // API配置 - 统一入口架构（Nginx反代）
+  // 前端和后端在同一服务器，通过Nginx统一入口，无CORS问题
+  API_BASE_URL: `${window.location.protocol}//${window.location.host}`,
   API_PREFIX: '/api',
-  WS_URL: window.PRODUCTION_WS_URL || 
-          (window.location.hostname === 'nas.pznas.com' ? 
-           'wss://nas.pznas.com:7990' : 
-           'https://your-api-domain.com'),
+  WS_URL: `${window.location.protocol.replace('http', 'ws')}//${window.location.host}`,
   
   // 功能开关
   ENABLE_WEBSOCKET: true,
   ENABLE_ENCRYPTION: true,
   DEBUG_MODE: false,
-  SHOW_DEV_TOOLS_NOTIFICATION: false, // 是否显示开发工具通知
+  SHOW_DEV_TOOLS_NOTIFICATION: false,
   
   // WebSocket优化开关 - 生产环境配置
   ENABLE_PERIODIC_REFRESH: false,     // 禁用定期刷新（WebSocket实时通知正常工作）
