@@ -23,11 +23,14 @@ NC='\033[0m' # No Color
 DOMAIN="nas.pznas.com"
 PORT="7990"
 FRONTEND_DIR="/var/www/difychat"
-BACKEND_DIR="/opt/difychat-backend"
-NGINX_CONFIG_DIR="/etc/nginx/sites-available"
-NGINX_ENABLED_DIR="/etc/nginx/sites-enabled"
+BACKEND_DIR="/opt/apps/DifySiteBack"
+NGINX_CONFIG_DIR="/etc/nginx/conf.d"  # 使用conf.d目录与现有matrix.conf一致
+NGINX_ENABLED_DIR=""  # conf.d目录下的配置自动生效，无需enabled目录
 SERVICE_USER="difychat"
 LOG_DIR="/var/log/difychat"
+# SSL证书目录（与现有matrix配置保持一致）
+SSL_CERT_DIR="/etc/ssl/certs"
+SSL_KEY_DIR="/etc/ssl/private"
 
 echo -e "${BLUE}🚀 DifyChatSite 生产环境部署开始${NC}"
 echo -e "${BLUE}架构：前后端同服务器，Nginx统一入口，无CORS问题${NC}"
@@ -87,25 +90,46 @@ echo -e "${GREEN}✅ 前端文件部署完成${NC}"
 # 3. 配置Nginx
 echo -e "${YELLOW}📋 Step 3: 配置Nginx${NC}"
 
-# 复制Nginx配置
-cp nginx/production-deploy.conf $NGINX_CONFIG_DIR/difychat
-
-# 提示用户配置SSL证书
-echo -e "${YELLOW}⚠️  请确保SSL证书已正确放置：${NC}"
-echo "   - 证书文件: /path/to/your/certificate.crt"
-echo "   - 私钥文件: /path/to/your/private.key"
-echo "   - 请编辑 $NGINX_CONFIG_DIR/difychat 更新证书路径"
-echo
-
-read -p "是否已配置SSL证书？(y/N) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${RED}❌ 请先配置SSL证书后再继续${NC}"
-    exit 1
+# 检查现有matrix配置，确定SSL证书路径
+if [ -f "/etc/nginx/conf.d/matrix.conf" ]; then
+    echo -e "${YELLOW}📍 检测到现有matrix.conf配置${NC}"
+    # 尝试从现有配置中提取SSL证书路径
+    EXISTING_CERT=$(grep -o 'ssl_certificate.*\.crt;' /etc/nginx/conf.d/matrix.conf | head -1 | sed 's/ssl_certificate //; s/;//')
+    EXISTING_KEY=$(grep -o 'ssl_certificate_key.*\.key;' /etc/nginx/conf.d/matrix.conf | head -1 | sed 's/ssl_certificate_key //; s/;//')
+    
+    if [ -n "$EXISTING_CERT" ] && [ -n "$EXISTING_KEY" ]; then
+        echo -e "${GREEN}✅ 检测到现有SSL证书配置：${NC}"
+        echo "   证书文件: $EXISTING_CERT"
+        echo "   私钥文件: $EXISTING_KEY"
+        
+        # 提取证书目录
+        SSL_CERT_DIR=$(dirname "$EXISTING_CERT")
+        SSL_KEY_DIR=$(dirname "$EXISTING_KEY")
+    fi
 fi
 
-# 启用站点
-ln -sf $NGINX_CONFIG_DIR/difychat $NGINX_ENABLED_DIR/
+# 复制并修改Nginx配置
+cp nginx/production-deploy.conf $NGINX_CONFIG_DIR/difychat.conf
+
+# 如果检测到现有SSL证书，自动更新配置
+if [ -n "$EXISTING_CERT" ] && [ -n "$EXISTING_KEY" ]; then
+    echo -e "${YELLOW}🔧 自动配置SSL证书路径${NC}"
+    sed -i "s|/path/to/your/certificate.crt|$EXISTING_CERT|g" $NGINX_CONFIG_DIR/difychat.conf
+    sed -i "s|/path/to/your/private.key|$EXISTING_KEY|g" $NGINX_CONFIG_DIR/difychat.conf
+    echo -e "${GREEN}✅ SSL证书路径已自动配置${NC}"
+else
+    echo -e "${YELLOW}⚠️  请手动配置SSL证书：${NC}"
+    echo "   推荐证书目录: $SSL_CERT_DIR"
+    echo "   推荐私钥目录: $SSL_KEY_DIR"
+    echo "   配置文件: $NGINX_CONFIG_DIR/difychat.conf"
+    echo
+    read -p "是否已配置SSL证书？(y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${RED}❌ 请先配置SSL证书后再继续${NC}"
+        exit 1
+    fi
+fi
 
 # 测试Nginx配置
 if nginx -t; then
