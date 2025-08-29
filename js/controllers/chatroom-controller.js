@@ -1586,7 +1586,13 @@ class ChatroomController {
             return;
         }
 
-        const avatarsHTML = onlineUsers.slice(0, 5).map((user, index) => {
+        // 移动端限制显示的用户数量，避免挤占按钮
+        const isMobile = window.innerWidth <= 768;
+        const maxDisplayUsers = isMobile ? 3 : 5;
+        const displayUsers = onlineUsers.slice(0, maxDisplayUsers);
+        const hasMoreUsers = onlineUsers.length > maxDisplayUsers;
+
+        const avatarsHTML = displayUsers.map((user, index) => {
             const initial = (user.username || user.name || '?').charAt(0).toUpperCase();
             const fullName = this.escapeHtml(user.username || user.name || '未知用户');
             const userId = user.id || index;
@@ -1604,7 +1610,19 @@ class ChatroomController {
             `;
         }).join('');
 
-        memberAvatarsElement.innerHTML = avatarsHTML;
+        // 如果有更多用户，添加+号指示器
+        const moreIndicator = hasMoreUsers ? `
+            <div class="member-avatar more-indicator" 
+                 data-bs-toggle="tooltip" 
+                 data-bs-placement="top" 
+                 data-bs-title="还有${onlineUsers.length - maxDisplayUsers}个用户在线，点击查看全部"
+                 onclick="window.chatroomController.showAllUsers()"
+                 style="cursor: pointer; background-color: #6c757d; color: white; font-weight: bold;">
+                +${onlineUsers.length - maxDisplayUsers}
+            </div>
+        ` : '';
+
+        memberAvatarsElement.innerHTML = avatarsHTML + moreIndicator;
         
         // 初始化 Bootstrap tooltips
         const tooltipTriggerList = memberAvatarsElement.querySelectorAll('[data-bs-toggle="tooltip"]');
