@@ -104,6 +104,11 @@
             background: rgba(255, 255, 255, 0.8);
             border: 1px solid transparent;
             color: #1A1A1A; /* 炭黑色字体 */
+            /* 移动端触摸优化 */
+            -webkit-tap-highlight-color: rgba(40, 167, 69, 0.3);
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         .agent-item:hover {
@@ -540,6 +545,26 @@
                 background: rgba(255, 255, 255, 0.2) !important;
             }
 
+            /* 移动端智能体触摸优化 */
+            .agent-item {
+                /* 移除300ms延迟 */
+                touch-action: manipulation !important;
+                /* 增大点击区域 */
+                min-height: 60px !important;
+                /* 确保触摸反馈 */
+                -webkit-tap-highlight-color: rgba(40, 167, 69, 0.2) !important;
+                /* 防止长按选择 */
+                -webkit-user-select: none !important;
+                -webkit-touch-callout: none !important;
+                user-select: none !important;
+            }
+
+            /* 触摸时的视觉反馈 */
+            .agent-item:active {
+                transform: scale(0.98) !important;
+                background: rgba(40, 167, 69, 0.15) !important;
+            }
+
             /* 移动端输入框样式调整 */
             .input-group textarea {
                 /* 确保输入框有足够的点击区域 */
@@ -662,8 +687,9 @@
         }
 
         @media (max-width: 768px) {
-            .sidebar.show ~ .sidebar-overlay {
-                display: block;
+            .sidebar.show + .sidebar-overlay,
+            .sidebar-overlay.show {
+                display: block !important;
             }
         }
         
@@ -1400,8 +1426,29 @@
 
         window.toggleSidebar = function() {
             const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            
             if (sidebar) {
-                sidebar.classList.toggle('show');
+                const isShowing = sidebar.classList.contains('show');
+                
+                if (isShowing) {
+                    // 关闭侧边栏
+                    sidebar.classList.remove('show');
+                    if (overlay) {
+                        overlay.style.display = 'none';
+                        overlay.classList.remove('show');
+                    }
+                } else {
+                    // 显示侧边栏
+                    sidebar.classList.add('show');
+                    if (overlay) {
+                        overlay.style.display = 'block';
+                        overlay.classList.add('show');
+                    }
+                }
+                
+                console.log('📱 侧边栏状态切换:', isShowing ? '关闭' : '显示');
+                console.log('📱 遮罩层状态:', overlay ? overlay.style.display : '未找到遮罩层');
             }
         };
 
@@ -1498,13 +1545,6 @@
         window.clearChat = function() {
             if (window.chatController) {
                 window.chatController.clearMessages();
-            }
-        };
-
-        window.toggleSidebar = function() {
-            const sidebar = document.getElementById('sidebar');
-            if (sidebar) {
-                sidebar.classList.toggle('show');
             }
         };
 

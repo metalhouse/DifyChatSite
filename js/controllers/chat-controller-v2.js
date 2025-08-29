@@ -148,15 +148,59 @@ export class SimpleChatController {
 
         this.agentList.innerHTML = agentsHtml;
 
-        // 绑定点击事件
-        this.agentList.querySelectorAll('.agent-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const agentId = item.dataset.agentId;
-                const agent = this.availableAgents.find(a => a.id === agentId);
-                if (agent) {
-                    this.selectAgent(agent);
-                }
-            });
+        // 绑定点击事件（支持移动端触摸）
+        this.agentList.querySelectorAll('.agent-item').forEach((item, index) => {
+            const agentId = item.dataset.agentId;
+            const agent = this.availableAgents.find(a => a.id === agentId);
+            
+            if (agent) {
+                // 创建全局处理函数
+                const globalFunctionName = `selectAgent_${agentId.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                window[globalFunctionName] = () => {
+                    console.log('📱 全局函数调用 - 选择智能体:', agent.name);
+                    console.log('📱 当前屏幕宽度:', window.innerWidth);
+                    
+                    // 调用选择智能体
+                    this.selectAgent.call(this, agent);
+                    
+                    // 移动端关闭侧边栏
+                    if (window.innerWidth <= 768) {
+                        console.log('📱 移动端 - 关闭侧边栏');
+                        const sidebar = document.getElementById('sidebar');
+                        const overlay = document.querySelector('.sidebar-overlay');
+                        
+                        if (sidebar) {
+                            sidebar.classList.remove('show');
+                            console.log('📱 侧边栏已关闭');
+                        }
+                        
+                        if (overlay) {
+                            overlay.style.display = 'none';
+                            overlay.classList.remove('show');
+                            console.log('📱 遮罩已隐藏');
+                        }
+                    }
+                };
+                
+                // 添加onclick属性
+                item.setAttribute('onclick', `${globalFunctionName}()`);
+                
+                // 添加触摸视觉反馈
+                item.addEventListener('touchstart', (e) => {
+                    item.style.transform = 'scale(0.98)';
+                    item.style.transition = 'transform 0.1s ease';
+                }, { passive: true });
+                
+                item.addEventListener('touchend', (e) => {
+                    setTimeout(() => {
+                        item.style.transform = '';
+                    }, 150);
+                }, { passive: true });
+                
+                item.addEventListener('touchcancel', () => {
+                    item.style.transform = '';
+                });
+            }
         });
     }
 
@@ -176,25 +220,50 @@ export class SimpleChatController {
         this.clearMessages();
         this.showWelcomeMessage(agent);
 
-        // 移动端自动关闭侧边栏
+        // 移动端自动关闭侧边栏（由触摸事件直接处理，这里不再重复）
+        // 保留这个逻辑作为备用方案
+        /*
         if (window.innerWidth <= 768) {
-            this.closeSidebar();
+            console.log('📱 检测到移动端，准备关闭侧边栏');
+            // ... 关闭逻辑已移到触摸事件处理中
         }
+        */
     }
 
     /**
      * 关闭侧边栏（移动端）
      */
     closeSidebar() {
+        console.log('📱 尝试关闭侧边栏...');
+        console.log('📱 当前屏幕宽度:', window.innerWidth);
+        
         const sidebar = document.getElementById('sidebar');
         const overlay = document.querySelector('.sidebar-overlay');
         
-        if (sidebar && sidebar.classList.contains('show')) {
-            console.log('📱 移动端自动关闭侧边栏');
-            sidebar.classList.remove('show');
-            if (overlay) {
-                overlay.style.display = 'none';
+        console.log('📱 侧边栏元素:', sidebar);
+        console.log('📱 遮罩元素:', overlay);
+        
+        if (sidebar) {
+            console.log('📱 侧边栏类名:', sidebar.className);
+            console.log('📱 是否有show类:', sidebar.classList.contains('show'));
+            
+            if (sidebar.classList.contains('show')) {
+                console.log('📱 移动端自动关闭侧边栏');
+                sidebar.classList.remove('show');
+                if (overlay) {
+                    overlay.style.display = 'none';
+                    overlay.classList.remove('show');
+                }
+            } else {
+                console.log('📱 侧边栏没有show类，但强制关闭');
+                sidebar.classList.remove('show');
+                if (overlay) {
+                    overlay.style.display = 'none';
+                    overlay.classList.remove('show');
+                }
             }
+        } else {
+            console.log('❌ 未找到侧边栏元素');
         }
     }
 
