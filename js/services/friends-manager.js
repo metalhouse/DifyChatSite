@@ -287,7 +287,7 @@ class FriendsManager {
 
         // 在移动设备上隐藏侧边栏
         if (window.innerWidth <= 768) {
-            document.getElementById('roomSidebar').classList.remove('show');
+            this.closeSidebar();
         }
     }
 
@@ -2334,6 +2334,22 @@ class FriendsManager {
         } catch (error) {
             console.log('❌ 测试失败:', error.message);
             this.chatroomController.handleMessageRead = originalHandler;
+        }
+    }
+
+    /**
+     * 关闭侧边栏（移动端）
+     */
+    closeSidebar() {
+        const sidebar = document.getElementById('roomSidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        
+        if (sidebar && sidebar.classList.contains('show')) {
+            console.log('📱 移动端自动关闭侧边栏');
+            sidebar.classList.remove('show');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
         }
     }
 }

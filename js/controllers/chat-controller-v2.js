@@ -175,6 +175,27 @@ export class SimpleChatController {
         this.updateChatHeader(agent);
         this.clearMessages();
         this.showWelcomeMessage(agent);
+
+        // 移动端自动关闭侧边栏
+        if (window.innerWidth <= 768) {
+            this.closeSidebar();
+        }
+    }
+
+    /**
+     * 关闭侧边栏（移动端）
+     */
+    closeSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        
+        if (sidebar && sidebar.classList.contains('show')) {
+            console.log('📱 移动端自动关闭侧边栏');
+            sidebar.classList.remove('show');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+        }
     }
 
     /**

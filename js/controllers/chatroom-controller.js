@@ -771,6 +771,11 @@ class ChatroomController {
         // 发送加入房间请求
         this.websocket.emit('join-room', { roomId });
         
+        // 移动端自动关闭侧边栏
+        if (window.innerWidth <= 768) {
+            this.closeSidebar();
+        }
+        
         // 临时解决方案：如果2秒内没有收到join-room-success响应，直接设置房间
         // 这是为了处理后端可能没有实现join-room事件的情况
         const timeoutId = setTimeout(() => {
@@ -2239,6 +2244,22 @@ class ChatroomController {
         // 也尝试其他可能的事件名称
         this.websocket.emit('get-online-users', { roomId: roomId });
         this.websocket.emit('room-info', { roomId: roomId });
+    }
+
+    /**
+     * 关闭侧边栏（移动端）
+     */
+    closeSidebar() {
+        const sidebar = document.getElementById('roomSidebar');
+        const overlay = document.querySelector('.sidebar-overlay');
+        
+        if (sidebar && sidebar.classList.contains('show')) {
+            console.log('📱 移动端自动关闭侧边栏');
+            sidebar.classList.remove('show');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+        }
     }
 }
 

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>AI智能对话 - DifyChat</title>
     
     <!-- Favicon -->
@@ -451,58 +451,112 @@
             }
         }
 
-        /* 响应式设计 - 简化版 */
+        /* 响应式设计 - 移动端优化 */
         @media (max-width: 768px) {
+            /* 移动端页面容器调整 */
+            body {
+                /* 使用 100dvh（动态视窗高度）来适应移动端虚拟键盘 */
+                min-height: 100dvh;
+                height: 100dvh;
+                overflow: hidden;
+            }
+
+            .chat-container {
+                /* 使用 100dvh 确保在虚拟键盘弹出时正确适应 */
+                height: calc(100dvh - 56px);
+                width: 100%;
+                position: relative;
+            }
+
             .sidebar {
                 position: fixed;
                 left: -100%;
                 top: 56px;
-                height: calc(100vh - 56px);
+                height: calc(100dvh - 56px);
                 z-index: 1000;
                 transition: left 0.3s ease;
                 background: rgba(255, 255, 255, 0.98) !important;
                 backdrop-filter: blur(10px);
                 width: 80vw !important;
                 max-width: 320px;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
             }
 
             .sidebar.show {
                 left: 0;
-            }
-
-            .chat-container {
-                width: 100%;
             }
 
             .chat-area {
                 width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                position: relative;
             }
-            
-            /* 移动端按钮优化 */
+
+            /* 移动端消息区域优化 */
+            .chat-messages {
+                /* 确保消息区域能够正确滚动 */
+                flex: 1;
+                min-height: 0;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                /* 为输入框留出空间 */
+                padding-bottom: 1rem;
+            }
+
+            /* 移动端输入区域优化 */
+            .chat-input {
+                /* 固定在底部，避免被虚拟键盘遮挡 */
+                position: sticky;
+                bottom: 0;
+                z-index: 100;
+                background: rgba(255, 255, 255, 0.98);
+                backdrop-filter: blur(10px);
+                border-top: 1px solid rgba(0, 0, 0, 0.1);
+                /* 增加一些padding来确保可见性 */
+                padding: 0.75rem;
+                margin: 0;
+                /* 确保输入框在安全区域内 */
+                padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+            }
+
+            /* 移动端智能体选中状态修复 - 最高优先级 */
+            .agent-item.active {
+                background: linear-gradient(135deg, #28a745, #20c997) !important;
+                color: white !important;
+                box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3) !important;
+            }
+
+            .agent-item.active .agent-name {
+                color: white !important;
+            }
+
+            .agent-item.active .agent-description {
+                color: rgba(255, 255, 255, 0.8) !important;
+            }
+
+            .agent-item.active .agent-avatar {
+                background: rgba(255, 255, 255, 0.2) !important;
+            }
+
+            /* 移动端输入框样式调整 */
+            .input-group textarea {
+                /* 确保输入框有足够的点击区域 */
+                min-height: 48px;
+                font-size: 16px; /* 防止iOS自动缩放 */
+                border-radius: 24px;
+                padding: 0.75rem 1rem;
+            }
+
+            /* 移动端发送按钮优化 */
             .send-button {
-                width: clamp(40px, 8vw, 48px);
-                height: clamp(40px, 8vw, 48px);
+                width: 48px;
+                height: 48px;
                 border-radius: 50%;
                 flex-shrink: 0;
             }
-        }
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 100%;
-                position: fixed;
-                top: 0;
-                left: -100%;
-                height: 100vh;
-                z-index: 1000;
-                transition: left 0.3s ease;
-                background: rgba(255, 255, 255, 0.98) !important;
-                backdrop-filter: blur(10px);
-            }
-
-            .sidebar.show {
-                left: 0;
-            }
-
+            
             .message-bubble {
                 max-width: 85%;
                 font-size: 0.85rem;
@@ -540,6 +594,37 @@
                 opacity: 1 !important;
                 margin-top: 0.3rem;
             }
+
+            .navbar-brand {
+                font-size: 1.25rem;
+            }
+
+            .chat-header h5 {
+                font-size: 1rem;
+            }
+
+            /* 确保在虚拟键盘弹出时页面不会被推上去 */
+            .chat-area:focus-within {
+                transform: translateY(0);
+            }
+        }
+
+        /* 支持更新的视窗单位的浏览器 */
+        @supports (height: 100dvh) {
+            @media (max-width: 768px) {
+                body {
+                    height: 100dvh;
+                    min-height: 100dvh;
+                }
+
+                .chat-container {
+                    height: calc(100dvh - 56px);
+                }
+
+                .sidebar {
+                    height: calc(100dvh - 56px);
+                }
+            }
         }
 
         /* 滚动条样式 */
@@ -562,91 +647,6 @@
         .sidebar-content::-webkit-scrollbar-thumb:hover,
         .chat-messages::-webkit-scrollbar-thumb:hover {
             background: rgba(0, 0, 0, 0.3);
-        }
-
-        /* 响应式设计 */
-        @media (max-width: 768px) {
-            .sidebar {
-                position: fixed;
-                left: -300px;
-                top: 56px;
-                height: calc(100vh - 56px);
-                z-index: 1000;
-                transition: left 0.3s ease;
-                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-                background: rgba(255, 255, 255, 0.98) !important; /* 确保背景足够不透明 */
-            }
-
-            .sidebar.show {
-                left: 0;
-            }
-
-            .chat-container {
-                width: 100%;
-            }
-
-            .chat-area {
-                width: 100%;
-            }
-
-            .navbar-brand {
-                font-size: 1.25rem;
-            }
-
-            .chat-header h5 {
-                font-size: 1rem;
-            }
-            
-            /* 确保小屏幕下侧边栏文字清晰可见 */
-            .sidebar-header {
-                background: rgba(248, 249, 250, 0.95);
-                border-bottom: 2px solid rgba(40, 167, 69, 0.2);
-            }
-            
-            .sidebar-header h6 {
-                color: #1A1A1A !important;
-                font-weight: 700;
-                text-shadow: 0 1px 2px rgba(255,255,255,0.8);
-            }
-            
-            /* 智能体项目在小屏幕下的样式优化 */
-            .agent-item {
-                background: rgba(255, 255, 255, 0.95) !important;
-                border: 1px solid rgba(0,0,0,0.05);
-                margin-bottom: 0.75rem;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            }
-            
-            .agent-name {
-                color: #1A1A1A !important;
-                font-weight: 600 !important;
-                font-size: 0.95rem !important;
-            }
-            
-            .agent-description {
-                color: #666 !important;
-                opacity: 1 !important;
-                font-size: 0.8rem !important;
-            }
-            
-            .agent-item:hover {
-                background: rgba(40, 167, 69, 0.05) !important;
-                border-color: rgba(40, 167, 69, 0.2) !important;
-            }
-            
-            .agent-item.active {
-                background: linear-gradient(135deg, #28a745, #20c997) !important;
-                color: white !important;
-                border-color: transparent !important;
-            }
-            
-            .agent-item.active .agent-name {
-                color: white !important;
-            }
-            
-            .agent-item.active .agent-description {
-                color: rgba(255, 255, 255, 0.9) !important;
-            }
         }
 
         /* 侧边栏遮罩层 */
@@ -2048,6 +2048,11 @@
             setupLogout();
             checkAdminPermission();
             
+            // 移动端输入框优化处理
+            if (window.innerWidth <= 768) {
+                setupMobileInputOptimization();
+            }
+            
             // =============================================================================
             // 对话管理功能 (新建、重命名、删除)
             // =============================================================================
@@ -2710,6 +2715,128 @@
             };
             
             console.log('✅ 页面初始化完成');
+        });
+
+        // ========================================
+        // 📱 移动端输入框优化
+        // ========================================
+        function setupMobileInputOptimization() {
+            const messageInput = document.getElementById('messageInput');
+            const chatMessages = document.getElementById('chatMessages');
+            const chatInput = document.querySelector('.chat-input');
+            
+            if (!messageInput || !chatMessages || !chatInput) {
+                console.log('移动端优化：未找到必要元素');
+                return;
+            }
+
+            console.log('📱 设置移动端输入框优化...');
+
+            // 输入框获得焦点时的处理
+            messageInput.addEventListener('focus', function() {
+                console.log('📱 输入框获得焦点');
+                
+                // 小延迟确保虚拟键盘已经弹出
+                setTimeout(() => {
+                    // 滚动到输入框位置，确保输入框可见
+                    messageInput.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center' 
+                    });
+                }, 150);
+
+                // 再次延迟确保滚动到底部
+                setTimeout(() => {
+                    if (chatMessages.scrollHeight > chatMessages.clientHeight) {
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 300);
+            });
+
+            // 输入框失去焦点时的处理
+            messageInput.addEventListener('blur', function() {
+                console.log('📱 输入框失去焦点');
+            });
+
+            // 处理输入框大小变化（虚拟键盘弹出/收起）
+            let initialHeight = window.innerHeight;
+            
+            function handleResize() {
+                const currentHeight = window.innerHeight;
+                const heightDifference = initialHeight - currentHeight;
+                
+                // 如果高度减少超过150px，认为是虚拟键盘弹出
+                if (heightDifference > 150) {
+                    console.log('📱 检测到虚拟键盘弹出，高度变化:', heightDifference);
+                    
+                    // 确保输入框可见
+                    setTimeout(() => {
+                        messageInput.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'end'
+                        });
+                    }, 100);
+                } else if (heightDifference < 50) {
+                    console.log('📱 检测到虚拟键盘收起');
+                }
+            }
+
+            // 监听窗口大小变化
+            window.addEventListener('resize', handleResize);
+
+            // 监听输入事件，确保输入时输入框始终可见
+            messageInput.addEventListener('input', function() {
+                // 防抖处理
+                clearTimeout(this.inputTimer);
+                this.inputTimer = setTimeout(() => {
+                    if (document.activeElement === messageInput) {
+                        messageInput.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'center' 
+                        });
+                    }
+                }, 100);
+            });
+
+            // Visual Viewport API 支持（更精确的虚拟键盘检测）
+            if (window.visualViewport) {
+                console.log('📱 使用 Visual Viewport API');
+                
+                window.visualViewport.addEventListener('resize', () => {
+                    const heightDiff = window.innerHeight - window.visualViewport.height;
+                    
+                    if (heightDiff > 150 && document.activeElement === messageInput) {
+                        console.log('📱 Visual Viewport 检测到虚拟键盘，高度差:', heightDiff);
+                        
+                        setTimeout(() => {
+                            messageInput.scrollIntoView({ 
+                                behavior: 'smooth', 
+                                block: 'center' 
+                            });
+                        }, 150);
+                    }
+                });
+            }
+
+            // 添加点击聊天区域自动聚焦输入框的功能（仅移动端）
+            chatMessages.addEventListener('click', function(e) {
+                // 如果点击的不是链接、按钮等交互元素
+                if (!e.target.closest('a, button, .message-actions')) {
+                    messageInput.focus();
+                }
+            });
+
+            console.log('✅ 移动端输入框优化设置完成');
+        }
+
+        // 窗口大小改变时重新检查是否需要移动端优化
+        window.addEventListener('resize', function() {
+            if (window.innerWidth <= 768 && !window.mobileOptimizationEnabled) {
+                setupMobileInputOptimization();
+                window.mobileOptimizationEnabled = true;
+            } else if (window.innerWidth > 768) {
+                window.mobileOptimizationEnabled = false;
+            }
         });
     </script>
 </body>
