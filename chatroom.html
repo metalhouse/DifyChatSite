@@ -763,6 +763,7 @@
         .message-user .message-bubble {
             margin-left: 15%;
             background: linear-gradient(135deg, #007bff, #0056b3) !important;
+            color: white !important;
         }
 
         .message-other .message-bubble,
@@ -1593,18 +1594,50 @@
             
             .online-members {
                 gap: 0.25rem;
+                flex-wrap: wrap;
             }
             
             /* 移动端按钮间距优化 */
             .online-members .btn {
-                padding: 0.25rem 0.5rem;
-                font-size: 0.7rem;
+                padding: 0.25rem 0.4rem;
+                font-size: 0.65rem;
+                min-width: auto;
+                margin-left: 0.1rem !important;
+                margin-right: 0 !important;
             }
             
             /* 移动端房间标题优化 */
             .chat-header-left h5 {
-                font-size: 1rem;
+                font-size: 0.9rem;
                 margin-bottom: 0;
+                max-width: 60vw;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            
+            /* 移动端聊天头部布局 */
+            .chat-header {
+                flex-wrap: nowrap;
+                justify-content: space-between;
+                padding: 0.5rem 0.75rem;
+            }
+            
+            .chat-header-left {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            /* 确保按钮容器不超出屏幕 */
+            .online-members {
+                flex-shrink: 0;
+                max-width: 35vw;
+                overflow: hidden;
+            }
+            
+            /* 隐藏不重要的按钮在移动端 */
+            .online-members #manageMembersBtn {
+                display: none;
             }
         }
     </style>

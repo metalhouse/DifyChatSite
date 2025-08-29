@@ -1171,6 +1171,9 @@ class ChatroomController {
 
         console.log('🎨 [前端] 消息样式分类:', {
             messageClass: messageClass,
+            messageId: message.id,
+            senderId: message.senderId,
+            currentUserId: this.currentUser.userId,
             isUser: message.senderId === this.currentUser.userId,
             isAgent: message.type === 'agent_response' || message.agentId,
             isSystem: message.type === 'system'
@@ -1232,6 +1235,7 @@ class ChatroomController {
         console.log('✅ [前端] 消息已成功添加到DOM:', {
             messageId: message.id,
             elementClass: messageElement.className,
+            classList: Array.from(messageElement.classList),
             totalMessages: this.elements.chatMessages.children.length
         });
 
