@@ -759,6 +759,29 @@
             font-style: italic;
         }
 
+        /* 消息对话布局增强：更好区分自己和他人的消息 */
+        .message-user .message-bubble {
+            margin-left: 15%;
+            background: linear-gradient(135deg, #007bff, #0056b3) !important;
+        }
+
+        .message-other .message-bubble,
+        .message-agent .message-bubble {
+            margin-right: 15%;
+        }
+
+        /* 移动端消息布局优化 */
+        @media (max-width: 768px) {
+            .message-user .message-bubble {
+                margin-left: 10%;
+            }
+            
+            .message-other .message-bubble,
+            .message-agent .message-bubble {
+                margin-right: 10%;
+            }
+        }
+
         .message-header {
             display: flex;
             align-items: center;
@@ -1561,6 +1584,29 @@
         .member-status.offline {
             background-color: #6c757d;
         }
+
+        /* 移动端优化：隐藏"在线成员"文字，节省空间 */
+        @media (max-width: 768px) {
+            .online-members-text {
+                display: none;
+            }
+            
+            .online-members {
+                gap: 0.25rem;
+            }
+            
+            /* 移动端按钮间距优化 */
+            .online-members .btn {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.7rem;
+            }
+            
+            /* 移动端房间标题优化 */
+            .chat-header-left h5 {
+                font-size: 1rem;
+                margin-bottom: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1721,7 +1767,7 @@
                 <div class="d-flex align-items-center">
                     <!-- 群聊模式：在线成员显示 -->
                     <div class="online-members" id="onlineMembers">
-                        <span>在线成员:</span>
+                        <span class="online-members-text">在线成员:</span>
                         <div class="member-avatars" id="memberAvatars">
                             <!-- 在线成员头像将动态添加 -->
                         </div>
