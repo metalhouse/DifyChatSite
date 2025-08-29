@@ -1258,26 +1258,7 @@ width: ${computedStyle.width}`;
         });
 
         messageElement.classList.add(messageClass);
-        
-        // 移动端强制内联样式（确保生效）
-        if (window.innerWidth <= 768) {
-            if (messageClass === 'message-user') {
-                messageElement.style.display = 'flex';
-                messageElement.style.justifyContent = 'flex-end';
-                messageElement.style.flexDirection = 'row';
-                messageElement.style.textAlign = 'right';
-                messageElement.style.marginLeft = 'auto';
-                messageElement.style.marginRight = '0';
-            } else if (messageClass === 'message-other' || messageClass === 'message-agent') {
-                messageElement.style.display = 'flex';
-                messageElement.style.justifyContent = 'flex-start';
-                messageElement.style.flexDirection = 'row';
-                messageElement.style.textAlign = 'left';
-                messageElement.style.marginLeft = '0';
-                messageElement.style.marginRight = 'auto';
-            }
-        }
-        
+
         // 构建消息HTML
         let messageHTML = `<div class="message-bubble">`;
 

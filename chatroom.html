@@ -690,6 +690,20 @@
             justify-content: flex-start !important;
         }
 
+        /* 移动端和PC端通用样式 - 不使用媒体查询 */
+        .message-user {
+            display: flex !important;
+            justify-content: flex-end !important;
+            flex-direction: row !important;
+        }
+
+        .message-other,
+        .message-agent {
+            display: flex !important;
+            justify-content: flex-start !important;
+            flex-direction: row !important;
+        }
+
         .message-system {
             display: flex !important;
             justify-content: center !important;
@@ -778,9 +792,8 @@
             font-style: italic;
         }
 
-        /* 移动端消息布局优化 - 最强制的样式 */
-        @media (max-width: 768px) {
-            /* 移动端强制左右分布 - 使用内联样式级别的优先级 */
+        /* 移动端消息布局优化 - 备用方案，暂时禁用媒体查询 */
+        /*@media (max-width: 768px) {
             .message.message-user,
             .message-user,
             div.message-user {
@@ -806,7 +819,6 @@
                 margin-right: auto !important;
             }
 
-            /* 消息气泡样式 */
             .message-user .message-bubble {
                 margin-left: 10%;
                 max-width: 80%;
@@ -819,6 +831,28 @@
                 max-width: 80%;
                 margin-left: 0;
             }
+        }*/
+
+        /* 通用样式，直接应用给所有屏幕（JavaScript会控制） */
+        .mobile-message-user {
+            display: flex !important;
+            justify-content: flex-end !important;
+            flex-direction: row !important;
+            text-align: right !important;
+            margin-left: auto !important;
+            margin-right: 0 !important;
+            width: 100% !important;
+        }
+
+        .mobile-message-other,
+        .mobile-message-agent {
+            display: flex !important;
+            justify-content: flex-start !important;
+            flex-direction: row !important;
+            text-align: left !important;
+            margin-left: 0 !important;
+            margin-right: auto !important;
+            width: 100% !important;
         }
 
         .message-header {
