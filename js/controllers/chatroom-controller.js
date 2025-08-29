@@ -633,37 +633,42 @@ class ChatroomController {
             this.adjustTextareaHeight();
         });
         
-        // 移动端添加调试按钮
-        this.addMobileDebugButton();
+        // 移动端添加调试按钮（临时禁用）
+        // this.addMobileDebugButton();
     }
 
     /**
      * 添加移动端调试按钮
      */
     addMobileDebugButton() {
-        if (window.innerWidth <= 768) {
-            const debugBtn = document.createElement('button');
-            debugBtn.innerHTML = '🐛调试';
-            debugBtn.style.cssText = `
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                background: #28a745;
-                color: white;
-                border: none;
-                padding: 8px 12px;
-                border-radius: 5px;
-                font-size: 12px;
-                z-index: 9998;
-                cursor: pointer;
-            `;
-            
-            debugBtn.addEventListener('click', () => {
-                this.showCurrentDebugInfo();
-            });
-            
-            document.body.appendChild(debugBtn);
-        }
+        // 强制显示调试按钮，不管屏幕大小
+        const debugBtn = document.createElement('button');
+        debugBtn.innerHTML = '🐛';
+        debugBtn.title = '调试信息';
+        debugBtn.style.cssText = `
+            position: fixed;
+            bottom: 100px;
+            right: 10px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 50%;
+            font-size: 16px;
+            z-index: 9998;
+            cursor: pointer;
+            width: 50px;
+            height: 50px;
+        `;
+        
+        debugBtn.addEventListener('click', () => {
+            this.showCurrentDebugInfo();
+        });
+        
+        document.body.appendChild(debugBtn);
+        
+        // 确认按钮已添加
+        console.log('🐛 调试按钮已添加到页面');
     }
 
     /**
@@ -671,26 +676,40 @@ class ChatroomController {
      */
     showCurrentDebugInfo() {
         const messages = this.elements.chatMessages.querySelectorAll('.message');
-        const lastMessage = messages[messages.length - 1];
+        const messageCount = messages.length;
+        const lastMessage = messages[messageCount - 1];
         
-        if (!lastMessage) {
-            alert('没有消息可以调试');
-            return;
-        }
-        
-        const computedStyle = window.getComputedStyle(lastMessage);
-        const classList = Array.from(lastMessage.classList);
-        
-        const debugText = `调试信息:
+        let debugInfo = `屏幕宽度: ${window.innerWidth}px
+当前用户ID: ${this.currentUser?.id || 'null'}
+当前用户名: ${this.currentUser?.username || 'null'}
+消息总数: ${messageCount}`;
+
+        if (lastMessage) {
+            const computedStyle = window.getComputedStyle(lastMessage);
+            const classList = Array.from(lastMessage.classList);
+            
+            debugInfo += `
+
+最后一条消息:
 CSS类: ${classList.join(' ')}
 display: ${computedStyle.display}
 justifyContent: ${computedStyle.justifyContent}
 flexDirection: ${computedStyle.flexDirection}
-屏幕宽度: ${window.innerWidth}px
-当前用户ID: ${this.currentUser?.id}
-消息总数: ${messages.length}`;
+width: ${computedStyle.width}`;
+        } else {
+            debugInfo += `\n\n没有找到任何消息`;
+        }
         
-        alert(debugText);
+        // 同时显示在页面和alert中
+        const debugContainer = document.getElementById('mobile-debug-info');
+        const debugContent = document.getElementById('debug-content');
+        
+        if (debugContainer && debugContent) {
+            debugContent.innerHTML = `<pre>${debugInfo}</pre>`;
+            debugContainer.style.display = 'block';
+        }
+        
+        alert(debugInfo);
     }
 
     /**
@@ -1240,39 +1259,25 @@ flexDirection: ${computedStyle.flexDirection}
 
         messageElement.classList.add(messageClass);
         
-        // 强制确保CSS类正确应用 - 增强调试
-        console.log('🔍 [前端] DOM元素类名检查:', {
-            elementClasses: Array.from(messageElement.classList),
-            expectedClass: messageClass,
-            hasExpectedClass: messageElement.classList.contains(messageClass),
-            currentUserId: this.currentUser?.id,
-            messageSenderId: message.senderId,
-            messageUserId: message.userId,
-            userComparison: message.senderId === this.currentUser?.id,
-            userIdComparison: message.userId === this.currentUser?.id,
-            isMobile: window.innerWidth <= 768,
-            windowWidth: window.innerWidth
-        });
-
-        // 移动端专门调试：检查计算后的样式
+        // 移动端强制内联样式（确保生效）
         if (window.innerWidth <= 768) {
-            setTimeout(() => {
-                const computedStyle = window.getComputedStyle(messageElement);
-                const debugInfo = {
-                    display: computedStyle.display,
-                    justifyContent: computedStyle.justifyContent,
-                    flexDirection: computedStyle.flexDirection,
-                    width: computedStyle.width,
-                    messageClass: messageClass,
-                    classList: Array.from(messageElement.classList).join(' ')
-                };
-                console.log('📱 [移动端] 计算后的样式:', debugInfo);
-                
-                // 在页面上显示调试信息（移动端）
-                this.showMobileDebugInfo(debugInfo, message);
-            }, 100);
+            if (messageClass === 'message-user') {
+                messageElement.style.display = 'flex';
+                messageElement.style.justifyContent = 'flex-end';
+                messageElement.style.flexDirection = 'row';
+                messageElement.style.textAlign = 'right';
+                messageElement.style.marginLeft = 'auto';
+                messageElement.style.marginRight = '0';
+            } else if (messageClass === 'message-other' || messageClass === 'message-agent') {
+                messageElement.style.display = 'flex';
+                messageElement.style.justifyContent = 'flex-start';
+                messageElement.style.flexDirection = 'row';
+                messageElement.style.textAlign = 'left';
+                messageElement.style.marginLeft = '0';
+                messageElement.style.marginRight = 'auto';
+            }
         }
-
+        
         // 构建消息HTML
         let messageHTML = `<div class="message-bubble">`;
 
@@ -1477,54 +1482,46 @@ flexDirection: ${computedStyle.flexDirection}
         // 只在移动端显示
         if (window.innerWidth > 768) return;
         
-        // 创建或获取调试容器
-        let debugContainer = document.getElementById('mobile-debug-container');
-        if (!debugContainer) {
-            debugContainer = document.createElement('div');
-            debugContainer.id = 'mobile-debug-container';
-            debugContainer.style.cssText = `
-                position: fixed;
-                top: 10px;
-                left: 10px;
-                right: 10px;
-                background: rgba(0,0,0,0.8);
-                color: white;
-                padding: 10px;
-                border-radius: 5px;
-                font-size: 12px;
-                z-index: 9999;
-                max-height: 200px;
-                overflow-y: auto;
-                display: block;
+        const debugContainer = document.getElementById('mobile-debug-info');
+        const debugContent = document.getElementById('debug-content');
+        
+        if (debugContainer && debugContent) {
+            const isCurrentUser = message.senderId === this.currentUser?.id || message.userId === this.currentUser?.id;
+            const debugText = `
+                <div style="margin-bottom: 5px; border-bottom: 1px solid #fff; padding-bottom: 5px;">
+                    <strong>消息调试 (${new Date().toLocaleTimeString()})</strong><br>
+                    当前用户ID: ${this.currentUser?.id || 'null'}<br>
+                    消息发送者ID: ${message.senderId || 'null'}<br>
+                    消息用户ID: ${message.userId || 'null'}<br>
+                    是否为当前用户: ${isCurrentUser}<br>
+                    CSS类: ${debugInfo.messageClass}<br>
+                    应用的类: ${debugInfo.classList}<br>
+                    display: ${debugInfo.display}<br>
+                    justifyContent: ${debugInfo.justifyContent}<br>
+                    flexDirection: ${debugInfo.flexDirection}<br>
+                    屏幕宽度: ${window.innerWidth}px
+                </div>
             `;
-            document.body.appendChild(debugContainer);
             
-            // 5秒后自动隐藏
+            debugContent.innerHTML = debugText + debugContent.innerHTML;
+            debugContainer.style.display = 'block';
+            
+            // 10秒后自动隐藏
             setTimeout(() => {
-                if (debugContainer) {
-                    debugContainer.style.display = 'none';
-                }
-            }, 5000);
+                debugContainer.style.display = 'none';
+            }, 10000);
+        } else {
+            // 如果找不到容器，就用alert
+            const isCurrentUser = message.senderId === this.currentUser?.id || message.userId === this.currentUser?.id;
+            alert(`调试信息:
+当前用户ID: ${this.currentUser?.id}
+消息发送者ID: ${message.senderId}
+是否为当前用户: ${isCurrentUser}
+CSS类: ${debugInfo.messageClass}
+display: ${debugInfo.display}
+justifyContent: ${debugInfo.justifyContent}
+屏幕宽度: ${window.innerWidth}px`);
         }
-        
-        const isCurrentUser = message.senderId === this.currentUser?.id || message.userId === this.currentUser?.id;
-        const debugText = `
-            <div style="margin-bottom: 5px; border-bottom: 1px solid #666; padding-bottom: 5px;">
-                <strong>消息调试 (${new Date().toLocaleTimeString()})</strong><br>
-                当前用户ID: ${this.currentUser?.id}<br>
-                消息发送者ID: ${message.senderId}<br>
-                是否为当前用户: ${isCurrentUser}<br>
-                CSS类: ${debugInfo.messageClass}<br>
-                应用的类: ${debugInfo.classList}<br>
-                display: ${debugInfo.display}<br>
-                justifyContent: ${debugInfo.justifyContent}<br>
-                flexDirection: ${debugInfo.flexDirection}<br>
-                屏幕宽度: ${window.innerWidth}px
-            </div>
-        `;
-        
-        debugContainer.innerHTML = debugText + debugContainer.innerHTML;
-        debugContainer.style.display = 'block';
     }
 
     /**
