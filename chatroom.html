@@ -725,7 +725,7 @@
 
         .message-bubble {
             max-width: clamp(250px, 75vw, 600px);
-            min-width: 120px; /* 添加最小宽度以容纳时间戳 */
+            min-width: clamp(140px, 30vw, 180px); /* 响应式最小宽度，确保不会太宽 */
             padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(0.75rem, 2vw, 1rem);
             border-radius: 18px;
             position: relative;
@@ -735,26 +735,29 @@
         }
 
         .message-user .message-bubble {
-            margin-left: 15% !important;
-            margin-right: 0 !important;
+            margin-left: auto !important;
+            margin-right: 10px !important; /* 添加右边距防止贴边 */
             background: linear-gradient(135deg, #007bff, #0056b3) !important;
             color: white !important;
+            max-width: calc(85% - 20px) !important; /* 确保不超出容器 */
         }
 
         .message-other .message-bubble {
-            margin-left: 0 !important;
-            margin-right: 15% !important;
-            background: linear-gradient(135deg, #d4edda, #c3e6cb) !important;
+            margin-left: 10px !important; /* 添加左边距防止贴边 */
+            margin-right: auto !important;
+            background: linear-gradient(135deg, #d4edda, #bee4c7) !important;
             color: #155724 !important;
             border: 1px solid rgba(40, 167, 69, 0.2);
+            max-width: calc(85% - 20px) !important; /* 确保不超出容器 */
         }
 
         .message-agent .message-bubble {
-            margin-left: 0 !important;
-            margin-right: 15% !important;
+            margin-left: 10px !important; /* 添加左边距防止贴边 */
+            margin-right: auto !important;
             background: linear-gradient(135deg, #e3f2fd, #bbdefb) !important;
             color: #1565c0 !important;
             border: 1px solid rgba(25, 118, 210, 0.2);
+            max-width: calc(85% - 20px) !important; /* 确保不超出容器 */
         }
 
         /* 发送中的消息样式 */
@@ -1011,7 +1014,7 @@
             font-size: clamp(0.8rem, 2vw, 0.9rem);
             max-width: 100%;
             box-sizing: border-box;
-            min-height: 44px;
+            min-height: 60px; /* 增加到约2行的高度 */
             max-height: 120px;
         }
 
@@ -1683,7 +1686,7 @@
 
             /* 移动端消息气泡优化 */
             .message-bubble {
-                min-width: 100px !important; /* 移动端稍微减小最小宽度 */
+                min-width: 140px !important; /* 移动端也适当增加最小宽度 */
                 max-width: 85% !important;
                 font-size: 0.85rem !important;
                 padding: 0.65rem 0.875rem !important;
@@ -1986,7 +1989,7 @@
                     <textarea 
                         id="messageInput" 
                         placeholder="输入您的消息... (Shift+Enter换行，Enter发送，@智能体名 可以@智能体)"
-                        rows="1"
+                        rows="2"
                         disabled
                     ></textarea>
                     <div class="input-actions">

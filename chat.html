@@ -391,6 +391,8 @@
             font-size: clamp(0.8rem, 2vw, 0.9rem);
             max-width: 100%; /* 防止溢出 */
             box-sizing: border-box;
+            min-height: 60px; /* 增加到约2行的高度 */
+            max-height: 120px;
         }
 
         .input-group textarea:focus {
@@ -1241,7 +1243,7 @@
                     <textarea 
                         id="messageInput" 
                         placeholder="输入您的消息... (Shift+Enter换行，Enter发送)"
-                        rows="1"
+                        rows="2"
                     ></textarea>
                     <button id="sendButton" class="send-button" type="button">
                         <i class="fas fa-paper-plane"></i>
