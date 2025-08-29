@@ -1190,8 +1190,24 @@ class ChatroomController {
             messageSenderId: message.senderId,
             messageUserId: message.userId,
             userComparison: message.senderId === this.currentUser?.id,
-            userIdComparison: message.userId === this.currentUser?.id
+            userIdComparison: message.userId === this.currentUser?.id,
+            isMobile: window.innerWidth <= 768,
+            windowWidth: window.innerWidth
         });
+
+        // 移动端专门调试：检查计算后的样式
+        if (window.innerWidth <= 768) {
+            setTimeout(() => {
+                const computedStyle = window.getComputedStyle(messageElement);
+                console.log('📱 [移动端] 计算后的样式:', {
+                    display: computedStyle.display,
+                    justifyContent: computedStyle.justifyContent,
+                    flexDirection: computedStyle.flexDirection,
+                    width: computedStyle.width,
+                    messageClass: messageClass
+                });
+            }, 100);
+        }
 
         // 构建消息HTML
         let messageHTML = `<div class="message-bubble">`;

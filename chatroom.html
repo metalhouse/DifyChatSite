@@ -778,31 +778,36 @@
             font-style: italic;
         }
 
-        /* 移动端消息布局优化 */
+        /* 移动端消息布局优化 - 更强制的样式 */
         @media (max-width: 768px) {
-            /* 确保移动端也有正确的左右分布 */
-            .message-user {
+            /* 移动端强制左右分布 - 使用更高优先级 */
+            .message.message-user {
                 display: flex !important;
                 justify-content: flex-end !important;
+                flex-direction: row !important;
             }
 
-            .message-other {
+            .message.message-other {
                 display: flex !important;
                 justify-content: flex-start !important;
+                flex-direction: row !important;
             }
 
-            .message-agent {
+            .message.message-agent {
                 display: flex !important;
                 justify-content: flex-start !important;
+                flex-direction: row !important;
             }
 
             .message-user .message-bubble {
                 margin-left: 10%;
+                max-width: 80%;
             }
             
             .message-other .message-bubble,
             .message-agent .message-bubble {
                 margin-right: 10%;
+                max-width: 80%;
             }
         }
 
