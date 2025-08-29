@@ -232,6 +232,13 @@ class ChatroomController {
 
         this.websocket.on('join-room-success', (data) => {
             console.log('✅ [前端] 成功加入房间:', data);
+            console.log('🔍 [前端] 房间加入详情:', {
+                roomId: data.id || data.roomId,
+                roomName: data.roomName || data.name,
+                memberCount: data.memberCount,
+                onlineUsers: data.onlineUsers?.length || 0,
+                recentMessages: data.recentMessages?.length || 0
+            });
             
             // 清除timeout
             if (this.joinRoomTimeout) {
@@ -298,6 +305,27 @@ class ChatroomController {
         // 消息相关事件
         this.websocket.on('new-message', (message) => {
             console.log('📨 [前端] 收到新消息:', message);
+            console.log('🔍 [前端] 消息详情:', {
+                messageId: message.id,
+                content: message.content?.substring(0, 50) + '...',
+                senderId: message.senderId,
+                senderName: message.senderName,
+                messageRoomId: message.roomId,
+                currentRoomId: this.currentRoom?.id || this.currentRoom?.roomId,
+                currentUserId: this.currentUser?.userId,
+                isOwnMessage: message.senderId === this.currentUser?.userId
+            });
+            
+            // 检查消息是否属于当前房间
+            const currentRoomId = this.currentRoom?.id || this.currentRoom?.roomId;
+            if (message.roomId && currentRoomId && message.roomId !== currentRoomId) {
+                console.log('🚫 [前端] 消息属于其他房间，忽略:', {
+                    messageRoomId: message.roomId,
+                    currentRoomId: currentRoomId
+                });
+                return;
+            }
+            
             this.handleNewMessage(message);
         });
 
@@ -1120,6 +1148,14 @@ class ChatroomController {
      * 添加消息到界面
      */
     addMessage(message, shouldScroll = true) {
+        console.log('🖼️ [前端] addMessage 开始添加消息到界面:', {
+            messageId: message.id,
+            senderId: message.senderId,
+            senderName: message.senderName,
+            content: message.content?.substring(0, 50) + '...',
+            currentRoomId: this.currentRoom?.id || this.currentRoom?.roomId
+        });
+        
         const messageElement = document.createElement('div');
         messageElement.className = 'message';
 
@@ -1132,6 +1168,13 @@ class ChatroomController {
         } else if (message.type === 'system') {
             messageClass = 'message-system';
         }
+
+        console.log('🎨 [前端] 消息样式分类:', {
+            messageClass: messageClass,
+            isUser: message.senderId === this.currentUser.userId,
+            isAgent: message.type === 'agent_response' || message.agentId,
+            isSystem: message.type === 'system'
+        });
 
         messageElement.classList.add(messageClass);
 
@@ -1185,6 +1228,12 @@ class ChatroomController {
 
         // 添加到消息列表
         this.elements.chatMessages.appendChild(messageElement);
+        
+        console.log('✅ [前端] 消息已成功添加到DOM:', {
+            messageId: message.id,
+            elementClass: messageElement.className,
+            totalMessages: this.elements.chatMessages.children.length
+        });
 
         // 滚动到底部
         if (shouldScroll) {
@@ -1244,6 +1293,13 @@ class ChatroomController {
      * 处理接收新消息（统一处理多种格式）
      */
     handleNewMessage(message) {
+        console.log('🎯 [前端] handleNewMessage 开始处理:', {
+            messageId: message.id,
+            senderId: message.senderId,
+            currentUserId: this.currentUser?.userId,
+            isOwnMessage: (message.senderId === this.currentUser?.userId || message.userId === this.currentUser?.userId)
+        });
+        
         // 消息去重：检查是否已经处理过这条消息
         if (message.id && this.processedMessages.has(message.id)) {
             console.log('🔄 [前端] 跳过重复消息:', message.id);
@@ -1297,9 +1353,22 @@ class ChatroomController {
             if (!foundPending) {
                 console.log('🔍 [前端] 未找到对应的本地待确认消息，可能已处理');
             }
+        } else {
+            console.log('👤 [前端] 收到其他用户的消息，准备显示:', {
+                senderId: message.senderId,
+                senderName: message.senderName,
+                content: message.content?.substring(0, 50) + '...'
+            });
         }
         
         // 添加服务器返回的正式消息
+        console.log('📤 [前端] 准备添加消息到界面:', {
+            messageId: message.id,
+            content: message.content,
+            senderId: message.senderId,
+            senderName: message.senderName,
+            isOwnMessage: message.senderId === this.currentUser.userId || message.userId === this.currentUser.userId
+        });
         this.addMessage(message);
     }
 
