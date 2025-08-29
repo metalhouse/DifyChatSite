@@ -735,14 +735,17 @@ function renderAgentsTable(agents) {
                     <td>${agent.conversationCount || 0}</td>
                     <td>${formatDateTime(agent.createdAt)}</td>
                     <td>
-                        <button class="admin-btn admin-btn-warning" onclick="editAgent('${agent.id}')">
+                        <button class="admin-btn admin-btn-warning" onclick="editAgent('${agent.id}')" title="编辑智能体">
                             <i class="fas fa-edit"></i>
                         </button>
+                        <button class="admin-btn admin-btn-info" onclick="manageAgentPermissions('${agent.id}')" title="权限管理">
+                            <i class="fas fa-users-cog"></i>
+                        </button>
                         <button class="admin-btn admin-btn-${agent.status === 'active' ? 'secondary' : 'success'}" 
-                                onclick="toggleAgentStatus('${agent.id}', '${agent.status}')">
+                                onclick="toggleAgentStatus('${agent.id}', '${agent.status}')" title="${agent.status === 'active' ? '暂停' : '启用'}">
                             <i class="fas fa-${agent.status === 'active' ? 'pause' : 'play'}"></i>
                         </button>
-                        <button class="admin-btn admin-btn-danger" onclick="deleteAgent('${agent.id}')">
+                        <button class="admin-btn admin-btn-danger" onclick="deleteAgent('${agent.id}')" title="删除智能体">
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
@@ -1651,6 +1654,30 @@ function showError(message) {
 }
 
 /**
+ * 显示成功信息
+ */
+function showSuccess(message) {
+    // 创建一个简单的成功提示
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        <i class="fas fa-check-circle me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // 3秒后自动消失
+    setTimeout(() => {
+        if (alertDiv && alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+
+/**
  * 格式化日期时间
  */
 function formatDateTime(dateString) {
@@ -2011,5 +2038,400 @@ function testGetAgentDetail(agentId) {
 window.debugAgentForm = debugAgentForm;
 window.testApiKeyDecryption = testApiKeyDecryption;
 window.testGetAgentDetail = testGetAgentDetail;
+
+// ========================================
+// 智能体权限管理功能
+// ========================================
+
+/**
+ * 打开智能体权限管理模态框
+ */
+async function manageAgentPermissions(agentId) {
+    try {
+        console.log('🔐 Opening permissions management for agent:', agentId);
+        
+        // 获取智能体信息
+        const response = await apiClient.get(`/admin/agents/${agentId}`);
+        if (!response.success) {
+            throw new Error(response.message || '获取智能体信息失败');
+        }
+        
+        const agent = response.data;
+        
+        // 更新模态框中的智能体信息
+        document.getElementById('permissionAgentName').textContent = agent.name;
+        document.getElementById('permissionAgentId').textContent = agent.id;
+        document.getElementById('permissionAgentOwner').textContent = agent.owner || '未知';
+        
+        // 存储当前智能体ID
+        window.currentPermissionAgentId = agentId;
+        
+        // 加载用户列表和权限列表
+        await Promise.all([
+            loadUsersForPermissions(),
+            loadAgentPermissionsList(agentId)
+        ]);
+        
+        // 显示模态框
+        const modal = new bootstrap.Modal(document.getElementById('agentPermissionsModal'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('❌ 打开权限管理失败:', error);
+        showError('打开权限管理失败: ' + error.message);
+    }
+}
+
+/**
+ * 加载用户列表供权限分配使用
+ */
+async function loadUsersForPermissions() {
+    try {
+        console.log('👥 Loading users for permissions assignment...');
+        
+        const response = await apiClient.get('/admin/users?limit=100');
+        if (!response.success) {
+            throw new Error(response.message || '获取用户列表失败');
+        }
+        
+        const userSelect = document.getElementById('permissionUserId');
+        userSelect.innerHTML = '<option value="">请选择用户</option>';
+        
+        response.data.users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = `${user.nickname || user.username} (${user.email})`;
+            userSelect.appendChild(option);
+        });
+        
+        console.log('✅ 加载了', response.data.users.length, '个用户');
+        
+    } catch (error) {
+        console.error('❌ 加载用户列表失败:', error);
+        showError('加载用户列表失败: ' + error.message);
+    }
+}
+
+/**
+ * 加载智能体权限列表
+ */
+async function loadAgentPermissionsList(agentId) {
+    try {
+        console.log('📋 Loading permissions list for agent:', agentId);
+        
+        const container = document.getElementById('permissionsListContainer');
+        container.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <div class="mt-2">正在加载权限列表...</div>
+            </div>
+        `;
+        
+        const response = await apiClient.get(`/admin/agents/${agentId}/permissions`);
+        if (!response.success) {
+            throw new Error(response.message || '获取权限列表失败');
+        }
+        
+        renderPermissionsList(response.data);
+        console.log('✅ 加载了', response.data.length, '条权限记录');
+        
+    } catch (error) {
+        console.error('❌ 加载权限列表失败:', error);
+        const container = document.getElementById('permissionsListContainer');
+        container.innerHTML = `
+            <div class="alert alert-danger m-3">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                加载权限列表失败: ${error.message}
+            </div>
+        `;
+    }
+}
+
+/**
+ * 渲染权限列表
+ */
+function renderPermissionsList(permissions) {
+    const container = document.getElementById('permissionsListContainer');
+    
+    if (!permissions || permissions.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-users-slash fs-2 mb-3"></i>
+                <div>暂无权限分配</div>
+                <small>您可以使用上方的表单为用户分配权限</small>
+            </div>
+        `;
+        return;
+    }
+    
+    const getPermissionTypeName = (type) => {
+        const types = {
+            'none': '无权限',
+            'read': '只读',
+            'write': '编辑', 
+            'admin': '管理员'
+        };
+        return types[type] || type;
+    };
+    
+    const getPermissionBadgeClass = (type) => {
+        const classes = {
+            'none': 'bg-secondary',
+            'read': 'bg-info',
+            'write': 'bg-warning',
+            'admin': 'bg-danger'
+        };
+        return classes[type] || 'bg-secondary';
+    };
+    
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>用户</th>
+                        <th>权限类型</th>
+                        <th>分配时间</th>
+                        <th>过期时间</th>
+                        <th>分配者</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${permissions.map(permission => `
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="me-2">
+                                        <i class="fas fa-user-circle text-muted"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-semibold">${permission.user.nickname || permission.user.username}</div>
+                                        <small class="text-muted">${permission.user.email}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge ${getPermissionBadgeClass(permission.permissionType)}">
+                                    ${getPermissionTypeName(permission.permissionType)}
+                                </span>
+                            </td>
+                            <td>
+                                <small>${formatDateTime(permission.grantedAt)}</small>
+                            </td>
+                            <td>
+                                ${permission.expiresAt 
+                                    ? `<small class="text-warning">${formatDateTime(permission.expiresAt)}</small>`
+                                    : '<small class="text-success">永不过期</small>'
+                                }
+                            </td>
+                            <td>
+                                <small>${permission.grantedByUser.username}</small>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" onclick="editPermission(${permission.id})" title="编辑权限">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="revokePermission(${permission.id})" title="撤销权限">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+/**
+ * 分配权限表单提交处理
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    const addPermissionForm = document.getElementById('addPermissionForm');
+    if (addPermissionForm) {
+        addPermissionForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await addAgentPermission();
+        });
+    }
+});
+
+/**
+ * 添加智能体权限
+ */
+async function addAgentPermission() {
+    try {
+        const agentId = window.currentPermissionAgentId;
+        if (!agentId) {
+            throw new Error('未找到智能体ID');
+        }
+        
+        const formData = new FormData(document.getElementById('addPermissionForm'));
+        const userId = formData.get('userId');
+        const permissionType = formData.get('permissionType');
+        const expiresAt = formData.get('expiresAt');
+        
+        if (!userId || !permissionType) {
+            throw new Error('请填写必填字段');
+        }
+        
+        console.log('➕ Processing permission:', { agentId, userId, permissionType, expiresAt });
+        
+        // 如果选择了"无权限"，需要撤销用户的现有权限
+        if (permissionType === 'none') {
+            await revokeUserPermission(agentId, userId);
+            return;
+        }
+        
+        const requestData = {
+            userId,
+            permissionType,
+            ...(expiresAt && { expiresAt })
+        };
+        
+        const response = await apiClient.post(`/admin/agents/${agentId}/permissions`, requestData);
+        if (!response.success) {
+            throw new Error(response.message || '分配权限失败');
+        }
+        
+        showSuccess('权限分配成功');
+        
+        // 清空表单
+        document.getElementById('addPermissionForm').reset();
+        
+        // 重新加载权限列表
+        await loadAgentPermissionsList(agentId);
+        
+    } catch (error) {
+        console.error('❌ 分配权限失败:', error);
+        showError('分配权限失败: ' + error.message);
+    }
+}
+
+/**
+ * 编辑权限
+ */
+async function editPermission(permissionId) {
+    try {
+        // 这里可以实现权限编辑的逻辑
+        // 为了简化，暂时使用prompt获取新的权限类型
+        const newType = prompt('请选择新的权限类型:\nnone - 无权限(撤销)\nread - 只读\nwrite - 编辑\nadmin - 管理员', 'read');
+        if (!newType || !['none', 'read', 'write', 'admin'].includes(newType)) {
+            return;
+        }
+        
+        const agentId = window.currentPermissionAgentId;
+        
+        // 如果选择了"无权限"，直接撤销权限
+        if (newType === 'none') {
+            if (confirm('确定要撤销此用户的权限吗？')) {
+                await revokePermission(permissionId);
+            }
+            return;
+        }
+        
+        const response = await apiClient.put(`/admin/agents/${agentId}/permissions/${permissionId}`, {
+            permissionType: newType
+        });
+        
+        if (!response.success) {
+            throw new Error(response.message || '更新权限失败');
+        }
+        
+        showSuccess('权限更新成功');
+        await loadAgentPermissionsList(agentId);
+        
+    } catch (error) {
+        console.error('❌ 更新权限失败:', error);
+        showError('更新权限失败: ' + error.message);
+    }
+}
+
+/**
+ * 撤销权限
+ */
+async function revokePermission(permissionId) {
+    try {
+        if (!confirm('确定要撤销此权限吗？此操作不可撤销。')) {
+            return;
+        }
+        
+        const agentId = window.currentPermissionAgentId;
+        const response = await apiClient.delete(`/admin/agents/${agentId}/permissions/${permissionId}`);
+        
+        if (!response.success) {
+            throw new Error(response.message || '撤销权限失败');
+        }
+        
+        showSuccess('权限撤销成功');
+        await loadAgentPermissionsList(agentId);
+        
+    } catch (error) {
+        console.error('❌ 撤销权限失败:', error);
+        showError('撤销权限失败: ' + error.message);
+    }
+}
+
+/**
+ * 撤销指定用户对智能体的权限
+ * @param {string} agentId - 智能体ID
+ * @param {string} userId - 用户ID
+ */
+async function revokeUserPermission(agentId, userId) {
+    try {
+        console.log('🗑️ Revoking user permission:', { agentId, userId });
+        
+        // 首先获取权限列表，找到该用户的权限ID
+        const permissionsResponse = await apiClient.get(`/admin/agents/${agentId}/permissions`);
+        if (!permissionsResponse.success) {
+            throw new Error('获取权限列表失败');
+        }
+        
+        // 查找该用户的权限
+        const userPermission = permissionsResponse.data.find(permission => permission.userId === userId);
+        if (!userPermission) {
+            throw new Error('该用户没有此智能体的权限');
+        }
+        
+        // 撤销权限
+        const response = await apiClient.delete(`/admin/agents/${agentId}/permissions/${userPermission.id}`);
+        if (!response.success) {
+            throw new Error(response.message || '撤销权限失败');
+        }
+        
+        showSuccess('用户权限撤销成功');
+        
+        // 清空表单
+        document.getElementById('addPermissionForm').reset();
+        
+        // 重新加载权限列表
+        await loadAgentPermissionsList(agentId);
+        
+    } catch (error) {
+        console.error('❌ 撤销用户权限失败:', error);
+        showError('撤销用户权限失败: ' + error.message);
+    }
+}
+
+/**
+ * 刷新权限列表
+ */
+async function refreshPermissionsList() {
+    const agentId = window.currentPermissionAgentId;
+    if (agentId) {
+        await loadAgentPermissionsList(agentId);
+    }
+}
+
+// 导出权限管理函数
+window.manageAgentPermissions = manageAgentPermissions;
+window.editPermission = editPermission;
+window.revokePermission = revokePermission;
+window.refreshPermissionsList = refreshPermissionsList;
 
 console.log('✅ Admin controller script loaded successfully');

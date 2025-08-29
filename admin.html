@@ -586,6 +586,106 @@
             padding-left: 0.75rem;
             padding-right: 0.75rem;
         }
+
+        /* 权限管理相关样式 */
+        #agentPermissionsModal .modal-dialog {
+            max-width: 1000px;
+        }
+        
+        .permission-user-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .permission-user-info .avatar {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #007bff, #6610f2);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-right: 0.75rem;
+        }
+        
+        .permission-type-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+        
+        .permission-actions .btn-group .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+        }
+        
+        .permissions-table th {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--admin-dark);
+            background: rgba(220, 53, 69, 0.1);
+        }
+        
+        .permissions-empty {
+            padding: 2rem;
+            text-align: center;
+            color: var(--admin-secondary);
+        }
+        
+        .permissions-empty i {
+            font-size: 3rem;
+            opacity: 0.5;
+            margin-bottom: 1rem;
+        }
+        
+        #addPermissionForm .btn {
+            font-weight: 600;
+        }
+        
+        .permission-card .card-header {
+            background: rgba(220, 53, 69, 0.1);
+            border-bottom: 1px solid rgba(220, 53, 69, 0.2);
+        }
+        
+        .permission-card .card-header h6 {
+            color: var(--admin-danger);
+        }
+        
+        /* 权限按钮图标颜色 */
+        .admin-btn-info {
+            background: linear-gradient(135deg, var(--admin-info), #0dcaf0);
+            color: white;
+        }
+        
+        .admin-btn-info:hover {
+            background: linear-gradient(135deg, #0dcaf0, #31d2f2);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        /* 权限表格响应式 */
+        @media (max-width: 768px) {
+            #agentPermissionsModal .modal-dialog {
+                max-width: 95%;
+                margin: 1rem auto;
+            }
+            
+            .permissions-table th,
+            .permissions-table td {
+                font-size: 0.8rem;
+                padding: 0.5rem 0.25rem;
+            }
+            
+            .permission-actions .btn-group .btn {
+                padding: 0.2rem 0.4rem;
+                font-size: 0.75rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1233,6 +1333,101 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-danger" onclick="saveAgentChanges()">保存更改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 智能体权限管理模态框 -->
+    <div class="modal fade" id="agentPermissionsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">智能体权限管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- 智能体信息 -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title">智能体信息</h6>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <strong>名称：</strong>
+                                    <span id="permissionAgentName">-</span>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>ID：</strong>
+                                    <code id="permissionAgentId">-</code>
+                                </div>
+                                <div class="col-md-4">
+                                    <strong>所有者：</strong>
+                                    <span id="permissionAgentOwner">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 添加权限表单 -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">分配新权限</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="addPermissionForm">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">选择用户</label>
+                                        <select class="form-select" id="permissionUserId" name="userId" required>
+                                            <option value="">请选择用户</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">权限类型</label>
+                                        <select class="form-select" id="permissionType" name="permissionType" required>
+                                            <option value="none">无权限 (撤销所有权限)</option>
+                                            <option value="read">只读权限 (查看和对话)</option>
+                                            <option value="write">编辑权限 (修改配置)</option>
+                                            <option value="admin">管理员权限 (完全控制)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">过期时间 <small class="text-muted">(可选)</small></label>
+                                        <input type="datetime-local" class="form-control" id="permissionExpiresAt" name="expiresAt">
+                                        <small class="form-text text-muted">留空表示永不过期</small>
+                                    </div>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-plus me-2"></i>分配权限
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- 现有权限列表 -->
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">现有权限列表</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="refreshPermissionsList()">
+                                <i class="fas fa-sync-alt me-1"></i>刷新
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="permissionsListContainer">
+                                <div class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                    <div class="mt-2">正在加载权限列表...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
                 </div>
             </div>
         </div>
