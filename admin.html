@@ -1119,6 +1119,23 @@
                             <label class="form-label">描述 <span class="text-danger">*</span></label>
                             <textarea class="form-control" name="description" rows="3" required placeholder="请描述智能体的功能和用途"></textarea>
                         </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Dify App ID</label>
+                                <input type="text" class="form-control" name="difyAppId" placeholder="请输入Dify应用ID">
+                                <small class="form-text text-muted">对接Dify平台的应用ID</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Dify API Key</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" name="difyApiKey" id="createDifyApiKey" placeholder="请输入Dify API密钥">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleApiKeyVisibility('createDifyApiKey', this)">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <small class="form-text text-muted">对接Dify平台的API密钥</small>
+                            </div>
+                        </div>
                         <div class="mb-3">
                             <label class="form-label">可见性</label>
                             <select class="form-select" name="visibility">
@@ -1192,6 +1209,23 @@
                                 <label class="form-label">所有者</label>
                                 <input type="text" class="form-control" id="editAgentOwner" readonly>
                                 <small class="form-text text-muted">所有者信息只读</small>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Dify App ID</label>
+                                <input type="text" class="form-control" id="editDifyAppId" name="difyAppId" placeholder="请输入Dify应用ID">
+                                <small class="form-text text-muted">对接Dify平台的应用ID</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Dify API Key</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="editDifyApiKey" name="difyApiKey" placeholder="请输入Dify API密钥">
+                                    <button class="btn btn-outline-secondary" type="button" onclick="toggleApiKeyVisibility('editDifyApiKey', this)">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                                <small class="form-text text-muted">对接Dify平台的API密钥</small>
                             </div>
                         </div>
                     </form>

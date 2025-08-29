@@ -1241,7 +1241,21 @@ async function createAgent() {
             visibility: formData.get('visibility') || 'private'
         };
         
+        // 处理 Dify 字段 - 始终发送这些字段，即使为空字符串
+        const difyAppId = formData.get('difyAppId');
+        const difyApiKey = formData.get('difyApiKey');
+        
+        // 只有在有值时才添加到请求中（空字符串也要发送）
+        if (difyAppId !== null) {
+            agentData.difyAppId = difyAppId || '';
+        }
+        
+        if (difyApiKey !== null) {
+            agentData.difyApiKey = difyApiKey || '';
+        }
+        
         console.log('🤖 Creating agent:', agentData.name);
+        console.log('📝 Agent data being sent:', agentData);
         
         const response = await apiClient.post('/admin/agents', agentData);
         if (response.success) {
@@ -1283,6 +1297,52 @@ async function editAgent(agentId) {
             document.querySelector('#editAgentForm textarea[name="description"]').value = agent.description || '';
             document.querySelector('#editAgentForm select[name="visibility"]').value = agent.visibility;
             document.querySelector('#editAgentForm select[name="status"]').value = agent.status;
+            document.querySelector('#editAgentForm input[name="difyAppId"]').value = agent.difyAppId || '';
+            
+            // 处理API Key字段 - 根据后端返回情况智能处理
+            const apiKeyInput = document.querySelector('#editAgentForm input[name="difyApiKey"]');
+            
+            // 根据API文档，管理员接口应该返回完整解密的API Key
+            if (agent.difyApiKey && agent.difyApiKey.trim() !== '' && agent.difyApiKey !== '***隐藏***') {
+                // 后端返回了完整的API Key，直接填充但初始隐藏
+                apiKeyInput.value = agent.difyApiKey;
+                apiKeyInput.placeholder = '已设置API Key';
+                apiKeyInput.dataset.hasApiKey = 'true';
+                console.log('✅ 管理员接口返回完整API Key，已填充到输入框');
+            } else {
+                // 后端没有返回API Key或返回了隐藏标记
+                apiKeyInput.value = '';
+                apiKeyInput.dataset.hasApiKey = 'false';
+                
+                if (agent.difyApiKey === '***隐藏***') {
+                    apiKeyInput.placeholder = '点击眼睛按钮查看已设置的API Key';
+                    apiKeyInput.dataset.hasApiKey = 'true';
+                    console.log('⚠️ 后端返回隐藏标记，需要通过API获取解密值');
+                } else {
+                    apiKeyInput.placeholder = '请输入Dify API密钥';
+                    console.log('ℹ️ 该智能体未设置API Key');
+                }
+            }
+            
+            // 确保输入框类型为password
+            apiKeyInput.type = 'password';
+            
+            // 重置眼睛按钮状态
+            const toggleBtn = document.querySelector('button[onclick*="editDifyApiKey"]');
+            if (toggleBtn) {
+                const icon = toggleBtn.querySelector('i');
+                if (icon) {
+                    icon.classList.remove('fa-eye-slash');
+                    icon.classList.add('fa-eye');
+                }
+                toggleBtn.setAttribute('title', '显示API Key');
+            }
+            
+            // 设置所有者信息（如果有的话）
+            const ownerField = document.getElementById('editAgentOwner');
+            if (ownerField && agent.owner) {
+                ownerField.value = agent.owner;
+            }
             
             // 显示模态框
             const modal = new bootstrap.Modal(document.getElementById('editAgentModal'));
@@ -1312,7 +1372,35 @@ async function saveAgentChanges() {
             status: formData.get('status')
         };
         
+        // 处理Dify字段
+        const difyAppId = formData.get('difyAppId');
+        const difyApiKey = formData.get('difyApiKey');
+        const apiKeyInput = document.getElementById('editDifyApiKey');
+        
+        // 处理 difyAppId
+        if (difyAppId !== null) {
+            updateData.difyAppId = difyAppId || '';
+        }
+        
+        // 智能处理 difyApiKey
+        if (difyApiKey !== null) {
+            if (difyApiKey.trim() !== '') {
+                // 用户输入了新的API Key
+                updateData.difyApiKey = difyApiKey;
+                console.log('📝 将更新API Key为新值');
+            } else if (apiKeyInput && apiKeyInput.dataset.hasApiKey === 'true') {
+                // 用户没有输入，但原来有API Key，不更新该字段（保持原值）
+                console.log('📝 保持原有API Key不变');
+                // 不添加 difyApiKey 字段到 updateData，后端会保持原值
+            } else {
+                // 用户没有输入，原来也没有API Key，发送空字符串
+                updateData.difyApiKey = '';
+                console.log('📝 设置API Key为空');
+            }
+        }
+        
         console.log('💾 Saving agent changes:', agentId);
+        console.log('📝 Update data being sent:', updateData);
         
         const response = await apiClient.put(`/admin/agents/${agentId}`, updateData);
         if (response.success) {
@@ -1692,5 +1780,236 @@ window.archiveConversation = archiveConversation;
 window.deleteConversation = deleteConversation;
 window.refreshSystemStatus = refreshSystemStatus;
 window.refreshLogs = refreshLogs;
+
+/**
+ * 切换API Key的显示状态
+ * @param {string} inputId - 输入框ID
+ * @param {Element} toggleBtn - 切换按钮元素
+ */
+function toggleApiKeyVisibility(inputId, toggleBtn) {
+    const input = document.getElementById(inputId);
+    const icon = toggleBtn.querySelector('i');
+    
+    if (input.type === 'password') {
+        // 显示API Key
+        input.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+        toggleBtn.setAttribute('title', '隐藏API Key');
+        
+        // 如果是编辑模式且需要从后端获取解密的API Key
+        if (inputId === 'editDifyApiKey') {
+            const hasApiKey = input.dataset.hasApiKey === 'true';
+            const hasValue = input.value && input.value.trim() !== '';
+            
+            // 如果标记显示有API Key但输入框为空，或者值是隐藏标记，则从后端获取
+            if (hasApiKey && (!hasValue || input.value === '***隐藏***')) {
+                const agentId = document.getElementById('editAgentId').value;
+                if (agentId) {
+                    console.log('🔄 需要从后端获取解密的API Key');
+                    loadDecryptedApiKey(agentId, inputId);
+                }
+            } else if (hasValue) {
+                console.log('✅ 直接显示已有的API Key');
+            }
+        }
+    } else {
+        // 隐藏API Key
+        input.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+        toggleBtn.setAttribute('title', '显示API Key');
+    }
+}
+
+/**
+ * 从后端加载解密的API Key
+ * @param {string} agentId - 智能体ID
+ * @param {string} inputId - 输入框ID
+ */
+async function loadDecryptedApiKey(agentId, inputId) {
+    try {
+        console.log('🔓 正在获取解密的API Key...');
+        
+        // 显示加载状态
+        const input = document.getElementById(inputId);
+        const originalPlaceholder = input.placeholder;
+        input.placeholder = '正在获取API Key...';
+        
+        // 调用管理员API获取完整的智能体信息（包含解密的API Key）
+        const response = await apiClient.get(`/admin/agents/${agentId}`);
+        
+        if (response.success && response.data.difyApiKey) {
+            // 检查返回的API Key是否是真实值（不是隐藏标记）
+            if (response.data.difyApiKey !== '***隐藏***' && response.data.difyApiKey.trim() !== '') {
+                input.value = response.data.difyApiKey;
+                input.placeholder = '已获取API Key';
+                console.log('✅ API Key已解密并显示');
+            } else {
+                input.placeholder = 'API Key获取失败：后端返回隐藏标记';
+                console.log('⚠️ 后端仍然返回隐藏标记，可能是权限问题');
+            }
+        } else {
+            input.placeholder = 'API Key获取失败：响应无效';
+            console.log('⚠️ API响应无效或无API Key字段');
+        }
+        
+        // 3秒后恢复原占位符（如果获取失败）
+        if (!response.success || !response.data.difyApiKey || response.data.difyApiKey === '***隐藏***') {
+            setTimeout(() => {
+                if (input.placeholder.includes('失败')) {
+                    input.placeholder = originalPlaceholder;
+                }
+            }, 3000);
+        }
+    } catch (error) {
+        console.error('❌ 获取解密API Key失败:', error);
+        
+        // 显示错误提示
+        const input = document.getElementById(inputId);
+        const originalPlaceholder = input.placeholder;
+        input.placeholder = `获取失败: ${error.message}`;
+        
+        // 3秒后恢复原占位符
+        setTimeout(() => {
+            input.placeholder = originalPlaceholder;
+        }, 3000);
+    }
+}
+
+/**
+ * 使用星号遮盖API Key
+ * @param {string} apiKey - 原始API Key
+ * @returns {string} 遮盖后的API Key
+ */
+function maskApiKey(apiKey) {
+    if (!apiKey || apiKey === '***隐藏***') {
+        return '';
+    }
+    
+    // 如果API Key长度小于8，全部用星号
+    if (apiKey.length <= 8) {
+        return '*'.repeat(apiKey.length);
+    }
+    
+    // 显示前4位和后4位，中间用星号
+    const start = apiKey.substring(0, 4);
+    const end = apiKey.substring(apiKey.length - 4);
+    const middle = '*'.repeat(Math.max(8, apiKey.length - 8));
+    
+    return start + middle + end;
+}
+
+// 导出函数到全局作用域
+window.toggleApiKeyVisibility = toggleApiKeyVisibility;
+window.maskApiKey = maskApiKey;
+
+/**
+ * 调试脚本 - 用于生产环境问题排查
+ * 在浏览器控制台中运行: window.debugAgentForm()
+ */
+function debugAgentForm() {
+    console.log('=== 智能体表单调试信息 ===');
+    
+    // 检查创建表单
+    const createForm = document.getElementById('createAgentForm');
+    if (createForm) {
+        const createFormData = new FormData(createForm);
+        console.log('📝 创建表单数据:');
+        console.log('- name:', createFormData.get('name'));
+        console.log('- type:', createFormData.get('type'));
+        console.log('- description:', createFormData.get('description'));
+        console.log('- visibility:', createFormData.get('visibility'));
+        console.log('- difyAppId:', createFormData.get('difyAppId'));
+        console.log('- difyApiKey:', createFormData.get('difyApiKey') ? '***有值***' : '***空值***');
+        console.log('- difyApiKey实际值:', createFormData.get('difyApiKey'));
+    }
+    
+    // 检查编辑表单
+    const editForm = document.getElementById('editAgentForm');
+    if (editForm) {
+        const editFormData = new FormData(editForm);
+        const apiKeyInput = document.getElementById('editDifyApiKey');
+        
+        console.log('✏️ 编辑表单数据:');
+        console.log('- id:', editFormData.get('id'));
+        console.log('- name:', editFormData.get('name'));
+        console.log('- description:', editFormData.get('description'));
+        console.log('- status:', editFormData.get('status'));
+        console.log('- visibility:', editFormData.get('visibility'));
+        console.log('- difyAppId:', editFormData.get('difyAppId'));
+        console.log('- difyApiKey表单值:', editFormData.get('difyApiKey') ? '***有值***' : '***空值***');
+        console.log('- difyApiKey实际值:', editFormData.get('difyApiKey'));
+        console.log('- apiKeyInput.value:', apiKeyInput?.value ? '***有值***' : '***空值***');
+        console.log('- apiKeyInput.value实际:', apiKeyInput?.value);
+        console.log('- apiKeyInput.dataset.hasApiKey:', apiKeyInput?.dataset.hasApiKey);
+        console.log('- apiKeyInput.placeholder:', apiKeyInput?.placeholder);
+        console.log('- apiKeyInput.type:', apiKeyInput?.type);
+    }
+    
+    // 检查环境配置
+    console.log('🔧 环境配置:');
+    console.log('- API Base URL:', ENV_CONFIG?.getApiUrl());
+    console.log('- Environment:', ENV_CONFIG?.ENVIRONMENT);
+    console.log('- Auth Token:', localStorage.getItem('dify_access_token') ? '***存在***' : '***不存在***');
+}
+
+/**
+ * 测试API Key解密功能
+ * 在浏览器控制台中运行: window.testApiKeyDecryption('your-agent-id')
+ */
+function testApiKeyDecryption(agentId) {
+    console.log('🧪 测试API Key解密功能...');
+    if (!agentId) {
+        console.error('❌ 请提供智能体ID');
+        return;
+    }
+    
+    loadDecryptedApiKey(agentId, 'editDifyApiKey')
+        .then(() => {
+            console.log('✅ 解密测试完成，检查输入框内容');
+        })
+        .catch(error => {
+            console.error('❌ 解密测试失败:', error);
+        });
+}
+
+/**
+ * 测试获取智能体详情API
+ * 在浏览器控制台中运行: window.testGetAgentDetail('your-agent-id')
+ */
+function testGetAgentDetail(agentId) {
+    console.log('🔍 测试获取智能体详情API...');
+    if (!agentId) {
+        console.error('❌ 请提供智能体ID');
+        return;
+    }
+    
+    return apiClient.get(`/admin/agents/${agentId}`)
+        .then(response => {
+            console.log('📊 API响应:', response);
+            if (response.success) {
+                const agent = response.data;
+                console.log('🤖 智能体数据:');
+                console.log('- id:', agent.id);
+                console.log('- name:', agent.name);
+                console.log('- difyAppId:', agent.difyAppId);
+                console.log('- difyApiKey类型:', typeof agent.difyApiKey);
+                console.log('- difyApiKey是否为隐藏标记:', agent.difyApiKey === '***隐藏***');
+                console.log('- difyApiKey长度:', agent.difyApiKey?.length);
+                console.log('- difyApiKey前10位:', agent.difyApiKey?.substring(0, 10));
+            }
+            return response;
+        })
+        .catch(error => {
+            console.error('❌ API调用失败:', error);
+            throw error;
+        });
+}
+
+// 导出调试函数
+window.debugAgentForm = debugAgentForm;
+window.testApiKeyDecryption = testApiKeyDecryption;
+window.testGetAgentDetail = testGetAgentDetail;
 
 console.log('✅ Admin controller script loaded successfully');
