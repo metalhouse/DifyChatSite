@@ -632,6 +632,65 @@ class ChatroomController {
         this.elements.messageInput.addEventListener('input', () => {
             this.adjustTextareaHeight();
         });
+        
+        // 移动端添加调试按钮
+        this.addMobileDebugButton();
+    }
+
+    /**
+     * 添加移动端调试按钮
+     */
+    addMobileDebugButton() {
+        if (window.innerWidth <= 768) {
+            const debugBtn = document.createElement('button');
+            debugBtn.innerHTML = '🐛调试';
+            debugBtn.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                border-radius: 5px;
+                font-size: 12px;
+                z-index: 9998;
+                cursor: pointer;
+            `;
+            
+            debugBtn.addEventListener('click', () => {
+                this.showCurrentDebugInfo();
+            });
+            
+            document.body.appendChild(debugBtn);
+        }
+    }
+
+    /**
+     * 显示当前消息的调试信息
+     */
+    showCurrentDebugInfo() {
+        const messages = this.elements.chatMessages.querySelectorAll('.message');
+        const lastMessage = messages[messages.length - 1];
+        
+        if (!lastMessage) {
+            alert('没有消息可以调试');
+            return;
+        }
+        
+        const computedStyle = window.getComputedStyle(lastMessage);
+        const classList = Array.from(lastMessage.classList);
+        
+        const debugText = `调试信息:
+CSS类: ${classList.join(' ')}
+display: ${computedStyle.display}
+justifyContent: ${computedStyle.justifyContent}
+flexDirection: ${computedStyle.flexDirection}
+屏幕宽度: ${window.innerWidth}px
+当前用户ID: ${this.currentUser?.id}
+消息总数: ${messages.length}`;
+        
+        alert(debugText);
     }
 
     /**
@@ -1199,13 +1258,18 @@ class ChatroomController {
         if (window.innerWidth <= 768) {
             setTimeout(() => {
                 const computedStyle = window.getComputedStyle(messageElement);
-                console.log('📱 [移动端] 计算后的样式:', {
+                const debugInfo = {
                     display: computedStyle.display,
                     justifyContent: computedStyle.justifyContent,
                     flexDirection: computedStyle.flexDirection,
                     width: computedStyle.width,
-                    messageClass: messageClass
-                });
+                    messageClass: messageClass,
+                    classList: Array.from(messageElement.classList).join(' ')
+                };
+                console.log('📱 [移动端] 计算后的样式:', debugInfo);
+                
+                // 在页面上显示调试信息（移动端）
+                this.showMobileDebugInfo(debugInfo, message);
             }, 100);
         }
 
@@ -1402,6 +1466,65 @@ class ChatroomController {
             isOwnMessage: message.senderId === this.currentUser.userId || message.userId === this.currentUser.userId
         });
         this.addMessage(message);
+    }
+
+    /**
+     * 移动端调试信息显示
+     * @param {Object} debugInfo - 调试信息对象
+     * @param {Object} message - 消息对象
+     */
+    showMobileDebugInfo(debugInfo, message) {
+        // 只在移动端显示
+        if (window.innerWidth > 768) return;
+        
+        // 创建或获取调试容器
+        let debugContainer = document.getElementById('mobile-debug-container');
+        if (!debugContainer) {
+            debugContainer = document.createElement('div');
+            debugContainer.id = 'mobile-debug-container';
+            debugContainer.style.cssText = `
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 10px;
+                border-radius: 5px;
+                font-size: 12px;
+                z-index: 9999;
+                max-height: 200px;
+                overflow-y: auto;
+                display: block;
+            `;
+            document.body.appendChild(debugContainer);
+            
+            // 5秒后自动隐藏
+            setTimeout(() => {
+                if (debugContainer) {
+                    debugContainer.style.display = 'none';
+                }
+            }, 5000);
+        }
+        
+        const isCurrentUser = message.senderId === this.currentUser?.id || message.userId === this.currentUser?.id;
+        const debugText = `
+            <div style="margin-bottom: 5px; border-bottom: 1px solid #666; padding-bottom: 5px;">
+                <strong>消息调试 (${new Date().toLocaleTimeString()})</strong><br>
+                当前用户ID: ${this.currentUser?.id}<br>
+                消息发送者ID: ${message.senderId}<br>
+                是否为当前用户: ${isCurrentUser}<br>
+                CSS类: ${debugInfo.messageClass}<br>
+                应用的类: ${debugInfo.classList}<br>
+                display: ${debugInfo.display}<br>
+                justifyContent: ${debugInfo.justifyContent}<br>
+                flexDirection: ${debugInfo.flexDirection}<br>
+                屏幕宽度: ${window.innerWidth}px
+            </div>
+        `;
+        
+        debugContainer.innerHTML = debugText + debugContainer.innerHTML;
+        debugContainer.style.display = 'block';
     }
 
     /**
