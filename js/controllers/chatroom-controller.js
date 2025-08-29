@@ -312,8 +312,8 @@ class ChatroomController {
                 senderName: message.senderName,
                 messageRoomId: message.roomId,
                 currentRoomId: this.currentRoom?.id || this.currentRoom?.roomId,
-                currentUserId: this.currentUser?.userId,
-                isOwnMessage: message.senderId === this.currentUser?.userId
+                currentUserId: this.currentUser?.id,
+                isOwnMessage: message.senderId === this.currentUser?.id
             });
             
             // 检查消息是否属于当前房间
@@ -1077,8 +1077,8 @@ class ChatroomController {
                 id: localMessageId,
                 content: content,
                 type: 'text',
-                senderId: this.currentUser.userId,
-                userId: this.currentUser.userId,
+                senderId: this.currentUser.id,
+                userId: this.currentUser.id,
                 senderName: this.currentUser.username,
                 username: this.currentUser.username,
                 timestamp: Date.now(),
@@ -1180,6 +1180,18 @@ class ChatroomController {
         });
 
         messageElement.classList.add(messageClass);
+        
+        // 强制确保CSS类正确应用 - 增强调试
+        console.log('🔍 [前端] DOM元素类名检查:', {
+            elementClasses: Array.from(messageElement.classList),
+            expectedClass: messageClass,
+            hasExpectedClass: messageElement.classList.contains(messageClass),
+            currentUserId: this.currentUser?.id,
+            messageSenderId: message.senderId,
+            messageUserId: message.userId,
+            userComparison: message.senderId === this.currentUser?.id,
+            userIdComparison: message.userId === this.currentUser?.id
+        });
 
         // 构建消息HTML
         let messageHTML = `<div class="message-bubble">`;
@@ -1300,8 +1312,8 @@ class ChatroomController {
         console.log('🎯 [前端] handleNewMessage 开始处理:', {
             messageId: message.id,
             senderId: message.senderId,
-            currentUserId: this.currentUser?.userId,
-            isOwnMessage: (message.senderId === this.currentUser?.userId || message.userId === this.currentUser?.userId)
+            currentUserId: this.currentUser?.id,
+            isOwnMessage: (message.senderId === this.currentUser?.id || message.userId === this.currentUser?.id)
         });
         
         // 消息去重：检查是否已经处理过这条消息
@@ -1322,7 +1334,7 @@ class ChatroomController {
         }
         
         // 检查是否是自己发送的消息的确认（避免重复显示）
-        if (message.senderId === this.currentUser.userId || message.userId === this.currentUser.userId) {
+        if (message.senderId === this.currentUser.id || message.userId === this.currentUser.id) {
             console.log('📨 [前端] 收到自己的消息确认:', message);
             
             // 查找并移除本地待确认的消息

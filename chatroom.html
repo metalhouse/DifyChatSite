@@ -780,6 +780,22 @@
 
         /* 移动端消息布局优化 */
         @media (max-width: 768px) {
+            /* 确保移动端也有正确的左右分布 */
+            .message-user {
+                display: flex !important;
+                justify-content: flex-end !important;
+            }
+
+            .message-other {
+                display: flex !important;
+                justify-content: flex-start !important;
+            }
+
+            .message-agent {
+                display: flex !important;
+                justify-content: flex-start !important;
+            }
+
             .message-user .message-bubble {
                 margin-left: 10%;
             }
