@@ -624,8 +624,49 @@
                 font-size: 1.25rem;
             }
 
+            .chat-header {
+                padding: 0.5rem;
+                height: auto !important;
+                min-height: 50px;
+                flex-wrap: nowrap;
+                align-items: center;
+            }
+
             .chat-header h5 {
-                font-size: 1rem;
+                font-size: 0.9rem;
+                flex: 1;
+                min-width: 0;
+                margin-right: 0.5rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .chat-header > div {
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+                flex-shrink: 0;
+            }
+
+            .chat-header .btn {
+                font-size: 0.7rem !important;
+                padding: 0.25rem 0.4rem !important;
+                min-width: auto;
+                border-radius: 4px !important;
+            }
+
+            .chat-header .btn .fas {
+                font-size: 0.7rem;
+            }
+
+            /* 在移动端隐藏按钮文字，只保留图标 */
+            .chat-header .btn span {
+                display: none;
+            }
+
+            .chat-header .btn .fas {
+                margin-right: 0 !important;
             }
 
             /* 确保在虚拟键盘弹出时页面不会被推上去 */
@@ -1168,16 +1209,16 @@
                 </h5>
                 <div>
                     <button class="btn btn-outline-light btn-sm me-2" onclick="showCreateConversationModal()" title="新建对话">
-                        <i class="fas fa-plus me-1"></i>新建
+                        <i class="fas fa-plus me-1"></i><span>新建</span>
                     </button>
                     <button class="btn btn-outline-light btn-sm me-2" onclick="showSelectConversationModal()" title="选择会话">
-                        <i class="fas fa-list me-1"></i>选择
+                        <i class="fas fa-list me-1"></i><span>选择</span>
                     </button>
                     <button class="btn btn-outline-light btn-sm me-2" onclick="showChatHistory()" title="查看聊天记录">
-                        <i class="fas fa-history me-1"></i>记录
+                        <i class="fas fa-history me-1"></i><span>记录</span>
                     </button>
                     <button class="btn btn-outline-light btn-sm me-2" onclick="clearChat()" title="清空对话">
-                        <i class="fas fa-trash me-1"></i>清空
+                        <i class="fas fa-trash me-1"></i><span>清空</span>
                     </button>
                     <button class="btn btn-outline-light btn-sm d-md-none" onclick="toggleSidebar()" title="显示/隐藏侧边栏">
                         <i class="fas fa-bars"></i>
