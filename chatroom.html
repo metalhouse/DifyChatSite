@@ -674,24 +674,25 @@
             animation: fadeInUp 0.3s ease;
         }
 
+        /* 消息布局 - 强化样式确保左右分布 */
         .message-user {
-            display: flex;
-            justify-content: flex-end;
+            display: flex !important;
+            justify-content: flex-end !important;
         }
 
         .message-other {
-            display: flex;
-            justify-content: flex-start;
-        }
-
-        .message-system {
-            display: flex;
-            justify-content: center;
+            display: flex !important;
+            justify-content: flex-start !important;
         }
 
         .message-agent {
-            display: flex;
-            justify-content: flex-start;
+            display: flex !important;
+            justify-content: flex-start !important;
+        }
+
+        .message-system {
+            display: flex !important;
+            justify-content: center !important;
         }
 
         /* 发送中消息样式 */
@@ -719,9 +720,26 @@
         }
 
         .message-user .message-bubble {
-            margin-left: 15%;
-            background: linear-gradient(135deg, #007bff, #0056b3);
-            color: white;
+            margin-left: 15% !important;
+            margin-right: 0 !important;
+            background: linear-gradient(135deg, #007bff, #0056b3) !important;
+            color: white !important;
+        }
+
+        .message-other .message-bubble {
+            margin-left: 0 !important;
+            margin-right: 15% !important;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef) !important;
+            color: #495057 !important;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .message-agent .message-bubble {
+            margin-left: 0 !important;
+            margin-right: 15% !important;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb) !important;
+            color: #1565c0 !important;
+            border: 1px solid rgba(25, 118, 210, 0.2);
         }
 
         /* 发送中的消息样式 */
@@ -758,11 +776,6 @@
             border: 1px solid rgba(255, 193, 7, 0.3);
             text-align: center;
             font-style: italic;
-        }
-
-        .message-other .message-bubble,
-        .message-agent .message-bubble {
-            margin-right: 15%;
         }
 
         /* 移动端消息布局优化 */

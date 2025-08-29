@@ -93,6 +93,13 @@ class ChatroomController {
             }
             
             console.log('用户信息加载完成:', userInfo);
+            console.log('🔍 [前端] 用户ID详情:', {
+                userId: userInfo.userId,
+                userIdType: typeof userInfo.userId,
+                id: userInfo.id,
+                idType: typeof userInfo.id,
+                username: userInfo.username
+            });
         } catch (error) {
             console.error('加载用户信息失败:', error);
             throw error;
@@ -1173,13 +1180,24 @@ class ChatroomController {
             messageClass: messageClass,
             messageId: message.id,
             senderId: message.senderId,
-            currentUserId: this.currentUser.userId,
+            userId: message.userId, 
+            currentUserId: this.currentUser?.userId,
+            currentUserIdType: typeof this.currentUser?.userId,
+            senderIdType: typeof message.senderId,
             isUser: message.senderId === this.currentUser.userId,
+            isUserAlt: message.userId === this.currentUser.userId,
             isAgent: message.type === 'agent_response' || message.agentId,
             isSystem: message.type === 'system'
         });
 
         messageElement.classList.add(messageClass);
+        
+        // 强制确保CSS类正确应用
+        console.log('🔍 [前端] DOM元素类名检查:', {
+            elementClasses: Array.from(messageElement.classList),
+            expectedClass: messageClass,
+            hasExpectedClass: messageElement.classList.contains(messageClass)
+        });
 
         // 构建消息HTML
         let messageHTML = `<div class="message-bubble">`;
@@ -1232,10 +1250,14 @@ class ChatroomController {
         // 添加到消息列表
         this.elements.chatMessages.appendChild(messageElement);
         
+        // 验证CSS样式是否正确应用
+        const computedStyle = window.getComputedStyle(messageElement);
         console.log('✅ [前端] 消息已成功添加到DOM:', {
             messageId: message.id,
             elementClass: messageElement.className,
             classList: Array.from(messageElement.classList),
+            computedDisplay: computedStyle.display,
+            computedJustifyContent: computedStyle.justifyContent,
             totalMessages: this.elements.chatMessages.children.length
         });
 
