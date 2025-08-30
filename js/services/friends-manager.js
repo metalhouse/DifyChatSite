@@ -313,7 +313,7 @@ class FriendsManager {
             this.loadPrivateChatHistory(friendId);
         }
 
-        // 启用输入框
+        // 启用输入框和相关按钮
         if (messageInput) {
             messageInput.disabled = false;
             messageInput.placeholder = `给 ${friendName} 发消息...`;
@@ -321,6 +321,19 @@ class FriendsManager {
         
         if (sendButton) {
             sendButton.disabled = false;
+        }
+        
+        // 启用图片上传按钮
+        const imageUploadButton = document.getElementById('imageUploadButton');
+        if (imageUploadButton) {
+            imageUploadButton.disabled = false;
+        }
+        
+        // 启用@智能体按钮（如果需要的话）
+        const mentionButton = document.getElementById('mentionButton');
+        if (mentionButton) {
+            // 私聊模式可能不需要@智能体，可以选择禁用或保持启用
+            // mentionButton.disabled = true;
         }
 
         // 显示私聊操作按钮，隐藏群聊元素
@@ -365,7 +378,35 @@ class FriendsManager {
             // 调用API获取私聊历史
             const response = await this.friendsApi.getChatHistory(friendId, 1, 50);
             
+            console.log('🔍 [调试] 私聊历史API响应:', response);
+            console.log('🔍 [调试] 消息数据:', response.data?.messages);
+            
             if (response.data && response.data.messages) {
+                // 详细检查每条消息的附件信息
+                response.data.messages.forEach((msg, index) => {
+                // 解析attachments JSON字符串 - 参考群聊控制器的处理方式
+                if (msg.attachments && typeof msg.attachments === 'string') {
+                    try {
+                        const parsed = JSON.parse(msg.attachments);
+                        msg.attachments = Array.isArray(parsed) ? parsed : [];
+                        console.log(`✅ [私聊API消息] 成功解析attachments JSON: ${msg.attachments.length}个附件`);
+                    } catch (e) {
+                        console.error('❌ [私聊API消息] 解析attachments JSON失败:', e, msg.attachments);
+                        msg.attachments = [];
+                    }
+                } else if (!msg.attachments || !Array.isArray(msg.attachments)) {
+                    msg.attachments = [];
+                }                    console.log(`🔍 [调试] 消息 ${index + 1}:`, {
+                        id: msg.id || msg._id || msg.messageId,
+                        content: msg.content,
+                        messageType: msg.messageType || msg.message_type,
+                        hasAttachments: !!(msg.attachments && msg.attachments.length > 0),
+                        attachments: msg.attachments,
+                        attachmentsType: typeof msg.attachments,
+                        rawMessage: msg
+                    });
+                });
+                
                 this.renderChatMessages(response.data.messages, friendId);
                 
                 // 注意：不在这里标记已读，由startPrivateChat统一处理
@@ -426,7 +467,9 @@ class FriendsManager {
         );
 
         // 渲染消息
-        chatMessages.innerHTML = sortedMessages.map(message => {
+        chatMessages.innerHTML = '';
+        
+        sortedMessages.forEach(message => {
             const isCurrentUser = message.senderId === currentUserId;
             const messageClass = isCurrentUser ? 'message-user' : 'message-other';
             const senderName = isCurrentUser ? '我' : message.senderInfo?.username || this.currentPrivateChat.friendName;
@@ -442,29 +485,89 @@ class FriendsManager {
             const readStatusContainer = isCurrentUser ? 
                 '<div class="message-read-container" data-message-id="' + messageId + '"></div>' : '';
             
-            return `
-                <div class="message ${messageClass}" data-message-id="${messageId}">
-                    <div class="message-select-wrapper">
-                        <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
-                        <div class="message-bubble">
-                            <div class="message-header">
-                                <span class="message-sender">${senderName}</span>
-                                <span class="message-time">${this.formatTime(new Date(message.createdAt))}</span>
-                                ${message.isEncrypted ? '<i class="fas fa-lock text-success" title="已加密"></i>' : ''}
-                                <div class="message-actions" style="display: none;">
-                                    <button class="btn btn-sm btn-outline-danger delete-message-btn" data-message-id="${messageId}" title="删除消息">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
+            // 处理消息内容 - 对于图片消息，不显示加密文本
+            let contentToShow = message.content;
+            if (message.attachments && message.attachments.length > 0) {
+                // 检查内容是否像加密字符串或系统提示
+                const isEncryptedContent = contentToShow && 
+                    contentToShow.includes(':') && 
+                    contentToShow.length > 50 && 
+                    /^[a-f0-9:]+$/.test(contentToShow);
+                    
+                const isImageSystemMessage = contentToShow && 
+                    (contentToShow.includes('发送了图片') || 
+                     contentToShow.includes('sent an image') ||
+                     contentToShow.match(/^[a-f0-9_.-]+\.(jpg|jpeg|png|gif|webp)$/i));
+                
+                if (isEncryptedContent || isImageSystemMessage) {
+                    contentToShow = '';
+                }
+            }
+            
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${messageClass}`;
+            messageElement.dataset.messageId = messageId;
+            
+            let messageHTML = `
+                <div class="message-select-wrapper">
+                    <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
+                    <div class="message-bubble">
+                        <div class="message-header">
+                            <span class="message-sender">${senderName}</span>
+                            <span class="message-time">${this.formatTime(new Date(message.createdAt))}</span>
+                            ${message.isEncrypted ? '<i class="fas fa-lock text-success" title="已加密"></i>' : ''}
+                            <div class="message-actions" style="display: none;">
+                                <button class="btn btn-sm btn-outline-danger delete-message-btn" data-message-id="${messageId}" title="删除消息">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </div>
-                            <div class="message-content">${this.escapeHtml(message.content)}</div>
-                            ${readStatusIndicator}
-                            ${readStatusContainer}
-                        </div>
+                        </div>`;
+            
+            // 如果有文本内容，显示文本
+            if (contentToShow && contentToShow.trim()) {
+                messageHTML += `<div class="message-content">${this.escapeHtml(contentToShow)}</div>`;
+            }
+            
+            messageHTML += `
+                        ${readStatusIndicator}
+                        ${readStatusContainer}
                     </div>
                 </div>
             `;
-        }).join('');
+            
+            messageElement.innerHTML = messageHTML;
+            
+            // 处理图片附件
+            if (message.attachments && message.attachments.length > 0) {
+                console.log(`🖼️ [调试] 消息 ${messageId} 有附件，开始处理:`, message.attachments);
+                
+                const messageBubble = messageElement.querySelector('.message-bubble');
+                const attachmentsContainer = document.createElement('div');
+                attachmentsContainer.className = 'message-attachments mt-2';
+                
+                // 确保 attachments 是数组
+                let attachmentArray = Array.isArray(message.attachments) ? message.attachments : [];
+                
+                attachmentArray.forEach((attachment, index) => {
+                    console.log(`🖼️ [调试] 处理附件 ${index + 1}:`, attachment);
+                    this.renderImageAttachment(attachment, attachmentsContainer);
+                });
+                
+                // 在已读状态容器之前插入附件容器
+                const readContainer = messageBubble.querySelector('.message-read-container');
+                if (readContainer) {
+                    messageBubble.insertBefore(attachmentsContainer, readContainer);
+                } else {
+                    messageBubble.appendChild(attachmentsContainer);
+                }
+                
+                console.log(`✅ [调试] 消息 ${messageId} 的 ${attachmentArray.length} 个附件处理完成`);
+            } else {
+                console.log(`ℹ️ [调试] 消息 ${messageId} 无附件`);
+            }
+            
+            chatMessages.appendChild(messageElement);
+        });
 
         // 重置事件附加标志并附加事件
         this.eventsAttached = false;
@@ -937,6 +1040,40 @@ class FriendsManager {
     /**
      * 发送私聊消息（已优化：移除不必要的状态刷新）
      */
+    /**
+     * 发送图片消息
+     */
+    async sendImageMessage(fileId, filename) {
+        if (!this.currentPrivateChat) {
+            console.warn('当前不在私聊模式');
+            return;
+        }
+
+        try {
+            console.log('🖼️ 发送私聊图片消息:', { fileId, filename });
+            
+            // 先在界面显示带图片的发送中状态
+            this.displaySendingImageMessage(fileId, filename);
+            
+            // 调用API发送私聊图片消息
+            const response = await this.friendsApi.sendPrivateMessage(
+                this.currentPrivateChat.friendId, 
+                `发送了图片: ${filename}`, 
+                'image',
+                [fileId]  // 附件数组
+            );
+            
+            console.log('✅ 私聊图片消息发送完成');
+            
+        } catch (error) {
+            console.error('❌ 发送私聊图片消息失败:', error);
+            showToast('发送图片失败: ' + error.message, 'error');
+            
+            // 移除发送中的消息显示
+            this.removeSendingMessage();
+        }
+    }
+
     async sendPrivateMessage(content) {
         if (!this.currentPrivateChat) {
             console.warn('当前不在私聊模式');
@@ -1078,6 +1215,55 @@ class FriendsManager {
     }
 
     /**
+     * 显示发送中的图片消息
+     */
+    displaySendingImageMessage(fileId, filename) {
+        const chatMessages = document.getElementById('chatMessages');
+        if (!chatMessages) return;
+
+        // 移除之前的发送中消息
+        this.removeSendingMessage();
+
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message message-user sending';
+        messageElement.id = 'sending-message';
+        
+        // 获取token
+        let token = null;
+        if (window.tokenManager && typeof window.tokenManager.getAccessToken === 'function') {
+            token = window.tokenManager.getAccessToken();
+        } else {
+            token = localStorage.getItem('access_token') || localStorage.getItem('dify_access_token');
+        }
+        
+        // 构建图片URL
+        const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://localhost:4005';
+        const imageUrl = token ? 
+            `${backendUrl}/api/files/${fileId}/view?token=${token}` : 
+            `${backendUrl}/api/files/${fileId}/view`;
+        
+        messageElement.innerHTML = `
+            <div class="message-bubble">
+                <div class="message-header">
+                    <span class="message-sender">我</span>
+                    <span class="message-time">发送中...</span>
+                </div>
+                <div class="message-attachments mt-2">
+                    <img src="${imageUrl}" 
+                         alt="${this.escapeHtml(filename)}" 
+                         title="${this.escapeHtml(filename)}" 
+                         class="message-image img-fluid" 
+                         style="max-width: 300px; max-height: 200px; border-radius: 8px; cursor: pointer; opacity: 0.8;"
+                         onclick="window.chatroomController?.openImageModal?.('${imageUrl}', '${this.escapeHtml(filename)}')" />
+                </div>
+            </div>
+        `;
+
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    /**
      * 移除发送中的消息显示
      */
     removeSendingMessage() {
@@ -1094,6 +1280,20 @@ class FriendsManager {
         const chatMessages = document.getElementById('chatMessages');
         if (!chatMessages || !this.currentPrivateChat) return;
 
+        // 解析attachments JSON字符串 - 参考群聊控制器的处理方式
+        if (message.attachments && typeof message.attachments === 'string') {
+            try {
+                const parsed = JSON.parse(message.attachments);
+                message.attachments = Array.isArray(parsed) ? parsed : [];
+                console.log(`✅ [WebSocket私聊消息] 成功解析attachments JSON: ${message.attachments.length}个附件`);
+            } catch (e) {
+                console.error('❌ [WebSocket私聊消息] 解析attachments JSON失败:', e, message.attachments);
+                message.attachments = [];
+            }
+        } else if (!message.attachments || !Array.isArray(message.attachments)) {
+            message.attachments = [];
+        }
+
         const messageElement = document.createElement('div');
         messageElement.className = 'message message-other';
         
@@ -1104,7 +1304,26 @@ class FriendsManager {
         const senderName = message.senderInfo?.nickname || message.senderInfo?.username || '好友';
         const time = this.formatTime(new Date(message.createdAt));
         
-        messageElement.innerHTML = `
+        // 处理消息内容 - 对于图片消息，不显示加密文本
+        let contentToShow = message.content;
+        if (message.attachments && message.attachments.length > 0) {
+            // 检查内容是否像加密字符串或系统提示
+            const isEncryptedContent = contentToShow && 
+                contentToShow.includes(':') && 
+                contentToShow.length > 50 && 
+                /^[a-f0-9:]+$/.test(contentToShow);
+                
+            const isImageSystemMessage = contentToShow && 
+                (contentToShow.includes('发送了图片') || 
+                 contentToShow.includes('sent an image') ||
+                 contentToShow.match(/^[a-f0-9_.-]+\.(jpg|jpeg|png|gif|webp)$/i));
+            
+            if (isEncryptedContent || isImageSystemMessage) {
+                contentToShow = '';
+            }
+        }
+        
+        let messageHTML = `
             <div class="message-select-wrapper">
                 <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
                 <div class="message-bubble">
@@ -1116,11 +1335,31 @@ class FriendsManager {
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
-                    </div>
-                    <div class="message-content">${this.escapeHtml(message.content)}</div>
-                </div>
-            </div>
-        `;
+                    </div>`;
+        
+        // 如果有文本内容，显示文本
+        if (contentToShow && contentToShow.trim()) {
+            messageHTML += `<div class="message-content">${this.escapeHtml(contentToShow)}</div>`;
+        }
+        
+        messageHTML += '</div></div>';
+        messageElement.innerHTML = messageHTML;
+
+        // 处理图片附件
+        if (message.attachments && message.attachments.length > 0) {
+            const messageBubble = messageElement.querySelector('.message-bubble');
+            const attachmentsContainer = document.createElement('div');
+            attachmentsContainer.className = 'message-attachments mt-2';
+            
+            // 确保 attachments 是数组
+            let attachmentArray = Array.isArray(message.attachments) ? message.attachments : [];
+            
+            attachmentArray.forEach(attachment => {
+                this.renderImageAttachment(attachment, attachmentsContainer);
+            });
+            
+            messageBubble.appendChild(attachmentsContainer);
+        }
 
         chatMessages.appendChild(messageElement);
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -1141,6 +1380,20 @@ class FriendsManager {
         // 先移除发送中的消息
         this.removeSendingMessage();
 
+        // 解析attachments JSON字符串 - 参考群聊控制器的处理方式
+        if (data.attachments && typeof data.attachments === 'string') {
+            try {
+                const parsed = JSON.parse(data.attachments);
+                data.attachments = Array.isArray(parsed) ? parsed : [];
+                console.log(`✅ [WebSocket发送成功] 成功解析attachments JSON: ${data.attachments.length}个附件`);
+            } catch (e) {
+                console.error('❌ [WebSocket发送成功] 解析attachments JSON失败:', e, data.attachments);
+                data.attachments = [];
+            }
+        } else if (!data.attachments || !Array.isArray(data.attachments)) {
+            data.attachments = [];
+        }
+
         const messageElement = document.createElement('div');
         messageElement.className = 'message message-user';
         
@@ -1151,7 +1404,26 @@ class FriendsManager {
         const currentUser = this.chatroomController.currentUser;
         const time = this.formatTime(new Date(data.createdAt));
         
-        messageElement.innerHTML = `
+        // 处理消息内容 - 对于图片消息，不显示加密文本
+        let contentToShow = data.content;
+        if (data.attachments && data.attachments.length > 0) {
+            // 检查内容是否像加密字符串或系统提示
+            const isEncryptedContent = contentToShow && 
+                contentToShow.includes(':') && 
+                contentToShow.length > 50 && 
+                /^[a-f0-9:]+$/.test(contentToShow);
+                
+            const isImageSystemMessage = contentToShow && 
+                (contentToShow.includes('发送了图片') || 
+                 contentToShow.includes('sent an image') ||
+                 contentToShow.match(/^[a-f0-9_.-]+\.(jpg|jpeg|png|gif|webp)$/i));
+            
+            if (isEncryptedContent || isImageSystemMessage) {
+                contentToShow = '';
+            }
+        }
+        
+        let messageHTML = `
             <div class="message-select-wrapper">
                 <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
                 <div class="message-bubble">
@@ -1163,13 +1435,39 @@ class FriendsManager {
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
-                    </div>
-                    <div class="message-content">${this.escapeHtml(data.content)}</div>
+                    </div>`;
+        
+        // 如果有文本内容，显示文本
+        if (contentToShow && contentToShow.trim()) {
+            messageHTML += `<div class="message-content">${this.escapeHtml(contentToShow)}</div>`;
+        }
+        
+        messageHTML += `
                     <!-- 为新发送的消息预留已读状态容器 -->
                     <div class="message-read-container" data-message-id="${messageId}"></div>
                 </div>
             </div>
         `;
+        
+        messageElement.innerHTML = messageHTML;
+        
+        // 处理图片附件
+        if (data.attachments && data.attachments.length > 0) {
+            const messageBubble = messageElement.querySelector('.message-bubble');
+            const attachmentsContainer = document.createElement('div');
+            attachmentsContainer.className = 'message-attachments mt-2';
+            
+            // 确保 attachments 是数组
+            let attachmentArray = Array.isArray(data.attachments) ? data.attachments : [];
+            
+            attachmentArray.forEach(attachment => {
+                this.renderImageAttachment(attachment, attachmentsContainer);
+            });
+            
+            // 在已读状态容器之前插入附件容器
+            const readContainer = messageBubble.querySelector('.message-read-container');
+            messageBubble.insertBefore(attachmentsContainer, readContainer);
+        }
 
         chatMessages.appendChild(messageElement);
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -2351,5 +2649,103 @@ class FriendsManager {
                 overlay.style.display = 'none';
             }
         }
+    }
+
+    /**
+     * 渲染图片附件
+     */
+    renderImageAttachment(attachment, container) {
+        console.log('🖼️ [调试] 渲染图片附件:', attachment);
+        
+        let imageUrl = '';
+        let fileName = '图片';
+        
+        // 获取token
+        let token = null;
+        if (window.tokenManager && typeof window.tokenManager.getAccessToken === 'function') {
+            token = window.tokenManager.getAccessToken();
+        } else {
+            token = localStorage.getItem('access_token') || localStorage.getItem('dify_access_token');
+        }
+        
+        const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://localhost:4005';
+        
+        console.log('🔑 [调试] 图片附件Token和URL配置:', {
+            hasToken: !!token,
+            backendUrl,
+            attachmentType: typeof attachment,
+            attachment: attachment
+        });
+        
+        if (typeof attachment === 'object' && attachment !== null) {
+            // 优先使用带token的URL（后端直接返回）
+            if (attachment.urlWithToken) {
+                imageUrl = attachment.urlWithToken;
+                if (!imageUrl.startsWith('http')) {
+                    imageUrl = `${backendUrl}${imageUrl}`;
+                }
+            } else if (attachment.id && token) {
+                imageUrl = `${backendUrl}/api/files/${attachment.id}/view?token=${token}`;
+            } else if (attachment.id) {
+                imageUrl = `${backendUrl}/api/files/${attachment.id}/view`;
+            } else if (attachment.url) {
+                imageUrl = attachment.url;
+                if (!imageUrl.startsWith('http')) {
+                    imageUrl = `${backendUrl}${imageUrl}`;
+                }
+            }
+            fileName = attachment.original_name || attachment.filename || '图片';
+        } else if (typeof attachment === 'string') {
+            // 附件是字符串ID
+            if (token) {
+                imageUrl = `${backendUrl}/api/files/${attachment}/view?token=${token}`;
+            } else {
+                imageUrl = `${backendUrl}/api/files/${attachment}/view`;
+            }
+            fileName = '图片';
+        }
+        
+        console.log('🖼️ [调试] 构建的图片URL:', { imageUrl, fileName });
+        
+        if (!imageUrl) {
+            console.error('❌ 无法构建图片URL，附件数据:', attachment);
+            return;
+        }
+        
+        // 创建图片元素
+        const img = document.createElement('img');
+        img.className = 'message-image img-fluid';
+        img.alt = fileName;
+        img.title = fileName;
+        img.style.cssText = 'max-width: 300px; max-height: 200px; border-radius: 8px; cursor: pointer;';
+        
+        // 处理图片加载错误
+        img.onerror = () => {
+            console.error('❌ 私聊图片加载失败:', imageUrl);
+            img.style.display = 'none';
+            const errorDiv = document.createElement('div');
+            errorDiv.textContent = `图片加载失败: ${fileName}`;
+            errorDiv.style.cssText = 'padding: 10px; background: #f5f5f5; border-radius: 4px; color: #666;';
+            img.parentNode.replaceChild(errorDiv, img);
+        };
+        
+        // 成功加载时的处理
+        img.onload = () => {
+            console.log('✅ 私聊图片加载成功:', imageUrl);
+        };
+        
+        // 点击放大功能
+        img.onclick = () => {
+            if (window.chatroomController && window.chatroomController.openImageModal) {
+                window.chatroomController.openImageModal(imageUrl, fileName);
+            }
+        };
+        
+        // 设置图片源
+        img.src = imageUrl;
+        
+        container.appendChild(img);
+        
+        console.log('✅ [调试] 图片元素已添加到容器');
     }
 }

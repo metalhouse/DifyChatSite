@@ -444,9 +444,10 @@ class FriendsApiService {
      * @param {string} receiverId 接收者ID
      * @param {string} content 消息内容
      * @param {string} messageType 消息类型 (默认: text)
+     * @param {Array} attachments 附件ID数组 (可选)
      * @returns {Promise<Object>} 发送结果
      */
-    async sendPrivateMessage(receiverId, content, messageType = 'text') {
+    async sendPrivateMessage(receiverId, content, messageType = 'text', attachments = null) {
         try {
             const url = this.endpoints.MESSAGES.SEND;
             const data = {
@@ -455,7 +456,12 @@ class FriendsApiService {
                 messageType
             };
             
-            console.log(`💬 发送私聊消息到 ${receiverId}:`, content);
+            // 如果有附件，添加到请求数据中
+            if (attachments && attachments.length > 0) {
+                data.attachments = attachments;
+            }
+            
+            console.log(`💬 发送私聊消息到 ${receiverId}:`, content, { messageType, attachments });
             const response = await this.request('POST', url, data);
             console.log('✅ 私聊消息发送成功:', response);
             return response;

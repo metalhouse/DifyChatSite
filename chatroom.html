@@ -3849,9 +3849,12 @@
             imageUploadButton.addEventListener('click', function() {
                 if (this.disabled) return;
                 
-                // 检查是否有选中的聊天室
-                if (!window.chatroomController?.currentRoom) {
-                    showToast('请先选择一个聊天室', 'warning');
+                // 检查是否有选中的聊天室或好友
+                const hasActiveRoom = window.chatroomController?.currentRoom;
+                const hasActiveFriend = window.friendsManager?.currentPrivateChat;
+                
+                if (!hasActiveRoom && !hasActiveFriend) {
+                    showToast('请先选择一个聊天室或好友', 'warning');
                     return;
                 }
 
@@ -3976,8 +3979,9 @@
                     attachments: [result.id]
                 };
 
-                // 通过聊天室控制器发送消息
+                // 发送图片消息
                 if (window.chatroomController?.currentRoom) {
+                    // 聊天室场景
                     // 先在本地显示图片消息
                     const imageUrl = window.imageUploader.getImageUrl(result.id, 'view');
                     const localMessage = {
@@ -4004,6 +4008,14 @@
 
                     // 使用WebSocket发送
                     window.chatroomController.websocket?.emit('send-message', messageData);
+                } else if (window.friendsManager?.currentPrivateChat) {
+                    // 好友私聊场景
+                    console.log('📤 好友私聊发送图片:', result);
+                    
+                    // 通过好友管理器发送图片消息
+                    await window.friendsManager.sendImageMessage(result.id, file.name);
+                } else {
+                    throw new Error('没有活动的聊天室或好友');
                 }
 
                 showToast('图片发送成功', 'success');
