@@ -29,19 +29,44 @@ class ImageUploadComponent {
     createUploadUI() {
         if (!this.container) return;
 
+        // 检测是否为移动设备
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
         this.container.innerHTML = `
             <div class="image-upload-wrapper">
-                <!-- 隐藏的文件输入 -->
+                <!-- 隐藏的文件输入 - 相册选择 -->
                 <input type="file" 
                        accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
                        ${this.multiple ? 'multiple' : ''}
                        style="display: none"
-                       class="file-input">
+                       class="file-input-gallery">
                 
-                <!-- 上传按钮 -->
-                <button type="button" class="btn btn-outline-primary image-upload-btn" title="点击选择图片文件">
-                    <i class="fas fa-folder-open me-1"></i>选择图片
-                </button>
+                <!-- 隐藏的文件输入 - 相机拍照（仅移动端） -->
+                ${isMobile ? `
+                <input type="file" 
+                       accept="image/*"
+                       capture="environment"
+                       style="display: none"
+                       class="file-input-camera">
+                ` : ''}
+                
+                <!-- 上传按钮组 -->
+                <div class="image-upload-buttons">
+                    ${isMobile ? `
+                    <!-- 移动端显示两个按钮 -->
+                    <button type="button" class="btn btn-outline-primary image-upload-btn me-2" data-source="camera" title="使用相机拍照">
+                        <i class="fas fa-camera me-1"></i>拍照
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary image-upload-btn" data-source="gallery" title="从相册选择">
+                        <i class="fas fa-images me-1"></i>相册
+                    </button>
+                    ` : `
+                    <!-- 桌面端显示单个按钮 -->
+                    <button type="button" class="btn btn-outline-primary image-upload-btn" data-source="gallery" title="点击选择图片文件">
+                        <i class="fas fa-folder-open me-1"></i>选择图片
+                    </button>
+                    `}
+                </div>
                 
                 <!-- 上传进度 -->
                 <div class="upload-progress" style="display: none;">
@@ -71,8 +96,9 @@ class ImageUploadComponent {
         `;
 
         // 获取元素引用
-        this.fileInput = this.container.querySelector('.file-input');
-        this.uploadBtn = this.container.querySelector('.image-upload-btn');
+        this.fileInputGallery = this.container.querySelector('.file-input-gallery');
+        this.fileInputCamera = this.container.querySelector('.file-input-camera');
+        this.uploadBtns = this.container.querySelectorAll('.image-upload-btn');
         this.progressContainer = this.container.querySelector('.upload-progress');
         this.progressBar = this.container.querySelector('.progress-bar');
         this.progressText = this.container.querySelector('.progress-text');
@@ -84,8 +110,9 @@ class ImageUploadComponent {
         
         // 调试元素引用
         console.log('🔍 ImageUploadComponent 元素引用:', {
-            fileInput: this.fileInput,
-            uploadBtn: this.uploadBtn,
+            fileInputGallery: this.fileInputGallery,
+            fileInputCamera: this.fileInputCamera,
+            uploadBtns: this.uploadBtns.length,
             container: this.container
         });
     }
@@ -93,21 +120,33 @@ class ImageUploadComponent {
     bindEvents() {
         if (!this.container) return;
 
-        // 点击上传按钮
-        this.uploadBtn?.addEventListener('click', () => {
-            console.log('🖱️ 上传按钮被点击');
-            console.log('🔍 文件输入元素:', this.fileInput);
-            if (this.fileInput) {
-                console.log('📁 触发文件选择对话框');
-                this.fileInput.click();
-            } else {
-                console.error('❌ 文件输入元素未找到');
-            }
+        // 点击上传按钮（支持相机和相册）
+        this.uploadBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const source = btn.getAttribute('data-source');
+                console.log('🖱️ 上传按钮被点击，来源:', source);
+                
+                if (source === 'camera' && this.fileInputCamera) {
+                    console.log('📷 触发相机拍照');
+                    this.fileInputCamera.click();
+                } else if (source === 'gallery' && this.fileInputGallery) {
+                    console.log('📁 触发相册选择');
+                    this.fileInputGallery.click();
+                } else {
+                    console.error('❌ 对应的文件输入元素未找到');
+                }
+            });
         });
 
-        // 文件选择
-        this.fileInput?.addEventListener('change', (e) => {
-            console.log('📁 文件选择事件触发:', e.target.files);
+        // 文件选择 - 相册
+        this.fileInputGallery?.addEventListener('change', (e) => {
+            console.log('📁 相册文件选择事件触发:', e.target.files);
+            this.handleFileSelect(e.target.files);
+        });
+
+        // 文件选择 - 相机
+        this.fileInputCamera?.addEventListener('change', (e) => {
+            console.log('📷 相机拍照事件触发:', e.target.files);
             this.handleFileSelect(e.target.files);
         });
 

@@ -1812,6 +1812,34 @@
             .online-members #manageMembersBtn {
                 display: none;
             }
+
+            /* 图片上传移动端优化 */
+            .image-upload-group {
+                position: relative;
+            }
+
+            .action-button.image-button {
+                padding: 8px 10px;
+                font-size: 16px;
+            }
+
+            /* 移动端图片来源选择模态框样式 */
+            #imageSourceModal .image-source-options {
+                margin-bottom: 0;
+                border-radius: 12px 12px 0 0;
+            }
+
+            #imageSourceModal .source-buttons .btn {
+                touch-action: manipulation;
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            /* 移动端图片预览优化 */
+            .message-image {
+                max-width: 250px !important;
+                max-height: 180px !important;
+                border-radius: 6px !important;
+            }
         }
     </style>
 </head>
@@ -2054,10 +2082,16 @@
                         disabled
                     ></textarea>
                     <div class="input-actions">
-                        <button id="imageUploadButton" class="action-button image-button" title="发送图片" disabled>
-                            <i class="fas fa-image"></i>
-                        </button>
-                        <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
+                        <!-- 图片上传按钮组 -->
+                        <div class="image-upload-group">
+                            <button id="imageUploadButton" class="action-button image-button" title="发送图片" disabled>
+                                <i class="fas fa-image"></i>
+                            </button>
+                            <!-- 相册选择 -->
+                            <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
+                            <!-- 相机拍照（移动端） -->
+                            <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display: none;">
+                        </div>
                         <button id="mentionButton" class="action-button mention-button" title="@智能体" disabled>
                             <i class="fas fa-at"></i>
                         </button>
@@ -3831,11 +3865,12 @@
         });
 
         /**
-         * 初始化图片上传功能
+         * 初始化图片上传功能 - 增强版支持移动端相机
          */
         function initImageUpload() {
             const imageUploadButton = document.getElementById('imageUploadButton');
             const imageFileInput = document.getElementById('imageFileInput');
+            const cameraFileInput = document.getElementById('cameraFileInput');
             
             if (!imageUploadButton || !imageFileInput) {
                 console.warn('图片上传元素未找到');
@@ -3845,7 +3880,10 @@
             // 初始化图片上传器
             window.imageUploader = new SimpleImageUploader();
 
-            // 点击上传按钮触发文件选择
+            // 检测是否为移动设备
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+            // 点击上传按钮 - 移动端显示选择选项，桌面端直接选择文件
             imageUploadButton.addEventListener('click', function() {
                 if (this.disabled) return;
                 
@@ -3858,19 +3896,40 @@
                     return;
                 }
 
-                imageFileInput.click();
+                if (isMobile && cameraFileInput) {
+                    // 移动端显示选择菜单
+                    showImageSourceModal();
+                } else {
+                    // 桌面端直接打开文件选择
+                    imageFileInput.click();
+                }
             });
 
-            // 文件选择后自动上传
+            // 文件选择后自动上传 - 相册
             imageFileInput.addEventListener('change', async function(e) {
                 const file = e.target.files[0];
                 if (!file) return;
 
+                console.log('📁 相册文件选择:', file.name);
                 // 重置文件输入，允许重复选择同一文件
                 e.target.value = '';
 
                 await uploadAndSendImage(file);
             });
+
+            // 文件选择后自动上传 - 相机（移动端）
+            if (cameraFileInput) {
+                cameraFileInput.addEventListener('change', async function(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+
+                    console.log('📷 相机拍照完成:', file.name);
+                    // 重置文件输入，允许重复拍照
+                    e.target.value = '';
+
+                    await uploadAndSendImage(file);
+                });
+            }
 
             // 拖拽上传支持
             const chatInput = document.querySelector('.chat-input');
@@ -3921,6 +3980,105 @@
             }
 
             console.log('✅ 图片上传功能初始化完成');
+        }
+
+        /**
+         * 显示图片来源选择模态框（移动端）
+         */
+        function showImageSourceModal() {
+            // 检查是否已有模态框
+            let existingModal = document.getElementById('imageSourceModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+
+            // 创建模态框
+            const modal = document.createElement('div');
+            modal.id = 'imageSourceModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 10000;
+                display: flex;
+                justify-content: center;
+                align-items: flex-end;
+                padding: 20px;
+                touch-action: none;
+            `;
+
+            modal.innerHTML = `
+                <div class="image-source-options" style="
+                    background: white;
+                    border-radius: 12px 12px 0 0;
+                    padding: 20px;
+                    width: 100%;
+                    max-width: 400px;
+                    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+                    animation: slideUp 0.3s ease-out;
+                ">
+                    <div class="modal-header mb-3">
+                        <h6 class="modal-title mb-0 text-center">选择图片来源</h6>
+                    </div>
+                    <div class="source-buttons">
+                        <button class="btn btn-primary w-100 mb-2 camera-btn" style="padding: 12px; font-size: 16px;">
+                            <i class="fas fa-camera me-2"></i>拍照
+                        </button>
+                        <button class="btn btn-outline-primary w-100 mb-3 gallery-btn" style="padding: 12px; font-size: 16px;">
+                            <i class="fas fa-images me-2"></i>从相册选择
+                        </button>
+                        <button class="btn btn-light w-100 cancel-btn" style="padding: 10px; border: 1px solid #ddd;">
+                            取消
+                        </button>
+                    </div>
+                </div>
+                <style>
+                    @keyframes slideUp {
+                        from { transform: translateY(100%); }
+                        to { transform: translateY(0); }
+                    }
+                </style>
+            `;
+
+            // 添加事件监听
+            const cameraBtn = modal.querySelector('.camera-btn');
+            const galleryBtn = modal.querySelector('.gallery-btn');
+            const cancelBtn = modal.querySelector('.cancel-btn');
+
+            cameraBtn.addEventListener('click', () => {
+                modal.remove();
+                document.getElementById('cameraFileInput')?.click();
+            });
+
+            galleryBtn.addEventListener('click', () => {
+                modal.remove();
+                document.getElementById('imageFileInput')?.click();
+            });
+
+            cancelBtn.addEventListener('click', () => {
+                modal.remove();
+            });
+
+            // 点击外部关闭
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+
+            // ESC 键关闭
+            const handleKeyPress = (e) => {
+                if (e.key === 'Escape') {
+                    modal.remove();
+                    document.removeEventListener('keydown', handleKeyPress);
+                }
+            };
+            document.addEventListener('keydown', handleKeyPress);
+
+            document.body.appendChild(modal);
         }
 
         /**
