@@ -1506,8 +1506,11 @@ width: ${computedStyle.width}`;
                     token = this.tokenManager.getAccessToken();
                 } else if (window.tokenManager && typeof window.tokenManager.getAccessToken === 'function') {
                     token = window.tokenManager.getAccessToken();
+                } else if (window.TokenManager && typeof window.TokenManager.getAccessToken === 'function') {
+                    token = window.TokenManager.getAccessToken();
                 } else {
-                    token = localStorage.getItem('access_token') || localStorage.getItem('dify_access_token');
+                    // 修正token存储key，使用正确的key
+                    token = localStorage.getItem('dify_access_token') || localStorage.getItem('access_token');
                 }
                 
                 console.log('🔑 [调试] Token获取结果:', { 
@@ -1523,33 +1526,39 @@ width: ${computedStyle.width}`;
                         imageUrl = attachment.urlWithToken;
                         // 确保是完整的URL
                         if (!imageUrl.startsWith('http')) {
-                            const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://localhost:4005';
+                            const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://127.0.0.1:4005';
                             imageUrl = `${backendUrl}${imageUrl}`;
                         }
+                    } else if (attachment.url && token) {
+                        // 使用附件中的URL路径加token参数
+                        const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://127.0.0.1:4005';
+                        const cleanUrl = attachment.url.startsWith('/') ? attachment.url : `/${attachment.url}`;
+                        imageUrl = `${backendUrl}${cleanUrl}?token=${token}`;
                     } else if (attachment.id && token) {
-                        const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://localhost:4005';
-                        imageUrl = `${backendUrl}/api/files/${attachment.id}/view?token=${token}`;
-                    } else if (attachment.id) {
-                        const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://localhost:4005';
-                        imageUrl = `${backendUrl}/api/files/${attachment.id}/view`;
+                        // 使用ENV_CONFIG.getApiUrl()来构建完整的API URL
+                        const apiUrl = window.ENV_CONFIG?.getApiUrl() || 'http://127.0.0.1:4005/api';
+                        imageUrl = `${apiUrl}/files/${attachment.id}/view?token=${token}`;
                     } else if (attachment.url) {
+                        // 备用方案：直接使用URL
                         imageUrl = attachment.url;
-                        // 确保是完整的URL
                         if (!imageUrl.startsWith('http')) {
-                            const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://localhost:4005';
+                            const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://127.0.0.1:4005';
                             imageUrl = `${backendUrl}${imageUrl}`;
                         }
+                    } else if (attachment.id) {
+                        const apiUrl = window.ENV_CONFIG?.getApiUrl() || 'http://127.0.0.1:4005/api';
+                        imageUrl = `${apiUrl}/files/${attachment.id}/view`;
                     }
                     fileName = attachment.original_name || attachment.filename || '图片';
                     console.log('🖼️ [调试] 构建图片URL (对象):', { imageUrl, fileName, attachment, token: token ? `${token.substring(0, 15)}...` : null });
                 } else if (typeof attachment === 'string') {
                     // 附件是字符串ID
                     if (token) {
-                        const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://localhost:4005';
-                        imageUrl = `${backendUrl}/api/files/${attachment}/view?token=${token}`;
+                        const apiUrl = window.ENV_CONFIG?.getApiUrl() || 'http://127.0.0.1:4005/api';
+                        imageUrl = `${apiUrl}/files/${attachment}/view?token=${token}`;
                     } else {
-                        const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://localhost:4005';
-                        imageUrl = `${backendUrl}/api/files/${attachment}/view`;
+                        const apiUrl = window.ENV_CONFIG?.getApiUrl() || 'http://127.0.0.1:4005/api';
+                        imageUrl = `${apiUrl}/files/${attachment}/view`;
                     }
                     fileName = '图片';
                     console.log('🖼️ [调试] 构建图片URL (字符串ID):', { imageUrl, attachmentId: attachment, token: token ? `${token.substring(0, 15)}...` : null });

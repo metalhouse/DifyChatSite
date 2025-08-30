@@ -2660,12 +2660,14 @@ class FriendsManager {
         let imageUrl = '';
         let fileName = '图片';
         
-        // 获取token
+        // 获取token - 使用正确的token key
         let token = null;
-        if (window.tokenManager && typeof window.tokenManager.getAccessToken === 'function') {
+        if (window.TokenManager && typeof window.TokenManager.getAccessToken === 'function') {
+            token = window.TokenManager.getAccessToken();
+        } else if (window.tokenManager && typeof window.tokenManager.getAccessToken === 'function') {
             token = window.tokenManager.getAccessToken();
         } else {
-            token = localStorage.getItem('access_token') || localStorage.getItem('dify_access_token');
+            token = localStorage.getItem('dify_access_token') || localStorage.getItem('access_token');
         }
         
         const backendUrl = window.ENV_CONFIG?.API_BASE_URL || window.globalConfig?.getBackendUrl() || 'http://localhost:4005';
@@ -2684,23 +2686,32 @@ class FriendsManager {
                 if (!imageUrl.startsWith('http')) {
                     imageUrl = `${backendUrl}${imageUrl}`;
                 }
+            } else if (attachment.url && token) {
+                // 使用附件中的URL路径加token参数
+                const cleanUrl = attachment.url.startsWith('/') ? attachment.url : `/${attachment.url}`;
+                imageUrl = `${backendUrl}${cleanUrl}?token=${token}`;
             } else if (attachment.id && token) {
-                imageUrl = `${backendUrl}/api/files/${attachment.id}/view?token=${token}`;
-            } else if (attachment.id) {
-                imageUrl = `${backendUrl}/api/files/${attachment.id}/view`;
+                // 使用ENV_CONFIG.getApiUrl()来构建完整的API URL
+                const apiUrl = window.ENV_CONFIG?.getApiUrl() || 'http://127.0.0.1:4005/api';
+                imageUrl = `${apiUrl}/files/${attachment.id}/view?token=${token}`;
             } else if (attachment.url) {
                 imageUrl = attachment.url;
                 if (!imageUrl.startsWith('http')) {
                     imageUrl = `${backendUrl}${imageUrl}`;
                 }
+            } else if (attachment.id) {
+                const apiUrl = window.ENV_CONFIG?.getApiUrl() || 'http://127.0.0.1:4005/api';
+                imageUrl = `${apiUrl}/files/${attachment.id}/view`;
             }
             fileName = attachment.original_name || attachment.filename || '图片';
         } else if (typeof attachment === 'string') {
             // 附件是字符串ID
             if (token) {
-                imageUrl = `${backendUrl}/api/files/${attachment}/view?token=${token}`;
+                const apiUrl = window.ENV_CONFIG?.getApiUrl() || 'http://127.0.0.1:4005/api';
+                imageUrl = `${apiUrl}/files/${attachment}/view?token=${token}`;
             } else {
-                imageUrl = `${backendUrl}/api/files/${attachment}/view`;
+                const apiUrl = window.ENV_CONFIG?.getApiUrl() || 'http://127.0.0.1:4005/api';
+                imageUrl = `${apiUrl}/files/${attachment}/view`;
             }
             fileName = '图片';
         }
@@ -2734,11 +2745,67 @@ class FriendsManager {
             console.log('✅ 私聊图片加载成功:', imageUrl);
         };
         
-        // 点击放大功能
-        img.onclick = () => {
-            if (window.chatroomController && window.chatroomController.openImageModal) {
-                window.chatroomController.openImageModal(imageUrl, fileName);
+        // 点击放大功能 - 使用与群聊相同的模态框逻辑
+        img.onclick = function() {
+            // 检查是否已有放大模态框
+            let existingModal = document.getElementById('imageModal');
+            if (existingModal) {
+                document.body.removeChild(existingModal);
+                return;
             }
+            
+            // 创建模态框
+            const modal = document.createElement('div');
+            modal.id = 'imageModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.8);
+                z-index: 9999;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                cursor: pointer;
+            `;
+            
+            // 创建放大的图片
+            const enlargedImg = document.createElement('img');
+            enlargedImg.src = this.src;
+            enlargedImg.alt = this.alt;
+            enlargedImg.style.cssText = `
+                max-width: 90%;
+                max-height: 90%;
+                object-fit: contain;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+                cursor: pointer;
+            `;
+            
+            // 点击模态框或图片时关闭
+            modal.onclick = function() {
+                document.body.removeChild(modal);
+            };
+            
+            // 阻止图片点击事件冒泡
+            enlargedImg.onclick = function(e) {
+                e.stopPropagation();
+                document.body.removeChild(modal);
+            };
+            
+            // ESC键关闭
+            const handleKeyPress = function(e) {
+                if (e.key === 'Escape') {
+                    document.body.removeChild(modal);
+                    document.removeEventListener('keydown', handleKeyPress);
+                }
+            };
+            document.addEventListener('keydown', handleKeyPress);
+            
+            modal.appendChild(enlargedImg);
+            document.body.appendChild(modal);
         };
         
         // 设置图片源
