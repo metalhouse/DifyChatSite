@@ -1066,6 +1066,67 @@
             box-shadow: 0 4px 12px rgba(23, 162, 184, 0.3);
         }
 
+        .image-button {
+            background: linear-gradient(135deg, #fd7e14, #e55a00);
+            color: white;
+        }
+
+        .image-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(253, 126, 20, 0.3);
+        }
+
+        .image-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .image-button.uploading {
+            background: linear-gradient(135deg, #6c757d, #5a6268);
+            cursor: not-allowed;
+        }
+
+        /* 上传进度提示 */
+        .upload-progress {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            background: white;
+            border-radius: 8px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-left: 4px solid #fd7e14;
+            z-index: 1050;
+            min-width: 250px;
+        }
+
+        .upload-progress .progress {
+            height: 6px;
+            margin-top: 8px;
+            border-radius: 3px;
+        }
+
+        /* 图片消息样式 */
+        .message-image {
+            max-width: 300px;
+            max-height: 200px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .message-image:hover {
+            transform: scale(1.02);
+        }
+
+        /* 拖拽上传样式 */
+        .chat-input.drag-over {
+            background: rgba(253, 126, 20, 0.1);
+            border: 2px dashed #fd7e14;
+            transform: scale(1.02);
+        }
+
         /* 加载状态 */
         /* 模态框和好友功能样式 */
         .user-search-result {
@@ -1993,6 +2054,10 @@
                         disabled
                     ></textarea>
                     <div class="input-actions">
+                        <button id="imageUploadButton" class="action-button image-button" title="发送图片" disabled>
+                            <i class="fas fa-image"></i>
+                        </button>
+                        <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
                         <button id="mentionButton" class="action-button mention-button" title="@智能体" disabled>
                             <i class="fas fa-at"></i>
                         </button>
@@ -2413,6 +2478,9 @@
     <!-- 房间管理服务 (ES模块) -->
     <script type="module" src="js/services/room-management.js"></script>
     
+    <!-- 图片上传服务 -->
+    <script src="js/services/simple-image-uploader.js"></script>
+    
     <!-- 好友API服务 -->
     <script src="js/api/friends-api.js"></script>
     
@@ -2421,9 +2489,6 @@
     
     <!-- 聊天室页面控制器 -->
     <script src="js/controllers/chatroom-controller.js"></script>
-    
-    <!-- 调试工具（开发环境） -->
-    <script src="debug-read-status.js"></script>
 
     <script>
         // 等待环境配置加载完成
@@ -2487,6 +2552,9 @@
                     console.log('初始化聊天室控制器');
                     window.chatroomController = new ChatroomController();
                     window.chatroomController.initialize();
+                    
+                    // 初始化图片上传功能
+                    initImageUpload();
                 } catch (error) {
                     console.error('初始化聊天室控制器失败:', error);
                     showToast('聊天室初始化失败: ' + error.message, 'error');
@@ -3761,6 +3829,206 @@
                 window.mobileOptimizationEnabled = false;
             }
         });
+
+        /**
+         * 初始化图片上传功能
+         */
+        function initImageUpload() {
+            const imageUploadButton = document.getElementById('imageUploadButton');
+            const imageFileInput = document.getElementById('imageFileInput');
+            
+            if (!imageUploadButton || !imageFileInput) {
+                console.warn('图片上传元素未找到');
+                return;
+            }
+
+            // 初始化图片上传器
+            window.imageUploader = new SimpleImageUploader();
+
+            // 点击上传按钮触发文件选择
+            imageUploadButton.addEventListener('click', function() {
+                if (this.disabled) return;
+                
+                // 检查是否有选中的聊天室
+                if (!window.chatroomController?.currentRoom) {
+                    showToast('请先选择一个聊天室', 'warning');
+                    return;
+                }
+
+                imageFileInput.click();
+            });
+
+            // 文件选择后自动上传
+            imageFileInput.addEventListener('change', async function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                // 重置文件输入，允许重复选择同一文件
+                e.target.value = '';
+
+                await uploadAndSendImage(file);
+            });
+
+            // 拖拽上传支持
+            const chatInput = document.querySelector('.chat-input');
+            if (chatInput) {
+                // 防止默认拖拽行为
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    chatInput.addEventListener(eventName, preventDefaults, false);
+                });
+
+                function preventDefaults(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+
+                // 拖拽视觉反馈
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    chatInput.addEventListener(eventName, () => {
+                        chatInput.classList.add('drag-over');
+                    });
+                });
+
+                ['dragleave', 'drop'].forEach(eventName => {
+                    chatInput.addEventListener(eventName, () => {
+                        chatInput.classList.remove('drag-over');
+                    });
+                });
+
+                // 处理文件拖拽
+                chatInput.addEventListener('drop', async function(e) {
+                    const files = e.dataTransfer.files;
+                    if (files.length === 0) return;
+
+                    // 检查是否有选中的聊天室
+                    if (!window.chatroomController?.currentRoom) {
+                        showToast('请先选择一个聊天室', 'warning');
+                        return;
+                    }
+
+                    // 只处理第一个文件，且必须是图片
+                    const file = files[0];
+                    if (!file.type.startsWith('image/')) {
+                        showToast('请拖拽图片文件', 'warning');
+                        return;
+                    }
+
+                    await uploadAndSendImage(file);
+                });
+            }
+
+            console.log('✅ 图片上传功能初始化完成');
+        }
+
+        /**
+         * 上传并发送图片
+         */
+        async function uploadAndSendImage(file) {
+            const imageUploadButton = document.getElementById('imageUploadButton');
+            let progressElement = null;
+
+            try {
+                // 验证文件
+                if (!file.type.startsWith('image/')) {
+                    showToast('请选择图片文件', 'warning');
+                    return;
+                }
+
+                if (file.size > 10 * 1024 * 1024) {
+                    showToast('图片过大，请选择小于10MB的图片', 'warning');
+                    return;
+                }
+
+                // 显示上传状态
+                imageUploadButton.classList.add('uploading');
+                imageUploadButton.disabled = true;
+                imageUploadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                // 创建进度提示
+                progressElement = document.createElement('div');
+                progressElement.className = 'upload-progress';
+                progressElement.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-image text-warning me-2"></i>
+                        <span>正在上传图片: ${file.name}</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar bg-warning" role="progressbar" style="width: 0%"></div>
+                    </div>
+                `;
+                document.body.appendChild(progressElement);
+
+                // 上传文件
+                const result = await window.imageUploader.uploadImage(file, 'room', (progress) => {
+                    const progressBar = progressElement.querySelector('.progress-bar');
+                    if (progressBar) {
+                        progressBar.style.width = progress + '%';
+                    }
+                });
+
+                console.log('📤 图片上传成功:', result);
+
+                // 构建图片消息
+                const imageMessage = {
+                    content: `发送了图片: ${file.name}`,
+                    message_type: 'image',
+                    type: 'image',
+                    attachments: [result.id]
+                };
+
+                // 通过聊天室控制器发送消息
+                if (window.chatroomController?.currentRoom) {
+                    // 先在本地显示图片消息
+                    const imageUrl = window.imageUploader.getImageUrl(result.id, 'view');
+                    const localMessage = {
+                        id: 'temp_' + Date.now(),
+                        content: imageMessage.content,
+                        type: 'image',
+                        senderId: window.chatroomController.currentUser?.id,
+                        senderName: window.chatroomController.currentUser?.username,
+                        timestamp: Date.now(),
+                        attachments: [result],
+                        isLocalPending: true
+                    };
+
+                    // 添加到聊天界面
+                    window.chatroomController.addMessage(localMessage);
+
+                    // 发送到服务器
+                    const messageData = {
+                        roomId: window.chatroomController.currentRoom.id || window.chatroomController.currentRoom.roomId,
+                        ...imageMessage,
+                        timestamp: Date.now(),
+                        clientId: window.chatroomController.websocket?.id
+                    };
+
+                    // 使用WebSocket发送
+                    window.chatroomController.websocket?.emit('send-message', messageData);
+                }
+
+                showToast('图片发送成功', 'success');
+
+            } catch (error) {
+                console.error('❌ 图片上传失败:', error);
+                showToast('图片上传失败: ' + error.message, 'error');
+            } finally {
+                // 恢复按钮状态
+                if (imageUploadButton) {
+                    imageUploadButton.classList.remove('uploading');
+                    imageUploadButton.disabled = false;
+                    imageUploadButton.innerHTML = '<i class="fas fa-image"></i>';
+                }
+
+                // 移除进度提示
+                if (progressElement) {
+                    setTimeout(() => {
+                        if (progressElement.parentNode) {
+                            progressElement.parentNode.removeChild(progressElement);
+                        }
+                    }, 2000);
+                }
+            }
+        }
     </script>
 </body>
 </html>

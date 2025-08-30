@@ -534,10 +534,23 @@ class RoomManagementService {
                 sender: options.sender || null
             };
 
-            const response = await httpClient.get(
-                API_ENDPOINTS.CHAT_ROOMS.MESSAGES.replace(':roomId', roomId),
-                { params }
-            );
+            const url = API_ENDPOINTS.CHAT_ROOMS.MESSAGES.replace('{id}', roomId);
+            console.log('🌐 [RoomManagement] 准备调用API:', {
+                url: url,
+                roomId: roomId,
+                params: params,
+                fullEndpoint: API_ENDPOINTS.CHAT_ROOMS.MESSAGES
+            });
+
+            const response = await httpClient.get(url, params);
+
+            console.log('📨 [RoomManagement] API响应结果:', {
+                success: response?.data?.success,
+                messageCount: response?.data?.messages?.length || 0,
+                total: response?.data?.total || response?.data?.pagination?.total || 0,
+                hasData: !!response?.data,
+                responseStructure: Object.keys(response?.data || {})
+            });
 
             if (ENV_CONFIG.isDebug()) {
                 console.log('💬 获取房间消息:', roomId, response.data.total);
@@ -546,6 +559,12 @@ class RoomManagementService {
             return response.data;
         } catch (error) {
             console.error('❌ 获取房间消息失败:', error.message);
+            console.error('🔧 [RoomManagement] 错误详情:', {
+                roomId: roomId,
+                url: API_ENDPOINTS.CHAT_ROOMS.MESSAGES.replace('{id}', roomId),
+                errorType: error.constructor.name,
+                errorMessage: error.message
+            });
             throw error;
         }
     }

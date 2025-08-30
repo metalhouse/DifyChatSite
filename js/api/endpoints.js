@@ -50,7 +50,7 @@ const API_ENDPOINTS = {
         JOIN: '/chat-rooms/{id}/join',            // 加入房间
         LEAVE: '/chat-rooms/{id}/leave',          // 离开房间
         MEMBERS: '/chat-rooms/{id}/members',      // 房间成员
-        MESSAGES: '/chat-rooms/{id}/messages',    // 房间消息
+        MESSAGES: '/rooms/{id}/messages',         // 房间消息（去掉/api前缀，避免重复）
         INVITE: '/chat-rooms/{id}/invite',        // 邀请成员
         KICK: '/chat-rooms/{id}/kick',            // 踢出成员
         TRANSFER: '/chat-rooms/{id}/transfer'     // 转移房主
