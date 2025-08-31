@@ -1052,6 +1052,29 @@ class FriendsManager {
         try {
             console.log('🖼️ 发送私聊图片消息:', { fileId, filename });
             
+            // 防止重复发送同一图片
+            const messageKey = `private_img_${fileId}_${this.currentPrivateChat.friendId}`;
+            if (this.sentImageMessages && this.sentImageMessages.has(messageKey)) {
+                console.warn('⚠️ 检测到重复的私聊图片消息，跳过发送:', messageKey);
+                showToast('图片已发送，请勿重复操作', 'warning');
+                return;
+            }
+            
+            // 初始化已发送图片记录
+            if (!this.sentImageMessages) {
+                this.sentImageMessages = new Set();
+            }
+            
+            // 记录已发送的图片
+            this.sentImageMessages.add(messageKey);
+            
+            // 5秒后清除记录
+            setTimeout(() => {
+                if (this.sentImageMessages) {
+                    this.sentImageMessages.delete(messageKey);
+                }
+            }, 5000);
+            
             // 先在界面显示带图片的发送中状态
             this.displaySendingImageMessage(fileId, filename);
             

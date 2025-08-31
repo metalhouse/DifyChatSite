@@ -66,8 +66,12 @@ class FileAPI {
                 accessLevel: accessLevel
             });
 
+            // 标准化URL拼接 - 使用路径工具
+            const uploadUrl = window.PathUtils 
+                ? window.PathUtils.joinUrl(this.baseURL, '/files/upload')
+                : this.standardizeUrl(`${this.baseURL}/files/upload`);
             const response = await this.uploadWithProgress(
-                `${this.baseURL}/files/upload`,
+                uploadUrl,
                 formData,
                 onProgress
             );
@@ -122,9 +126,10 @@ class FileAPI {
                 reject(new Error('上传超时，请检查网络连接'));
             };
 
-            // 配置请求
+            // 配置请求 - 标准化URL拼接
+            const standardizedUrl = this.standardizeUrl(url);
             xhr.timeout = this.timeout;
-            xhr.open('POST', url, true);
+            xhr.open('POST', standardizedUrl, true);
             
             // 设置认证头
             try {
@@ -166,8 +171,12 @@ class FileAPI {
         formData.append('access_level', accessLevel);
 
         try {
+            const uploadUrl = window.PathUtils 
+                ? window.PathUtils.joinUrl(this.baseURL, '/files/upload/multiple')
+                : this.standardizeUrl(`${this.baseURL}/files/upload/multiple`);
+                
             const response = await this.uploadWithProgress(
-                `${this.baseURL}/files/upload/multiple`,
+                uploadUrl,
                 formData,
                 onProgress
             );
@@ -202,7 +211,7 @@ class FileAPI {
             params.append('page', page.toString());
             params.append('limit', limit.toString());
 
-            const response = await fetch(`${this.baseURL}/files/my-files?${params}`, {
+            const response = await fetch(this.standardizeUrl(`${this.baseURL}/files/my-files?${params}`), {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -238,7 +247,7 @@ class FileAPI {
         }
 
         try {
-            const response = await fetch(`${this.baseURL}/files/${fileId}`, {
+            const response = await fetch(this.standardizeUrl(`${this.baseURL}/files/${fileId}`), {
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',
@@ -272,13 +281,48 @@ class FileAPI {
             throw new Error('文件ID不能为空');
         }
 
-        let url = `${this.baseURL}/files/${fileId}/${type}`;
+        // 使用路径工具标准化URL拼接
+        let url;
+        if (window.PathUtils) {
+            url = window.PathUtils.joinUrl(this.baseURL, `/files/${fileId}/${type}`);
+        } else {
+            // 回退方法
+            const baseUrl = this.baseURL.endsWith('/') 
+                ? this.baseURL.slice(0, -1) 
+                : this.baseURL;
+            url = `${baseUrl}/files/${fileId}/${type}`;
+        }
         
         if (type === 'thumbnail' && size) {
             url += `?size=${size}`;
         }
 
         return url;
+    }
+
+    /**
+     * 标准化URL - 处理多重斜杠和路径拼接
+     * @param {string} url - 原始URL
+     * @returns {string} 标准化后的URL
+     */
+    standardizeUrl(url) {
+        // 优先使用全局路径工具
+        if (window.PathUtils) {
+            return window.PathUtils.standardizeUrl(url);
+        }
+        
+        // 回退到内置方法
+        if (!url) return '';
+        
+        // 保护协议部分
+        const protocolMatch = url.match(/^(https?:\/\/)/);
+        const protocol = protocolMatch ? protocolMatch[1] : '';
+        const urlWithoutProtocol = protocolMatch ? url.slice(protocol.length) : url;
+        
+        // 移除多重斜杠，但保留单个斜杠
+        const cleanUrl = urlWithoutProtocol.replace(/\/+/g, '/');
+        
+        return protocol + cleanUrl;
     }
 
     /**

@@ -11,12 +11,19 @@
     <link rel="alternate icon" href="assets/images/favicon.svg">
     <meta name="theme-color" content="#28a745">
     
+    <!-- 字体预加载 - 移动端优化 -->
+    <link rel="preload" href="./vendor/font-awesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="./vendor/font-awesome/webfonts/fa-brands-400.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="./vendor/font-awesome/webfonts/fa-regular-400.woff2" as="font" type="font/woff2" crossorigin>
+    
     <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="./vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="./vendor/font-awesome/all.min.css" rel="stylesheet">
+    <!-- 移动端Font Awesome修复 -->
+    <link href="./vendor/font-awesome/mobile-font-fix.css" rel="stylesheet">
     <!-- Socket.IO Client -->
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="./vendor/socket.io/socket.io.min.js"></script>
     
     <style>
         body {
@@ -2492,7 +2499,7 @@
     </div>
 
     <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="./vendor/bootstrap/bootstrap.bundle.min.js"></script>
     
     <!-- 开发工具 -->
     <script src="js/utils/dev-tools.js?v=1.0.0"></script>
@@ -2513,6 +2520,9 @@
     <script type="module" src="js/services/room-management.js"></script>
     
     <!-- 图片上传服务 -->
+    <!-- 路径处理工具 -->
+    <script src="js/utils/path-utils.js"></script>
+    <script src="js/utils/production-path-fix.js"></script>
     <script src="js/services/simple-image-uploader.js"></script>
     
     <!-- 好友API服务 -->
@@ -3868,6 +3878,12 @@
          * 初始化图片上传功能 - 增强版支持移动端相机
          */
         function initImageUpload() {
+            // 避免重复初始化
+            if (window.imageUploadInitialized) {
+                console.log('图片上传功能已初始化，跳过重复初始化');
+                return;
+            }
+            
             const imageUploadButton = document.getElementById('imageUploadButton');
             const imageFileInput = document.getElementById('imageFileInput');
             const cameraFileInput = document.getElementById('cameraFileInput');
@@ -3885,7 +3901,10 @@
 
             // 点击上传按钮 - 移动端显示选择选项，桌面端直接选择文件
             imageUploadButton.addEventListener('click', function() {
-                if (this.disabled) return;
+                if (this.disabled) {
+                    console.warn('上传按钮已禁用，忽略点击事件');
+                    return;
+                }
                 
                 // 检查是否有选中的聊天室或好友
                 const hasActiveRoom = window.chatroomController?.currentRoom;
@@ -3911,8 +3930,19 @@
                 if (!file) return;
 
                 console.log('📁 相册文件选择:', file.name);
+                
+                // 防止重复处理同一文件
+                const fileKey = `${file.name}_${file.size}_${file.lastModified}`;
+                if (window.lastUploadedFile === fileKey) {
+                    console.warn('检测到重复文件选择，忽略');
+                    return;
+                }
+                window.lastUploadedFile = fileKey;
+                
                 // 重置文件输入，允许重复选择同一文件
-                e.target.value = '';
+                setTimeout(() => {
+                    e.target.value = '';
+                }, 100);
 
                 await uploadAndSendImage(file);
             });
@@ -3924,8 +3954,19 @@
                     if (!file) return;
 
                     console.log('📷 相机拍照完成:', file.name);
+                    
+                    // 防止重复处理同一文件
+                    const fileKey = `${file.name}_${file.size}_${file.lastModified}`;
+                    if (window.lastUploadedFile === fileKey) {
+                        console.warn('检测到重复文件选择，忽略');
+                        return;
+                    }
+                    window.lastUploadedFile = fileKey;
+                    
                     // 重置文件输入，允许重复拍照
-                    e.target.value = '';
+                    setTimeout(() => {
+                        e.target.value = '';
+                    }, 100);
 
                     await uploadAndSendImage(file);
                 });
@@ -3980,6 +4021,7 @@
             }
 
             console.log('✅ 图片上传功能初始化完成');
+            window.imageUploadInitialized = true; // 标记为已初始化
         }
 
         /**
@@ -4086,6 +4128,13 @@
          */
         async function uploadAndSendImage(file) {
             const imageUploadButton = document.getElementById('imageUploadButton');
+            
+            // 防重复提交检查
+            if (imageUploadButton && imageUploadButton.disabled) {
+                console.warn('已有图片正在上传中，忽略重复请求');
+                return;
+            }
+            
             let progressElement = null;
 
             try {
@@ -4100,10 +4149,16 @@
                     return;
                 }
 
-                // 显示上传状态
-                imageUploadButton.classList.add('uploading');
-                imageUploadButton.disabled = true;
-                imageUploadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                // 显示上传状态 - 添加防重复检查
+                if (imageUploadButton) {
+                    if (imageUploadButton.disabled) {
+                        console.warn('检测到按钮已禁用，可能有重复上传');
+                        return;
+                    }
+                    imageUploadButton.classList.add('uploading');
+                    imageUploadButton.disabled = true;
+                    imageUploadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                }
 
                 // 创建进度提示
                 progressElement = document.createElement('div');
@@ -4119,44 +4174,72 @@
                 `;
                 document.body.appendChild(progressElement);
 
-                // 上传文件
-                const result = await window.imageUploader.uploadImage(file, 'room', (progress) => {
-                    const progressBar = progressElement.querySelector('.progress-bar');
-                    if (progressBar) {
-                        progressBar.style.width = progress + '%';
+                // 上传文件 - 添加重试机制
+                let result;
+                let retryCount = 0;
+                const maxRetries = 2;
+                
+                while (retryCount <= maxRetries) {
+                    try {
+                        result = await window.imageUploader.uploadImage(file, 'room', (progress) => {
+                            const progressBar = progressElement.querySelector('.progress-bar');
+                            if (progressBar) {
+                                progressBar.style.width = progress + '%';
+                            }
+                        });
+                        break; // 上传成功，跳出重试循环
+                    } catch (error) {
+                        retryCount++;
+                        if (retryCount > maxRetries) {
+                            throw error; // 超过最大重试次数，抛出错误
+                        }
+                        console.warn(`图片上传失败，正在重试 (${retryCount}/${maxRetries}):`, error.message);
+                        await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒后重试
                     }
-                });
+                }
 
                 console.log('📤 图片上传成功:', result);
+
+                // 防止重复发送的唯一标识
+                const messageKey = `img_${result.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                // 检查是否已经发送过这个文件
+                if (window.sentImageMessages && window.sentImageMessages.has(result.id)) {
+                    console.warn('⚠️ 检测到重复的图片消息，跳过发送:', result.id);
+                    showToast('图片已发送，请勿重复操作', 'warning');
+                    return;
+                }
+                
+                // 初始化已发送图片记录
+                if (!window.sentImageMessages) {
+                    window.sentImageMessages = new Set();
+                }
+                
+                // 记录已发送的图片
+                window.sentImageMessages.add(result.id);
+                
+                // 5秒后清除记录，允许重新发送相同图片
+                setTimeout(() => {
+                    if (window.sentImageMessages) {
+                        window.sentImageMessages.delete(result.id);
+                    }
+                }, 5000);
 
                 // 构建图片消息
                 const imageMessage = {
                     content: `发送了图片: ${file.name}`,
                     message_type: 'image',
                     type: 'image',
-                    attachments: [result.id]
+                    attachments: [result.id],
+                    messageKey: messageKey  // 添加唯一标识
                 };
 
                 // 发送图片消息
                 if (window.chatroomController?.currentRoom) {
                     // 聊天室场景
-                    // 先在本地显示图片消息
-                    const imageUrl = window.imageUploader.getImageUrl(result.id, 'view');
-                    const localMessage = {
-                        id: 'temp_' + Date.now(),
-                        content: imageMessage.content,
-                        type: 'image',
-                        senderId: window.chatroomController.currentUser?.id,
-                        senderName: window.chatroomController.currentUser?.username,
-                        timestamp: Date.now(),
-                        attachments: [result],
-                        isLocalPending: true
-                    };
-
-                    // 添加到聊天界面
-                    window.chatroomController.addMessage(localMessage);
-
-                    // 发送到服务器
+                    console.log('📤 聊天室发送图片消息:', result);
+                    
+                    // 构建发送数据
                     const messageData = {
                         roomId: window.chatroomController.currentRoom.id || window.chatroomController.currentRoom.roomId,
                         ...imageMessage,
@@ -4164,8 +4247,12 @@
                         clientId: window.chatroomController.websocket?.id
                     };
 
-                    // 使用WebSocket发送
+                    // 只通过WebSocket发送，不在本地预显示
+                    // WebSocket服务器会广播消息回来，届时统一显示
+                    console.log('📤 即将通过WebSocket发送图片消息:', messageData);
                     window.chatroomController.websocket?.emit('send-message', messageData);
+                    
+                    console.log('✅ 图片消息已通过WebSocket发送，等待服务器确认');
                 } else if (window.friendsManager?.currentPrivateChat) {
                     // 好友私聊场景
                     console.log('📤 好友私聊发送图片:', result);
