@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API URL Test</title>
+</head>
+<body>
+    <h1>API URL测试</h1>
+    <div id="results"></div>
+    
+    <script type="module">
+        import { ENV_CONFIG } from './config/env.js';
+        import apiClient from './js/api/api-client.js';
+        
+        console.log('🔍 ENV_CONFIG.getApiUrl():', ENV_CONFIG.getApiUrl());
+        console.log('🔍 apiClient.baseURL:', apiClient.baseURL);
+        
+        // 模拟URL构建
+        const testUrl = '/users/profile';
+        const fullUrl = testUrl.startsWith('http') ? testUrl : `${apiClient.baseURL}${testUrl}`;
+        console.log('🔍 构建的完整URL:', fullUrl);
+        
+        document.getElementById('results').innerHTML = `
+            <p>ENV_CONFIG.getApiUrl(): ${ENV_CONFIG.getApiUrl()}</p>
+            <p>apiClient.baseURL: ${apiClient.baseURL}</p>
+            <p>测试路径: ${testUrl}</p>
+            <p>构建的完整URL: ${fullUrl}</p>
+        `;
+    </script>
+</body>
+</html>

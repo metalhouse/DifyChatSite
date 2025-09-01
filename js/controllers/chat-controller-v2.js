@@ -108,8 +108,25 @@ export class SimpleChatController {
                 this.availableAgents = result.agents;
                 this.renderAgents();
                 
-                // 自动选择第一个智能体
-                this.selectAgent(result.agents[0]);
+                // 尝试恢复上次选择的智能体
+                const lastAgentId = localStorage.getItem('lastSelectedAgent');
+                console.log('🔍 检查localStorage中的lastSelectedAgent:', lastAgentId);
+                let selectedAgent = null;
+                
+                if (lastAgentId) {
+                    // 查找上次选择的智能体
+                    selectedAgent = result.agents.find(agent => agent.id === lastAgentId);
+                    if (selectedAgent) {
+                        console.log('🔄 恢复上次选择的智能体:', selectedAgent.name);
+                    } else {
+                        console.log('⚠️ 上次选择的智能体不存在，使用默认智能体。可用智能体:', result.agents.map(a => a.id));
+                    }
+                } else {
+                    console.log('📝 首次使用，将自动选择第一个智能体');
+                }
+                
+                // 选择智能体（优先使用上次选择的，否则使用第一个）
+                this.selectAgent(selectedAgent || result.agents[0]);
                 
                 console.log(`✅ 智能体加载成功: ${result.agents.length} 个`);
             } else {
@@ -134,8 +151,14 @@ export class SimpleChatController {
      * 渲染智能体列表
      */
     renderAgents() {
-        const agentsHtml = this.availableAgents.map(agent => `
-            <div class="agent-item" data-agent-id="${agent.id}">
+        // 从localStorage恢复排序
+        this.restoreAgentOrder();
+        
+        const agentsHtml = this.availableAgents.map((agent, index) => `
+            <div class="agent-item" data-agent-id="${agent.id}" draggable="true" data-index="${index}">
+                <div class="drag-handle">
+                    <i class="fas fa-grip-vertical"></i>
+                </div>
                 <div class="agent-avatar">
                     <i class="fas fa-robot"></i>
                 </div>
@@ -202,6 +225,135 @@ export class SimpleChatController {
                 });
             }
         });
+        
+        // 添加拖动事件
+        this.addDragAndDropEvents();
+    }
+
+    /**
+     * 添加拖拽事件
+     */
+    addDragAndDropEvents() {
+        // 移动端禁用拖动功能
+        if (window.innerWidth <= 768) {
+            console.log('📱 移动端环境，禁用拖动功能');
+            return;
+        }
+        
+        const agentItems = this.agentList.querySelectorAll('.agent-item');
+        
+        agentItems.forEach((item) => {
+            // 拖动开始
+            item.addEventListener('dragstart', (e) => {
+                item.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', item.outerHTML);
+                e.dataTransfer.setData('text/plain', item.dataset.agentId);
+                console.log('🎯 开始拖动智能体:', item.dataset.agentId);
+            });
+
+            // 拖动结束
+            item.addEventListener('dragend', (e) => {
+                item.classList.remove('dragging');
+                console.log('✅ 拖动结束');
+            });
+
+            // 拖动进入
+            item.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                item.classList.add('drag-over');
+            });
+
+            // 拖动悬停
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+
+            // 拖动离开
+            item.addEventListener('dragleave', (e) => {
+                item.classList.remove('drag-over');
+            });
+
+            // 放置
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                item.classList.remove('drag-over');
+                
+                const draggedAgentId = e.dataTransfer.getData('text/plain');
+                const targetAgentId = item.dataset.agentId;
+                
+                if (draggedAgentId !== targetAgentId) {
+                    this.reorderAgents(draggedAgentId, targetAgentId);
+                }
+            });
+        });
+    }
+
+    /**
+     * 重新排序智能体
+     */
+    reorderAgents(draggedAgentId, targetAgentId) {
+        console.log('🔄 重新排序智能体:', draggedAgentId, '->', targetAgentId);
+        
+        const draggedIndex = this.availableAgents.findIndex(agent => agent.id === draggedAgentId);
+        const targetIndex = this.availableAgents.findIndex(agent => agent.id === targetAgentId);
+        
+        if (draggedIndex !== -1 && targetIndex !== -1) {
+            // 移动元素
+            const [draggedAgent] = this.availableAgents.splice(draggedIndex, 1);
+            this.availableAgents.splice(targetIndex, 0, draggedAgent);
+            
+            // 保存新的排序
+            this.saveAgentOrder();
+            
+            // 重新渲染
+            this.renderAgents();
+            
+            console.log('✅ 智能体排序已更新');
+        }
+    }
+
+    /**
+     * 保存智能体排序
+     */
+    saveAgentOrder() {
+        const order = this.availableAgents.map(agent => agent.id);
+        localStorage.setItem('agentOrder', JSON.stringify(order));
+        console.log('💾 已保存智能体排序:', order);
+    }
+
+    /**
+     * 恢复智能体排序
+     */
+    restoreAgentOrder() {
+        const savedOrder = localStorage.getItem('agentOrder');
+        if (savedOrder) {
+            try {
+                const order = JSON.parse(savedOrder);
+                console.log('🔄 恢复智能体排序:', order);
+                
+                // 按照保存的顺序重新排列
+                const orderedAgents = [];
+                order.forEach(agentId => {
+                    const agent = this.availableAgents.find(a => a.id === agentId);
+                    if (agent) {
+                        orderedAgents.push(agent);
+                    }
+                });
+                
+                // 添加任何新的智能体到末尾
+                this.availableAgents.forEach(agent => {
+                    if (!orderedAgents.find(a => a.id === agent.id)) {
+                        orderedAgents.push(agent);
+                    }
+                });
+                
+                this.availableAgents = orderedAgents;
+            } catch (error) {
+                console.error('恢复智能体排序失败:', error);
+            }
+        }
     }
 
     /**
@@ -213,6 +365,10 @@ export class SimpleChatController {
         // 更新当前智能体
         this.currentAgent = agent;
         this.conversationId = null; // 重置对话ID
+
+        // 保存选择到localStorage
+        localStorage.setItem('lastSelectedAgent', agent.id);
+        console.log('💾 已保存智能体选择:', agent.id);
 
         // 更新UI
         this.updateAgentSelection(agent.id);
@@ -690,7 +846,61 @@ export class SimpleChatController {
      * 滚动到底部
      */
     scrollToBottom() {
-        this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+        if (!this.chatMessages) return;
+        
+        const forceScrollToBottom = () => {
+            // 计算真正的最大滚动位置
+            const maxScrollTop = this.chatMessages.scrollHeight - this.chatMessages.clientHeight;
+            this.chatMessages.scrollTop = maxScrollTop;
+            
+            // 如果仍然没有到底部，使用更直接的方法
+            if (this.chatMessages.scrollTop < maxScrollTop) {
+                this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+            }
+            
+            // 使用最后一个消息的 scrollIntoView 作为最终保障
+            const lastMessage = this.chatMessages.lastElementChild;
+            if (lastMessage && !lastMessage.classList.contains('text-center')) {
+                lastMessage.scrollIntoView({ 
+                    behavior: 'instant', 
+                    block: 'end',
+                    inline: 'nearest' 
+                });
+            }
+            
+            console.log('🔄 [聊天滚动调试]', {
+                scrollHeight: this.chatMessages.scrollHeight,
+                clientHeight: this.chatMessages.clientHeight,
+                scrollTop: this.chatMessages.scrollTop,
+                maxScrollTop: maxScrollTop,
+                isAtBottom: this.chatMessages.scrollTop >= maxScrollTop - 5
+            });
+        };
+        
+        // 立即滚动
+        forceScrollToBottom();
+        
+        // 使用双重 requestAnimationFrame 确保DOM完全更新
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                forceScrollToBottom();
+                
+                // 短延时后再次检查和修正
+                setTimeout(() => {
+                    const maxScrollTop = this.chatMessages.scrollHeight - this.chatMessages.clientHeight;
+                    const isAtBottom = this.chatMessages.scrollTop >= maxScrollTop - 10;
+                    if (!isAtBottom) {
+                        console.log('🔄 [聊天滚动修正] 未完全到达底部，再次滚动');
+                        forceScrollToBottom();
+                    }
+                }, 150);
+                
+                // 最终保险滚动
+                setTimeout(() => {
+                    forceScrollToBottom();
+                }, 500);
+            });
+        });
     }
 
     /**
@@ -1036,8 +1246,10 @@ export class SimpleChatController {
             }
         });
         
-        // 滚动到底部
-        this.scrollToBottom();
+        // 滚动到底部 - 增加延时确保DOM更新完成
+        setTimeout(() => {
+            this.scrollToBottom();
+        }, 200);
         
         console.log('✅ 历史消息渲染完成');
     }

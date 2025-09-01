@@ -1125,6 +1125,11 @@ width: ${computedStyle.width}`;
                 });
                 this.addMessage(message, false);
             });
+            
+            // 备用消息加载完成后滚动到底部
+            setTimeout(() => {
+                this.scrollToBottom();
+            }, 200);
         }
         
         // 如果没有任何消息，显示欢迎信息
@@ -1245,6 +1250,12 @@ width: ${computedStyle.width}`;
                 });
 
                 console.log('✅ [前端] API历史消息渲染完成');
+                
+                // 确保在所有消息渲染完成后滚动到底部
+                setTimeout(() => {
+                    this.scrollToBottom();
+                }, 200);
+                
                 return true;
             } else {
                 console.log('📭 [前端] API未返回历史消息');
@@ -1684,6 +1695,15 @@ width: ${computedStyle.width}`;
                     img.onerror = () => {
                         if (img.parentNode) {
                             img.parentNode.innerHTML = `<div style="padding: 10px; background: #f5f5f5; border-radius: 4px; color: #666;">图片加载失败: ${fileName}</div>`;
+                        }
+                    };
+                    
+                    // 图片加载完成后重新滚动到底部
+                    img.onload = () => {
+                        if (shouldScroll) {
+                            setTimeout(() => {
+                                this.scrollToBottom();
+                            }, 100);
                         }
                     };
                     
@@ -2617,7 +2637,77 @@ justifyContent: ${debugInfo.justifyContent}
      */
     scrollToBottom() {
         const messagesElement = this.elements.chatMessages;
-        messagesElement.scrollTop = messagesElement.scrollHeight;
+        if (!messagesElement) return;
+        
+        // 创建一个更强制和精确的滚动方法
+        const forceScrollToBottom = () => {
+            // 获取容器的样式信息
+            const computedStyle = window.getComputedStyle(messagesElement);
+            const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0;
+            
+            // 确保滚动到绝对底部，考虑padding
+            const maxScrollTop = messagesElement.scrollHeight - messagesElement.clientHeight;
+            messagesElement.scrollTop = maxScrollTop;
+            
+            // 如果仍然没有到底部，使用更直接的方法
+            if (messagesElement.scrollTop < maxScrollTop) {
+                messagesElement.scrollTop = messagesElement.scrollHeight;
+            }
+            
+            // 使用 scrollIntoView 作为最终保障
+            const lastMessage = messagesElement.lastElementChild;
+            if (lastMessage && !lastMessage.classList.contains('text-center')) {
+                lastMessage.scrollIntoView({ 
+                    behavior: 'instant', 
+                    block: 'end',
+                    inline: 'nearest'
+                });
+            }
+            
+            console.log('🔄 [滚动调试]', {
+                scrollHeight: messagesElement.scrollHeight,
+                clientHeight: messagesElement.clientHeight,
+                scrollTop: messagesElement.scrollTop,
+                maxScrollTop: maxScrollTop,
+                paddingBottom: paddingBottom,
+                isAtBottom: messagesElement.scrollTop >= maxScrollTop - 5
+            });
+        };
+        
+        // 立即执行第一次滚动
+        forceScrollToBottom();
+        
+        // 使用双重 requestAnimationFrame 确保DOM完全更新
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                forceScrollToBottom();
+                
+                // 短延时后再次检查和修正
+                setTimeout(() => {
+                    const maxScrollTop = messagesElement.scrollHeight - messagesElement.clientHeight;
+                    const currentScrollTop = messagesElement.scrollTop;
+                    const isAtBottom = currentScrollTop >= maxScrollTop - 10; // 允许10px的容差
+                    
+                    if (!isAtBottom) {
+                        console.log('🔄 [滚动修正] 未完全到达底部，再次强制滚动', {
+                            current: currentScrollTop,
+                            max: maxScrollTop,
+                            diff: maxScrollTop - currentScrollTop
+                        });
+                        forceScrollToBottom();
+                    }
+                }, 100);
+                
+                // 长延时后的最终检查（处理图片加载）
+                setTimeout(() => {
+                    const maxScrollTop = messagesElement.scrollHeight - messagesElement.clientHeight;
+                    if (messagesElement.scrollTop < maxScrollTop - 10) {
+                        console.log('🔄 [最终滚动修正] 执行最终滚动调整');
+                        forceScrollToBottom();
+                    }
+                }, 800);
+            });
+        });
     }
 
     /**

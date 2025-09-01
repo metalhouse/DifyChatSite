@@ -138,6 +138,60 @@
             color: rgba(255, 255, 255, 0.8) !important; /* active状态时描述为半透明白色 */
         }
 
+        /* 拖动手柄样式 */
+        .drag-handle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 100%;
+            margin-right: 8px;
+            color: #6c757d;
+            cursor: grab;
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
+        }
+
+        .drag-handle:hover {
+            opacity: 1;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        /* 拖动状态样式 */
+        .agent-item.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg);
+            z-index: 1000;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .agent-item.drag-over {
+            background: rgba(40, 167, 69, 0.2);
+            border-color: #28a745;
+            border-style: dashed;
+        }
+
+        /* 拖动时的指示器 */
+        .agent-list {
+            position: relative;
+        }
+
+        .drop-indicator {
+            height: 2px;
+            background: #28a745;
+            margin: 2px 0;
+            border-radius: 1px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .drop-indicator.visible {
+            opacity: 1;
+        }
+
         .agent-avatar {
             width: clamp(32px, 6vw, 45px);
             height: clamp(32px, 6vw, 45px);
@@ -566,6 +620,13 @@
                 -webkit-user-select: none !important;
                 -webkit-touch-callout: none !important;
                 user-select: none !important;
+                /* 移动端禁用拖动 */
+                -webkit-user-drag: none;
+            }
+
+            /* 移动端隐藏拖动手柄 */
+            .drag-handle {
+                display: none !important;
             }
 
             /* 触摸时的视觉反馈 */
@@ -1713,7 +1774,9 @@
                     </div>
                 `;
                 
-                const response = await fetch(`${ENV_CONFIG.getApiUrl('/conversations')}?limit=100&sort=-updated_at`, {
+                // 添加时间戳防止缓存
+                const timestamp = new Date().getTime();
+                const response = await fetch(`${ENV_CONFIG.getApiUrl('/conversations')}?limit=100&sort=-updated_at&_t=${timestamp}`, {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('dify_access_token')}`,
@@ -1763,7 +1826,7 @@
         window.renderConversationList = function() {
             const conversationListElement = document.getElementById('conversationList');
             
-            if (window.currentConversations.length === 0) {
+            if (!window.currentConversations || window.currentConversations.length === 0) {
                 conversationListElement.innerHTML = `
                     <div class="text-center text-muted py-4">
                         <i class="fas fa-comments fa-2x mb-2 opacity-50"></i>
@@ -1859,7 +1922,7 @@
             }
             
             // 获取对话信息并显示在标题中
-            const conversation = window.currentConversations.find(c => c.id === conversationId);
+            const conversation = window.currentConversations && window.currentConversations.find(c => c.id === conversationId);
             if (conversation) {
                 const infoElement = document.getElementById('selectedConversationInfo');
                 // 根据API文档，对话标题字段是 name，智能体ID是 agent_id
@@ -1988,6 +2051,60 @@
             }).join('');
             
             messageHistoryElement.innerHTML = messagesHtml;
+            
+            // 强制精确滚动到底部显示最新消息
+            const forceScrollToBottom = () => {
+                const maxScrollTop = messageHistoryElement.scrollHeight - messageHistoryElement.clientHeight;
+                messageHistoryElement.scrollTop = maxScrollTop;
+                
+                // 如果仍然没有到底部，使用更直接的方法
+                if (messageHistoryElement.scrollTop < maxScrollTop) {
+                    messageHistoryElement.scrollTop = messageHistoryElement.scrollHeight;
+                }
+                
+                // 使用最后一个消息的 scrollIntoView 作为备用
+                const lastMessage = messageHistoryElement.lastElementChild;
+                if (lastMessage && !lastMessage.classList.contains('text-center')) {
+                    lastMessage.scrollIntoView({ 
+                        behavior: 'instant', 
+                        block: 'end',
+                        inline: 'nearest' 
+                    });
+                }
+                
+                console.log('🔄 [模态框滚动调试]', {
+                    scrollHeight: messageHistoryElement.scrollHeight,
+                    clientHeight: messageHistoryElement.clientHeight,
+                    scrollTop: messageHistoryElement.scrollTop,
+                    maxScrollTop: maxScrollTop,
+                    isAtBottom: messageHistoryElement.scrollTop >= maxScrollTop - 5
+                });
+            };
+            
+            // 立即滚动
+            forceScrollToBottom();
+            
+            // 使用双重 requestAnimationFrame 确保DOM完全更新
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    forceScrollToBottom();
+                });
+            });
+            
+            // 延时滚动序列，确保内容完全渲染后
+            setTimeout(() => {
+                forceScrollToBottom();
+                
+                // 检查是否到达底部
+                const maxScrollTop = messageHistoryElement.scrollHeight - messageHistoryElement.clientHeight;
+                const isAtBottom = messageHistoryElement.scrollTop >= maxScrollTop - 10;
+                if (!isAtBottom) {
+                    console.log('🔄 [模态框滚动修正] 未完全到达底部，再次滚动');
+                    forceScrollToBottom();
+                }
+            }, 200);
+            
+            setTimeout(() => forceScrollToBottom(), 500);
         }
         
         // 追加消息历史（用于分页加载）

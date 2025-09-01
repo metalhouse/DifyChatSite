@@ -102,8 +102,22 @@ export class SimpleChatController {
                 this.availableAgents = result.agents;
                 this.renderAgents();
                 
-                // 自动选择第一个智能体
-                this.selectAgent(result.agents[0]);
+                // 尝试恢复上次选择的智能体
+                const lastAgentId = localStorage.getItem('lastSelectedAgent');
+                let selectedAgent = null;
+                
+                if (lastAgentId) {
+                    // 查找上次选择的智能体
+                    selectedAgent = result.agents.find(agent => agent.id === lastAgentId);
+                    if (selectedAgent) {
+                        console.log('🔄 恢复上次选择的智能体:', selectedAgent.name);
+                    } else {
+                        console.log('⚠️ 上次选择的智能体不存在，使用默认智能体');
+                    }
+                }
+                
+                // 选择智能体（优先使用上次选择的，否则使用第一个）
+                this.selectAgent(selectedAgent || result.agents[0]);
                 
                 console.log(`✅ 智能体加载成功: ${result.agents.length} 个`);
             } else {
@@ -156,6 +170,10 @@ export class SimpleChatController {
         // 更新当前智能体
         this.currentAgent = agent;
         this.conversationId = null; // 重置对话ID
+
+        // 保存选择到localStorage
+        localStorage.setItem('lastSelectedAgent', agent.id);
+        console.log('💾 已保存智能体选择:', agent.id);
 
         // 更新UI
         this.updateAgentSelection(agent.id);
@@ -400,8 +418,13 @@ export class SimpleChatController {
             </div>
         `;
     }
-}
-            }
+
+    /**
+     * 初始化方法 - 创建必要的DOM元素和绑定事件
+     */
+    async initialize() {
+        try {
+            console.log('🚀 开始初始化简化版聊天控制器');
 
             // 创建消息容器
             this.messageContainer = document.createElement('div');
@@ -643,6 +666,10 @@ export class SimpleChatController {
 
         this.currentAgent = selectedAgent;
         
+        // 保存选择到localStorage
+        localStorage.setItem('lastSelectedAgent', agentId);
+        console.log('💾 已保存智能体选择:', agentId);
+        
         // 更新UI状态
         document.querySelectorAll('.agent-button').forEach(btn => {
             btn.classList.remove('active', 'btn-primary');
@@ -773,9 +800,52 @@ export class SimpleChatController {
     }
 
     scrollToBottom() {
-        setTimeout(() => {
-            this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
-        }, 100);
+        if (!this.messageContainer) return;
+        
+        const forceScrollToBottom = () => {
+            // 计算真正的最大滚动位置
+            const maxScrollTop = this.messageContainer.scrollHeight - this.messageContainer.clientHeight;
+            this.messageContainer.scrollTop = maxScrollTop;
+            
+            // 如果仍然没有到底部，使用更直接的方法
+            if (this.messageContainer.scrollTop < maxScrollTop) {
+                this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+            }
+            
+            // 使用最后一个消息的 scrollIntoView 作为最终保障
+            const lastMessage = this.messageContainer.lastElementChild;
+            if (lastMessage && !lastMessage.classList.contains('text-center')) {
+                lastMessage.scrollIntoView({ 
+                    behavior: 'instant', 
+                    block: 'end',
+                    inline: 'nearest' 
+                });
+            }
+        };
+        
+        // 立即滚动
+        forceScrollToBottom();
+        
+        // 使用双重 requestAnimationFrame 确保DOM完全更新
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                forceScrollToBottom();
+                
+                // 短延时后再次检查和修正
+                setTimeout(() => {
+                    const maxScrollTop = this.messageContainer.scrollHeight - this.messageContainer.clientHeight;
+                    const isAtBottom = this.messageContainer.scrollTop >= maxScrollTop - 10;
+                    if (!isAtBottom) {
+                        forceScrollToBottom();
+                    }
+                }, 150);
+                
+                // 最终保险滚动
+                setTimeout(() => {
+                    forceScrollToBottom();
+                }, 500);
+            });
+        });
     }
 
     showError(message) {

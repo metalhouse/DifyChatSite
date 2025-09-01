@@ -80,7 +80,18 @@ class HttpClient {
      * 核心请求方法 - 增强错误处理和超时管理
      */
     async request(method, url, data = null, options = {}) {
-        const fullUrl = url.startsWith('http') ? url : `${this.baseURL}${url}`;
+        // 修复URL构建逻辑 - 如果URL已经是完整路径或以/api开头，直接使用baseURL拼接
+        let fullUrl;
+        if (url.startsWith('http')) {
+            fullUrl = url;
+        } else if (url.startsWith('/api')) {
+            // 如果URL已经包含/api前缀，使用API_BASE_URL拼接
+            fullUrl = `${ENV_CONFIG.API_BASE_URL}${url}`;
+        } else {
+            // 否则使用完整的API URL（包含/api前缀）
+            fullUrl = `${this.baseURL}${url.startsWith('/') ? url : '/' + url}`;
+        }
+        
         const timeout = options.timeout || this.getTimeoutForUrl(url);
         
         if (ENV_CONFIG.isDebug()) {

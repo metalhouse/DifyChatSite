@@ -580,10 +580,96 @@ class FriendsManager {
             this.loadMessageReadStatus(this.currentPrivateChat.friendId, sortedMessages);
         }
 
-        // 滚动到底部
+        // 滚动到底部 - 使用更精确和强制的滚动策略
+        const forceScrollToBottom = () => {
+            if (chatMessages && chatMessages.scrollHeight > chatMessages.clientHeight) {
+                // 计算真正的最大滚动位置
+                const maxScrollTop = chatMessages.scrollHeight - chatMessages.clientHeight;
+                chatMessages.scrollTop = maxScrollTop;
+                
+                // 如果仍然没有到底部，使用更直接的方法
+                if (chatMessages.scrollTop < maxScrollTop) {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+                
+                // 使用最后一个消息元素的 scrollIntoView 作为最终保障
+                const lastMessage = chatMessages.lastElementChild;
+                if (lastMessage && !lastMessage.classList.contains('text-center')) {
+                    lastMessage.scrollIntoView({ 
+                        behavior: 'instant', 
+                        block: 'end',
+                        inline: 'nearest' 
+                    });
+                }
+                
+                console.log('🔄 [私聊滚动调试]', {
+                    scrollHeight: chatMessages.scrollHeight,
+                    clientHeight: chatMessages.clientHeight,
+                    scrollTop: chatMessages.scrollTop,
+                    maxScrollTop: maxScrollTop,
+                    isAtBottom: chatMessages.scrollTop >= maxScrollTop - 5
+                });
+            }
+        };
+        
+        // 立即滚动
+        forceScrollToBottom();
+        
+        // 使用双重 requestAnimationFrame 确保DOM完全更新
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                forceScrollToBottom();
+            });
+        });
+        
+        // 使用延时序列确保各种异步内容加载完成后也能正确滚动
         setTimeout(() => {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }, 100);
+            forceScrollToBottom();
+            
+            // 检查是否真正到达底部
+            if (chatMessages) {
+                const maxScrollTop = chatMessages.scrollHeight - chatMessages.clientHeight;
+                const isAtBottom = chatMessages.scrollTop >= maxScrollTop - 10;
+                if (!isAtBottom) {
+                    console.log('🔄 [私聊滚动修正] 未完全到达底部，再次滚动');
+                    forceScrollToBottom();
+                }
+            }
+        }, 200);
+        
+        setTimeout(() => {
+            forceScrollToBottom();
+        }, 600);
+        
+        // 监听图片加载完成事件，确保图片加载后重新滚动
+        const images = chatMessages.querySelectorAll('img');
+        if (images.length > 0) {
+            let loadedImages = 0;
+            images.forEach(img => {
+                if (img.complete) {
+                    loadedImages++;
+                } else {
+                    img.addEventListener('load', () => {
+                        loadedImages++;
+                        if (loadedImages === images.length) {
+                            console.log('�️ 所有图片加载完成，重新滚动到底部');
+                            setTimeout(() => forceScrollToBottom(), 100);
+                        }
+                    });
+                    img.addEventListener('error', () => {
+                        loadedImages++;
+                        if (loadedImages === images.length) {
+                            setTimeout(() => forceScrollToBottom(), 100);
+                        }
+                    });
+                }
+            });
+            
+            // 如果所有图片都已加载，立即滚动
+            if (loadedImages === images.length) {
+                setTimeout(() => forceScrollToBottom(), 100);
+            }
+        }
 
         console.log(`✅ 已渲染 ${messages.length} 条私聊消息`);
     }
@@ -1199,7 +1285,11 @@ class FriendsManager {
         `;
 
         chatMessages.appendChild(messageElement);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // 确保滚动到底部
+        requestAnimationFrame(() => {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
     }
 
     /**
@@ -2767,6 +2857,20 @@ class FriendsManager {
         // 成功加载时的处理
         img.onload = () => {
             console.log('✅ 私聊图片加载成功:', imageUrl);
+            
+            // 图片加载完成后重新滚动到底部
+            setTimeout(() => {
+                const chatMessages = document.getElementById('chatMessages');
+                if (chatMessages) {
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    
+                    // 使用最后一个消息的 scrollIntoView 作为备用
+                    const lastMessage = chatMessages.lastElementChild;
+                    if (lastMessage && !lastMessage.classList.contains('text-center')) {
+                        lastMessage.scrollIntoView({ behavior: 'instant', block: 'end' });
+                    }
+                }
+            }, 100);
         };
         
         // 点击放大功能 - 使用与群聊相同的模态框逻辑

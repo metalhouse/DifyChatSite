@@ -172,7 +172,17 @@ export class ChatController {
         // 代理切换
         if (this.agentSelector) {
             this.agentSelector.addEventListener('change', (e) => {
-                this.switchAgent(e.target.value);
+                const selectedAgentId = e.target.value;
+                const selectedOption = e.target.selectedOptions[0];
+                const agent = {
+                    id: selectedAgentId,
+                    name: selectedOption.textContent,
+                    description: selectedOption.title
+                };
+                
+                this.currentAgent = agent;
+                this.onAgentSelected(agent);
+                this.switchAgent(selectedAgentId);
             });
         }
         
@@ -270,10 +280,32 @@ export class ChatController {
                     this.agentSelector.appendChild(option);
                 });
                 
-                // 设置默认代理
-                if (agents.length > 0) {
+                // 尝试恢复上次选择的智能体
+                const lastAgentId = this.storageManager.getUserSetting('currentAgent');
+                let selectedAgent = null;
+                
+                if (lastAgentId) {
+                    // 查找上次选择的智能体
+                    selectedAgent = agents.find(agent => agent.id === lastAgentId);
+                    if (selectedAgent) {
+                        this.log('恢复上次选择的智能体:', selectedAgent.name);
+                    } else {
+                        this.log('上次选择的智能体不存在，使用默认智能体');
+                    }
+                }
+                
+                // 设置当前智能体（优先使用上次选择的，否则使用第一个）
+                if (selectedAgent) {
+                    this.currentAgent = selectedAgent;
+                    this.agentSelector.value = selectedAgent.id;
+                } else if (agents.length > 0) {
                     this.currentAgent = agents[0];
                     this.agentSelector.value = agents[0].id;
+                }
+                
+                // 触发智能体选择事件以更新UI
+                if (this.currentAgent) {
+                    this.onAgentSelected(this.currentAgent);
                 }
             }
             
@@ -758,6 +790,35 @@ export class ChatController {
             this.error('切换代理失败:', error);
             this.errorHandler.showError('切换代理失败');
         }
+    }
+
+    /**
+     * 智能体选择事件处理
+     */
+    onAgentSelected(agent) {
+        this.log('智能体已选择:', agent.name);
+        
+        // 更新UI显示当前智能体
+        const agentNameElement = document.getElementById('currentAgentName');
+        if (agentNameElement) {
+            agentNameElement.textContent = agent.name || agent.id;
+        }
+        
+        // 更新聊天区域提示
+        const chatWelcomeElement = document.querySelector('.chat-welcome');
+        if (chatWelcomeElement) {
+            chatWelcomeElement.innerHTML = `
+                <div class="text-center text-muted">
+                    <i class="fas fa-robot fa-3x mb-3 opacity-50"></i>
+                    <h5>与 ${agent.name} 开始对话</h5>
+                    <p>您可以向AI助手提问任何问题</p>
+                </div>
+            `;
+        }
+        
+        // 保存当前选择的智能体
+        this.storageManager.setUserSetting('currentAgent', agent.id);
+        this.log('已保存智能体选择:', agent.id);
     }
 
     /**
