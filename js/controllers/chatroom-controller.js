@@ -1444,26 +1444,84 @@ width: ${computedStyle.width}`;
             `;
         }
 
-        // 消息内容 - 后端已修复自动解密，直接显示内容即可
+        // 消息内容处理 - 对于图片消息，不显示加密文本
         let contentToShow = message.content;
-        
-        // 简化的图片消息处理：只隐藏系统生成的图片提示文本
+        console.log('🔍 [调试] 消息内容处理开始:', {
+            messageId: message.id,
+            originalContent: contentToShow?.substring(0, 100) + (contentToShow?.length > 100 ? '...' : ''),
+            contentLength: contentToShow?.length,
+            hasAttachments: !!(message.attachments && message.attachments.length > 0),
+            attachmentsCount: message.attachments?.length || 0
+        });
+
         if (message.attachments && message.attachments.length > 0) {
-            // 只检查是否是系统生成的图片消息提示，不再检查加密内容
+            // 检查内容是否像加密字符串或系统提示
+            const isEncryptedContent = contentToShow && 
+                contentToShow.includes(':') && 
+                contentToShow.length > 50 && 
+                /^[a-f0-9:]+$/.test(contentToShow);
+                
             const isImageSystemMessage = contentToShow && 
                 (contentToShow.includes('发送了图片') || 
                  contentToShow.includes('sent an image') ||
                  contentToShow.match(/^[a-f0-9_.-]+\.(jpg|jpeg|png|gif|webp)$/i));
             
-            if (isImageSystemMessage) {
-                contentToShow = ''; // 不显示系统提示
+            console.log('🔍 [调试] 图片消息内容检查:', {
+                messageId: message.id,
+                isEncryptedContent,
+                isImageSystemMessage,
+                willHideContent: isEncryptedContent || isImageSystemMessage,
+                contentPreview: contentToShow?.substring(0, 100)
+            });
+            
+            if (isEncryptedContent || isImageSystemMessage) {
+                contentToShow = '';
+            }
+        }
+        
+        // 对于没有附件的消息，也要检查是否是加密hash码
+        if ((!message.attachments || message.attachments.length === 0) && contentToShow) {
+            // 更严格的加密内容检测，避免误判正常消息
+            const hasNonHexChars = /[^a-f0-9:]/.test(contentToShow);
+            const isEncryptedContent = contentToShow && 
+                !hasNonHexChars &&  // 只包含十六进制字符和冒号
+                contentToShow.includes(':') && 
+                contentToShow.length > 100 &&  // 增加长度要求
+                contentToShow.split(':').length > 10;  // 确保有足够多的冒号分割
+                
+            console.log('🔍 [调试] 纯文本消息内容检查:', {
+                messageId: message.id,
+                contentLength: contentToShow.length,
+                hasColon: contentToShow.includes(':'),
+                hasNonHexChars: hasNonHexChars,
+                isHexOnly: !hasNonHexChars,
+                colonCount: contentToShow.split(':').length - 1,
+                isEncryptedContent,
+                willHideContent: isEncryptedContent,
+                contentPreview: contentToShow.substring(0, 100) + (contentToShow.length > 100 ? '...' : '')
+            });
+                
+            if (isEncryptedContent) {
+                console.log('🔒 [聊天室] 检测到加密hash码内容，已过滤:', contentToShow.substring(0, 50) + '...');
+                contentToShow = '';
             }
         }
         
         if (contentToShow && contentToShow.trim()) {
+            console.log('✅ [调试] 将显示消息内容:', {
+                messageId: message.id,
+                contentPreview: contentToShow.substring(0, 100) + (contentToShow.length > 100 ? '...' : ''),
+                contentLength: contentToShow.length
+            });
             messageHTML += `
                 <div class="message-content">${this.formatMessageContent(contentToShow)}</div>
             `;
+        } else {
+            console.log('⚠️ [调试] 消息内容为空，不显示:', {
+                messageId: message.id,
+                originalContent: message.content?.substring(0, 50),
+                wasFiltered: message.content && !contentToShow
+            });
         }
 
         // 处理附件（图片）
