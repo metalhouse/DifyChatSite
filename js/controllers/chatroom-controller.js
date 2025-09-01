@@ -20,6 +20,12 @@ class ChatroomController {
         // 初始化好友管理器
         this.friendsManager = null;
         
+        // 初始化懒加载器
+        this.lazyLoader = null;
+        
+        // 初始化图片优化服务
+        this.imageOptimizer = null;
+        
         // DOM 元素
         this.elements = {
             roomList: document.getElementById('roomList'),
@@ -65,6 +71,23 @@ class ChatroomController {
             
             // 设置全局引用，以便HTML中的按钮可以调用
             window.friendsManager = this.friendsManager;
+            
+            // 初始化懒加载器
+            if (window.LazyLoader) {
+                this.lazyLoader = new window.LazyLoader();
+                this.lazyLoader.init();
+                console.log('✅ [前端] 懒加载器初始化成功');
+            } else {
+                console.warn('⚠️ [前端] LazyLoader 未找到，图片将直接加载');
+            }
+            
+            // 初始化图片优化服务
+            if (window.ImageOptimizationService) {
+                this.imageOptimizer = new window.ImageOptimizationService();
+                console.log('✅ [前端] 图片优化服务初始化成功');
+            } else {
+                console.warn('⚠️ [前端] ImageOptimizationService 未找到，将使用默认图片加载');
+            }
             
             // 初始化WebSocket连接
             this.initializeWebSocket();
@@ -1619,96 +1642,55 @@ width: ${computedStyle.width}`;
                     return;
                 }
                 
-                // 创建图片元素 - 改进加载方式
-                const img = document.createElement('img');
-                img.className = 'message-image img-fluid';
-                img.alt = fileName;
-                img.title = fileName;
-                img.style.cssText = 'border-radius: 8px; cursor: pointer; max-width: 100%; height: auto; display: block;';
-                
-                // 处理图片加载错误
-                img.onerror = () => {
-                    console.error('❌ 图片加载失败:', imageUrl);
-                    img.style.display = 'none';
-                    const errorDiv = document.createElement('div');
-                    errorDiv.textContent = `图片加载失败: ${fileName}`;
-                    errorDiv.style.cssText = 'padding: 10px; background: #f5f5f5; border-radius: 4px; color: #666;';
-                    img.parentNode.replaceChild(errorDiv, img);
-                };
-                
-                // 成功加载时的处理
-                img.onload = () => {
-                    console.log('✅ 图片加载成功:', imageUrl);
-                };
-                
-                // 添加点击放大功能 - 改进为模态框效果
-                img.onclick = function() {
-                    // 检查是否已有放大模态框
-                    let existingModal = document.getElementById('imageModal');
-                    if (existingModal) {
-                        document.body.removeChild(existingModal);
-                        return;
+                // 优先使用图片优化服务
+                if (this.imageOptimizer) {
+                    console.log('🚀 [优化] 使用ImageOptimizationService处理图片:', { attachment, fileName });
+                    
+                    // 从附件对象或字符串中提取文件ID
+                    const fileId = (typeof attachment === 'object' && attachment !== null) ? attachment.id : attachment;
+                    
+                    if (fileId) {
+                        const imageContainer = this.imageOptimizer.progressiveLoadImage(fileId, fileName);
+                        attachmentsContainer.appendChild(imageContainer);
+                    } else {
+                        console.error('❌ [优化] 附件中缺少文件ID，无法优化:', attachment);
+                        // 如果缺少文件ID，显示错误信息
+                        const errorDiv = document.createElement('div');
+                        errorDiv.textContent = `图片加载失败: ${fileName}`;
+                        errorDiv.style.cssText = 'padding: 10px; background: #f5f5f5; border-radius: 4px; color: #666;';
+                        attachmentsContainer.appendChild(errorDiv);
+                    }
+                } else {
+                    // 降级方案：如果没有优化服务，使用旧的懒加载方法
+                    console.log('⚠️ [降级] ImageOptimizationService未初始化，使用旧的懒加载方法');
+                    const img = document.createElement('img');
+                    img.className = 'message-image img-fluid lazy-image';
+                    img.alt = fileName;
+                    img.title = fileName;
+                    img.style.cssText = 'border-radius: 8px; cursor: pointer; max-width: 100%; height: auto; display: block; min-height: 100px; background: #f0f0f0;';
+                    
+                    if (this.lazyLoader) {
+                        img.dataset.src = imageUrl;
+                        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect width="100%25" height="100%25" fill="%23f0f0f0"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-family="sans-serif" font-size="16"%3E加载中...%3C/text%3E%3C/svg%3E';
+                        setTimeout(() => {
+                            if (this.lazyLoader && img.parentNode) {
+                                this.lazyLoader.observe(img);
+                            }
+                        }, 100);
+                    } else {
+                        img.src = imageUrl;
                     }
                     
-                    // 创建模态框
-                    const modal = document.createElement('div');
-                    modal.id = 'imageModal';
-                    modal.style.cssText = `
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100%;
-                        background: rgba(0, 0, 0, 0.8);
-                        z-index: 9999;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        cursor: pointer;
-                    `;
-                    
-                    // 创建放大的图片
-                    const enlargedImg = document.createElement('img');
-                    enlargedImg.src = this.src;
-                    enlargedImg.alt = this.alt;
-                    enlargedImg.style.cssText = `
-                        max-width: 90%;
-                        max-height: 90%;
-                        object-fit: contain;
-                        border-radius: 8px;
-                        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-                        cursor: pointer;
-                    `;
-                    
-                    // 点击模态框或图片时关闭
-                    modal.onclick = function() {
-                        document.body.removeChild(modal);
-                    };
-                    
-                    // 阻止图片点击事件冒泡
-                    enlargedImg.onclick = function(e) {
-                        e.stopPropagation();
-                        document.body.removeChild(modal);
-                    };
-                    
-                    // ESC键关闭
-                    const handleKeyPress = function(e) {
-                        if (e.key === 'Escape') {
-                            document.body.removeChild(modal);
-                            document.removeEventListener('keydown', handleKeyPress);
+                    img.onerror = () => {
+                        if (img.parentNode) {
+                            img.parentNode.innerHTML = `<div style="padding: 10px; background: #f5f5f5; border-radius: 4px; color: #666;">图片加载失败: ${fileName}</div>`;
                         }
                     };
-                    document.addEventListener('keydown', handleKeyPress);
                     
-                    modal.appendChild(enlargedImg);
-                    document.body.appendChild(modal);
-                };
-                
-                // 设置图片源 - 直接使用构建的URL（已包含token）
-                img.src = imageUrl;
-                console.log('🖼️ [调试] 设置图片源:', imageUrl);
-                
-                attachmentsContainer.appendChild(img);
+                    img.onclick = () => this.showImageModal(imageUrl, fileName);
+                    
+                    attachmentsContainer.appendChild(img);
+                }
             });
             
             // 将附件容器添加到消息气泡中
@@ -2379,6 +2361,71 @@ justifyContent: ${debugInfo.justifyContent}
         document.getElementById('userDetailsModal').addEventListener('hidden.bs.modal', function () {
             this.remove();
         });
+    }
+
+    /**
+     * 显示图片放大模态框
+     */
+    showImageModal(imageUrl, altText) {
+        // 检查是否已有放大模态框
+        let existingModal = document.getElementById('imageModal');
+        if (existingModal) {
+            document.body.removeChild(existingModal);
+            return;
+        }
+        
+        // 创建模态框
+        const modal = document.createElement('div');
+        modal.id = 'imageModal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        `;
+        
+        // 创建放大的图片
+        const enlargedImg = document.createElement('img');
+        enlargedImg.src = imageUrl;
+        enlargedImg.alt = altText;
+        enlargedImg.style.cssText = `
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+        `;
+        
+        // 点击模态框或图片时关闭
+        modal.onclick = function() {
+            document.body.removeChild(modal);
+        };
+        
+        // 阻止图片点击事件冒泡
+        enlargedImg.onclick = function(e) {
+            e.stopPropagation();
+            document.body.removeChild(modal);
+        };
+        
+        // ESC键关闭
+        const handleKeyPress = function(e) {
+            if (e.key === 'Escape') {
+                document.body.removeChild(modal);
+                document.removeEventListener('keydown', handleKeyPress);
+            }
+        };
+        document.addEventListener('keydown', handleKeyPress);
+        
+        modal.appendChild(enlargedImg);
+        document.body.appendChild(modal);
     }
 
     /**
