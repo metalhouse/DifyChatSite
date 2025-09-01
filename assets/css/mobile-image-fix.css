@@ -1,0 +1,155 @@
+/* 移动端图片显示修复 */
+
+/* 移动端图片优化 */
+@media (max-width: 768px) {
+    /* 强制显示图片消息 - 最高优先级 */
+    .message-image {
+        max-width: 250px !important;
+        max-height: 180px !important;
+        width: auto !important;
+        height: auto !important;
+        object-fit: cover !important;
+        border-radius: 8px !important;
+        cursor: pointer !important;
+        touch-action: manipulation !important;
+        /* 强制显示 */
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        /* 防止被其他样式覆盖 */
+        position: relative !important;
+        z-index: 1 !important;
+    }
+    
+    /* 修复可能的隐藏问题 */
+    .message-attachments {
+        display: block !important;
+        visibility: visible !important;
+        margin-top: 8px !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+    }
+    
+    /* 确保消息气泡不会隐藏图片 */
+    .message-bubble {
+        overflow: visible !important;
+    }
+    
+    /* 图片容器修复 */
+    .message-attachments img {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+    
+    /* 图片上传按钮在移动端的优化 */
+    #imageUploadButton {
+        min-height: 44px !important; /* iOS推荐的最小触摸区域 */
+        min-width: 44px !important;
+        touch-action: manipulation !important; /* 防止双击缩放 */
+        -webkit-touch-callout: none !important; /* 禁用长按菜单 */
+        user-select: none !important;
+        /* 强制启用 */
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        cursor: pointer !important;
+    }
+    
+    /* 确保文件输入框在移动端能正确触发 */
+    #imageFileInput,
+    #cameraFileInput {
+        position: absolute !important;
+        left: -9999px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    
+    /* 图片加载错误时的样式 */
+    .message-image[src=""],
+    .message-image:not([src]) {
+        display: none !important;
+    }
+    
+    /* 图片模态框在移动端的优化 */
+    #imageModal,
+    #forceImageSourceModal {
+        padding: 10px !important;
+        box-sizing: border-box !important;
+    }
+    
+    #imageModal img {
+        max-width: 95% !important;
+        max-height: 95% !important;
+        object-fit: contain !important;
+    }
+    
+    /* 图片加载失败提示在移动端的优化 */
+    .image-error-message {
+        padding: 8px 12px !important;
+        background: #f8f9fa !important;
+        border: 1px solid #dee2e6 !important;
+        border-radius: 6px !important;
+        color: #6c757d !important;
+        font-size: 0.9rem !important;
+        text-align: center !important;
+        max-width: 250px !important;
+        display: block !important;
+    }
+    
+    /* 加载中状态 */
+    .image-loading {
+        padding: 20px !important;
+        text-align: center !important;
+        background: #f8f9fa !important;
+        border-radius: 6px !important;
+        color: #6c757d !important;
+        max-width: 250px !important;
+        display: block !important;
+    }
+    
+    .image-loading::before {
+        content: "📸 " !important;
+        display: inline-block !important;
+        animation: pulse 1.5s ease-in-out infinite !important;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+
+    /* 修复WebKit浏览器的图片显示问题 */
+    .message-image {
+        -webkit-transform: translateZ(0) !important;
+        transform: translateZ(0) !important;
+        backface-visibility: hidden !important;
+        -webkit-backface-visibility: hidden !important;
+    }
+
+    /* 强制重绘修复 */
+    .message-attachments {
+        transform: translateZ(0) !important;
+        -webkit-transform: translateZ(0) !important;
+    }
+}
+
+/* 高DPI显示屏优化 */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .message-image {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+}
+
+/* 触摸设备专用样式 */
+@media (hover: none) and (pointer: coarse) {
+    .message-image:hover {
+        transform: none; /* 移除hover效果 */
+    }
+    
+    .message-image:active {
+        transform: scale(0.98);
+        transition: transform 0.1s ease;
+    }
+}

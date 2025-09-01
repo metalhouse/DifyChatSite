@@ -1276,7 +1276,7 @@ class FriendsManager {
                          alt="${this.escapeHtml(filename)}" 
                          title="${this.escapeHtml(filename)}" 
                          class="message-image img-fluid" 
-                         style="max-width: 300px; max-height: 200px; border-radius: 8px; cursor: pointer; opacity: 0.8;"
+                         style="border-radius: 8px; cursor: pointer; opacity: 0.8; max-width: 100%; height: auto; display: block;"
                          onclick="window.chatroomController?.openImageModal?.('${imageUrl}', '${this.escapeHtml(filename)}')" />
                 </div>
             </div>
@@ -2751,7 +2751,8 @@ class FriendsManager {
         img.className = 'message-image img-fluid';
         img.alt = fileName;
         img.title = fileName;
-        img.style.cssText = 'max-width: 300px; max-height: 200px; border-radius: 8px; cursor: pointer;';
+        // 移除固定的max-width和max-height，让CSS自适应控制
+        img.style.cssText = 'border-radius: 8px; cursor: pointer; max-width: 100%; height: auto; display: block;';
         
         // 处理图片加载错误
         img.onerror = () => {

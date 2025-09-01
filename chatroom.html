@@ -22,6 +22,8 @@
     <link href="./vendor/font-awesome/all.min.css" rel="stylesheet">
     <!-- 移动端Font Awesome修复 -->
     <link href="./vendor/font-awesome/mobile-font-fix.css" rel="stylesheet">
+    <!-- 移动端图片显示修复 -->
+    <link href="./assets/css/mobile-image-fix.css" rel="stylesheet">
     <!-- Socket.IO Client -->
     <script src="./vendor/socket.io/socket.io.min.js"></script>
     
@@ -1116,15 +1118,101 @@
 
         /* 图片消息样式 */
         .message-image {
-            max-width: 300px;
-            max-height: 200px;
+            max-width: 100%;
+            max-height: 300px;
+            width: auto;
+            height: auto;
             border-radius: 8px;
             cursor: pointer;
             transition: transform 0.2s ease;
+            display: block;
         }
 
         .message-image:hover {
             transform: scale(1.02);
+        }
+
+        /* 包含图片的消息气泡样式调整 */
+        .message-bubble:has(.message-image) {
+            padding: clamp(0.3rem, 1vw, 0.5rem);
+            max-width: clamp(200px, 60vw, 320px);
+            min-width: auto;
+            width: fit-content;
+        }
+
+        .message-user .message-bubble:has(.message-image) {
+            max-width: min(320px, calc(75% - 20px));
+        }
+
+        .message-other .message-bubble:has(.message-image),
+        .message-agent .message-bubble:has(.message-image) {
+            max-width: min(320px, calc(75% - 20px));
+        }
+
+        /* 兼容性：为不支持:has()的浏览器提供备选方案 - 使用更高优先级 */
+        .message-bubble.has-image {
+            padding: clamp(0.3rem, 1vw, 0.5rem) !important;
+            max-width: clamp(200px, 60vw, 320px) !important;
+            min-width: auto !important;
+            width: fit-content !important;
+        }
+
+        .message-user .message-bubble.has-image {
+            max-width: 320px !important;
+        }
+
+        .message-other .message-bubble.has-image,
+        .message-agent .message-bubble.has-image {
+            max-width: 320px !important;
+        }
+
+        /* 更具体的选择器确保样式生效 */
+        .message.message-user .message-bubble.has-image,
+        .message-user.message .message-bubble.has-image {
+            max-width: 320px !important;
+        }
+
+        .message.message-other .message-bubble.has-image,
+        .message-other.message .message-bubble.has-image,
+        .message.message-agent .message-bubble.has-image,
+        .message-agent.message .message-bubble.has-image {
+            max-width: 320px !important;
+        }
+
+        /* 图片消息的消息气泡特殊样式 - 覆盖所有基础样式 */
+        .message .message-bubble.has-image.image-bubble-adjusted {
+            max-width: 320px !important;
+            width: fit-content !important;
+            min-width: auto !important;
+            padding: 0.5rem !important;
+        }
+
+        .message-user .message-bubble.has-image.image-bubble-adjusted {
+            max-width: 320px !important;
+        }
+
+        .message-other .message-bubble.has-image.image-bubble-adjusted,
+        .message-agent .message-bubble.has-image.image-bubble-adjusted {
+            max-width: 320px !important;
+        }
+
+        /* 终极覆盖方案 - 最高优先级 */
+        div.message div.message-bubble.has-image {
+            max-width: 320px !important;
+            width: fit-content !important;
+            min-width: auto !important;
+        }
+
+        div.message-user div.message-bubble.has-image,
+        div.message.message-user div.message-bubble.has-image {
+            max-width: 320px !important;
+        }
+
+        div.message-other div.message-bubble.has-image,
+        div.message.message-other div.message-bubble.has-image,
+        div.message-agent div.message-bubble.has-image,
+        div.message.message-agent div.message-bubble.has-image {
+            max-width: 320px !important;
         }
 
         /* 拖拽上传样式 */
@@ -1843,9 +1931,93 @@
 
             /* 移动端图片预览优化 */
             .message-image {
-                max-width: 250px !important;
-                max-height: 180px !important;
+                max-width: 100% !important;
+                max-height: 250px !important;
                 border-radius: 6px !important;
+                width: auto !important;
+                height: auto !important;
+            }
+
+            /* 移动端图片气泡样式调整 */
+            .message-bubble:has(.message-image) {
+                padding: 0.4rem !important;
+                max-width: min(280px, calc(85% - 20px)) !important;
+                min-width: auto !important;
+            }
+
+            .message-user .message-bubble:has(.message-image) {
+                max-width: min(280px, calc(80% - 20px)) !important;
+            }
+
+            .message-other .message-bubble:has(.message-image),
+            .message-agent .message-bubble:has(.message-image) {
+                max-width: min(280px, calc(80% - 20px)) !important;
+            }
+
+            /* 移动端兼容性：为不支持:has()的浏览器提供备选方案 */
+            .message-bubble.has-image {
+                padding: 0.4rem !important;
+                max-width: 280px !important;
+                min-width: auto !important;
+                width: fit-content !important;
+            }
+
+            .message-user .message-bubble.has-image {
+                max-width: 280px !important;
+            }
+
+            .message-other .message-bubble.has-image,
+            .message-agent .message-bubble.has-image {
+                max-width: 280px !important;
+            }
+
+            /* 更具体的移动端选择器 */
+            .message.message-user .message-bubble.has-image,
+            .message-user.message .message-bubble.has-image {
+                max-width: 280px !important;
+            }
+
+            .message.message-other .message-bubble.has-image,
+            .message-other.message .message-bubble.has-image,
+            .message.message-agent .message-bubble.has-image,
+            .message-agent.message .message-bubble.has-image {
+                max-width: 280px !important;
+            }
+
+            /* 移动端图片消息的消息气泡特殊样式 */
+            .message .message-bubble.has-image.image-bubble-adjusted {
+                max-width: 280px !important;
+                width: fit-content !important;
+                min-width: auto !important;
+                padding: 0.4rem !important;
+            }
+
+            .message-user .message-bubble.has-image.image-bubble-adjusted {
+                max-width: 280px !important;
+            }
+
+            .message-other .message-bubble.has-image.image-bubble-adjusted,
+            .message-agent .message-bubble.has-image.image-bubble-adjusted {
+                max-width: 280px !important;
+            }
+
+            /* 移动端终极覆盖方案 - 最高优先级 */
+            div.message div.message-bubble.has-image {
+                max-width: 280px !important;
+                width: fit-content !important;
+                min-width: auto !important;
+            }
+
+            div.message-user div.message-bubble.has-image,
+            div.message.message-user div.message-bubble.has-image {
+                max-width: 280px !important;
+            }
+
+            div.message-other div.message-bubble.has-image,
+            div.message.message-other div.message-bubble.has-image,
+            div.message-agent div.message-bubble.has-image,
+            div.message.message-agent div.message-bubble.has-image {
+                max-width: 280px !important;
             }
         }
     </style>
@@ -4285,6 +4457,187 @@
                     }, 2000);
                 }
             }
+        }
+
+        /**
+         * 图片气泡自适应处理（兼容不支持:has()的浏览器）
+         * 当消息中包含图片时，自动调整气泡大小
+         */
+        function adjustImageBubbleSize() {
+            const messageBubbles = document.querySelectorAll('.message-bubble');
+            console.log(`🔧 调整图片气泡大小，找到 ${messageBubbles.length} 个气泡`);
+            
+            messageBubbles.forEach((bubble, index) => {
+                const hasImage = bubble.querySelector('.message-image');
+                
+                if (hasImage) {
+                    console.log(`📷 气泡 ${index} 包含图片，开始调整`);
+                    // 添加包含图片的类名用于样式控制
+                    bubble.classList.add('has-image');
+                    
+                    // 为了兼容不支持:has()的浏览器，直接设置样式
+                    const isUser = bubble.closest('.message-user');
+                    const isMobile = window.innerWidth <= 768;
+                    
+                    // 移除之前可能设置的内联样式，让CSS类来控制
+                    bubble.style.padding = '';
+                    bubble.style.minWidth = '';
+                    bubble.style.width = '';
+                    bubble.style.maxWidth = '';
+                    
+                    // 添加调试类名以便识别
+                    bubble.classList.add('image-bubble-adjusted');
+                    if (isUser) {
+                        bubble.classList.add('user-image-bubble');
+                    } else {
+                        bubble.classList.add('other-image-bubble');
+                    }
+                    
+                    // 确保图片自适应
+                    const images = bubble.querySelectorAll('.message-image');
+                    images.forEach(img => {
+                        img.style.maxWidth = '100%';
+                        img.style.height = 'auto';
+                        img.style.display = 'block';
+                        
+                        // 监听图片加载完成事件，再次调整气泡
+                        if (!img.complete) {
+                            img.onload = () => {
+                                console.log('📷 图片加载完成，重新调整气泡');
+                                setTimeout(() => adjustImageBubbleSize(), 100);
+                            };
+                        }
+                        
+                        console.log('✅ 图片样式已调整');
+                    });
+                    
+                    console.log(`✅ 气泡 ${index} 调整完成，类名:`, bubble.className);
+                } else {
+                    bubble.classList.remove('has-image', 'image-bubble-adjusted', 'user-image-bubble', 'other-image-bubble');
+                }
+            });
+        }
+
+        /**
+         * 监听DOM变化，自动调整新添加消息的图片气泡
+         */
+        function observeMessageChanges() {
+            const chatMessages = document.getElementById('chatMessages');
+            if (!chatMessages) return;
+
+            const observer = new MutationObserver((mutations) => {
+                let shouldAdjust = false;
+                
+                mutations.forEach((mutation) => {
+                    if (mutation.type === 'childList') {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.nodeType === 1 && (node.classList.contains('message') || node.querySelector('.message'))) {
+                                shouldAdjust = true;
+                            }
+                        });
+                    }
+                });
+                
+                if (shouldAdjust) {
+                    // 延迟执行，确保图片元素已完全添加
+                    setTimeout(adjustImageBubbleSize, 100);
+                }
+            });
+
+            observer.observe(chatMessages, {
+                childList: true,
+                subtree: true
+            });
+
+            console.log('✅ 图片气泡自适应监听器已启动');
+        }
+
+        /**
+         * 响应式处理：窗口大小变化时重新调整
+         */
+        function handleResize() {
+            adjustImageBubbleSize();
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM加载完成，开始初始化图片气泡系统');
+            
+            // 初始调整现有消息
+            setTimeout(() => {
+                console.log('⏰ 开始初始调整');
+                adjustImageBubbleSize();
+            }, 500);
+            
+            // 启动变化监听
+            setTimeout(observeMessageChanges, 1000);
+            
+            // 监听窗口大小变化
+            window.addEventListener('resize', debounce(handleResize, 200));
+            
+            console.log('✅ 图片气泡自适应系统已初始化');
+        });
+
+        // 也在window.onload后再次尝试
+        window.addEventListener('load', function() {
+            console.log('🌟 页面完全加载完成，再次调整图片气泡');
+            setTimeout(adjustImageBubbleSize, 1000);
+        });
+
+        // 暴露到全局作用域用于调试
+        window.adjustImageBubbleSize = adjustImageBubbleSize;
+        window.debugImageBubbles = function() {
+            console.log('🔍 手动调试图片气泡:');
+            const bubbles = document.querySelectorAll('.message-bubble');
+            console.log(`总气泡数: ${bubbles.length}`);
+            
+            bubbles.forEach((bubble, i) => {
+                const hasImage = bubble.querySelector('.message-image');
+                console.log(`气泡 ${i}:`, {
+                    hasImage: !!hasImage,
+                    classes: bubble.className,
+                    computedStyle: {
+                        maxWidth: getComputedStyle(bubble).maxWidth,
+                        width: getComputedStyle(bubble).width,
+                        padding: getComputedStyle(bubble).padding
+                    }
+                });
+            });
+            
+            // 强制重新调整
+            adjustImageBubbleSize();
+        };
+
+        console.log('💡 提示: 如果图片气泡没有自动调整，请在控制台运行 window.debugImageBubbles() 进行调试');
+
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+    </script>
+    
+    <!-- 图片显示修复脚本 v2.0 - 基于file-api.js标准 -->
+    <script src="./assets/js/image-display-fix.js"></script>
+    
+    <!-- 强力上传修复脚本（移动端Action Sheet） -->
+    <script src="./assets/js/force-upload-fix.js"></script>
+    
+    <!-- 移动端调试工具（开发模式） -->
+    <script>
+        // 检查是否为开发环境或需要调试
+        const isDevelopment = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.search.includes('debug=true');
+        if (isDevelopment) {
+            const debugScript = document.createElement('script');
+            debugScript.src = './assets/js/mobile-debug-tool.js';
+            document.head.appendChild(debugScript);
         }
     </script>
 </body>

@@ -1444,22 +1444,40 @@ width: ${computedStyle.width}`;
             `;
         }
 
-        // 消息内容 - 后端已修复自动解密，直接显示内容即可
+        // 消息内容 - 对于图片消息，不显示加密文本
         let contentToShow = message.content;
         
-        // 简化的图片消息处理：只隐藏系统生成的图片提示文本
-        if (message.attachments && message.attachments.length > 0) {
-            // 只检查是否是系统生成的图片消息提示，不再检查加密内容
-            const isImageSystemMessage = contentToShow && 
-                (contentToShow.includes('发送了图片') || 
-                 contentToShow.includes('sent an image') ||
-                 contentToShow.match(/^[a-f0-9_.-]+\.(jpg|jpeg|png|gif|webp)$/i));
-            
-            if (isImageSystemMessage) {
-                contentToShow = ''; // 不显示系统提示
-            }
-        }
+        // 调试：记录原始消息内容
+        console.log('🔍 [消息内容调试] 原始消息:', {
+            content: message.content,
+            messageId: message.id,
+            type: message.type || message.message_type,
+            hasAttachments: !!message.attachments
+        });
         
+        // 根据后端API文档，后端已自动处理加密/解密
+        // 前端接收的都是已解密的明文内容，无需额外处理
+        console.log('🔍 [消息内容调试] 消息内容信息:', {
+            content: contentToShow?.substring(0, 100),
+            contentLength: contentToShow?.length,
+            hasAttachments: !!message.attachments,
+            attachmentCount: message.attachments?.length || 0,
+            messageType: message.type || message.message_type,
+            messageId: message.id,
+            encrypted: message.encrypted || false
+        });
+        
+        // 参考简单聊天控制器的做法，直接显示消息内容，不进行复杂的加密检测
+        console.log('🔍 [消息内容调试] 消息信息:', {
+            content: contentToShow,
+            contentLength: contentToShow?.length,
+            hasAttachments: !!message.attachments,
+            attachmentCount: message.attachments?.length || 0,
+            messageType: message.type || message.message_type,
+            messageId: message.id
+        });
+        
+        // 直接显示内容，不做任何过滤（参考简单聊天的做法）
         if (contentToShow && contentToShow.trim()) {
             messageHTML += `
                 <div class="message-content">${this.formatMessageContent(contentToShow)}</div>
@@ -1566,7 +1584,14 @@ width: ${computedStyle.width}`;
                 img.className = 'message-image img-fluid';
                 img.alt = fileName;
                 img.title = fileName;
-                img.style.cssText = 'border-radius: 8px; cursor: pointer; max-width: 100%; height: auto; display: block;';
+                img.style.cssText = 'max-width: 300px; max-height: 200px; border-radius: 8px; cursor: pointer;';
+                
+                // 设置文件ID属性，便于图片修复脚本使用
+                if (typeof attachment === 'object' && attachment.id) {
+                    img.setAttribute('data-file-id', attachment.id);
+                } else if (typeof attachment === 'string') {
+                    img.setAttribute('data-file-id', attachment);
+                }
                 
                 // 处理图片加载错误
                 img.onerror = () => {
@@ -1646,9 +1671,21 @@ width: ${computedStyle.width}`;
                     document.body.appendChild(modal);
                 };
                 
-                // 设置图片源 - 直接使用构建的URL（已包含token）
-                img.src = imageUrl;
-                console.log('🖼️ [调试] 设置图片源:', imageUrl);
+                // 设置图片源 - 使用包含token的URL（因为img元素无法设置Authorization头）
+                const baseUrl = window.ENV_CONFIG?.getApiUrl() || 'http://127.0.0.1:4005/api';
+                
+                if (typeof attachment === 'object' && attachment.id) {
+                    img.src = token ? 
+                        `${baseUrl}/files/${attachment.id}/view?token=${token}` : 
+                        `${baseUrl}/files/${attachment.id}/view`;
+                } else if (typeof attachment === 'string') {
+                    img.src = token ? 
+                        `${baseUrl}/files/${attachment}/view?token=${token}` : 
+                        `${baseUrl}/files/${attachment}/view`;
+                } else {
+                    img.src = imageUrl; // 回退到原始URL
+                }
+                console.log('🖼️ [调试] 设置图片源（含token）:', img.src.substring(0, 80) + '...');
                 
                 attachmentsContainer.appendChild(img);
             });
