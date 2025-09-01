@@ -1497,6 +1497,13 @@
                 
                 console.log('✅ 聊天系统初始化完成');
                 
+                // 加载用户资料并更新导航栏显示
+                try {
+                    await loadUserProfile();
+                } catch (profileError) {
+                    console.warn('⚠️ 用户资料加载失败:', profileError);
+                }
+                
             } catch (error) {
                 console.error('❌ 聊天系统初始化失败:', error);
                 
@@ -1525,6 +1532,32 @@
                         </div>
                     `;
                 }
+            }
+        }
+
+        // ========================================
+        // 👤 用户资料加载功能
+        // ========================================
+        
+        // 加载用户资料并更新导航栏显示
+        async function loadUserProfile() {
+            try {
+                const response = await apiClient.get('/api/users/profile');
+                if (response.success && response.data) {
+                    const user = response.data;
+                    console.log('📋 用户资料加载成功:', user);
+                    
+                    // 更新导航栏用户名显示
+                    const currentUsernameNav = document.getElementById('currentUsername');
+                    if (currentUsernameNav) {
+                        currentUsernameNav.textContent = user.nickname || user.username || '用户';
+                    }
+                } else {
+                    console.warn('⚠️ 用户资料加载失败:', response);
+                }
+            } catch (error) {
+                console.error('❌ 加载用户资料时出错:', error);
+                // 失败时保持默认显示，不影响页面功能
             }
         }
 

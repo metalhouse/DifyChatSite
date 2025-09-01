@@ -2023,25 +2023,6 @@
     </style>
 </head>
 <body>
-    <!-- 移动端调试信息显示区域 -->
-    <div id="mobile-debug-info" style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        background: rgba(255, 0, 0, 0.9);
-        color: white;
-        padding: 10px;
-        font-size: 12px;
-        z-index: 10000;
-        display: none;
-        max-height: 150px;
-        overflow-y: auto;
-    ">
-        <div style="float: right; cursor: pointer;" onclick="this.parentElement.style.display='none'">×</div>
-        <div id="debug-content"></div>
-    </div>
-
     <!-- 导航栏 -->
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
         <div class="container-fluid">
@@ -2697,6 +2678,9 @@
     <script src="js/utils/production-path-fix.js"></script>
     <script src="js/services/simple-image-uploader.js"></script>
     
+    <!-- API客户端 -->
+    <script type="module" src="js/api/api-client.js"></script>
+    
     <!-- 好友API服务 -->
     <script src="js/api/friends-api.js"></script>
     
@@ -2761,6 +2745,11 @@
             // 初始化标签页切换处理
             handleTabSwitch();
 
+            // 立即尝试加载用户资料（独立于其他初始化过程）
+            setTimeout(() => {
+                loadUserProfile();
+            }, 500);
+
             // 等待环境配置加载完成后初始化
             waitForEnvConfig(function() {
                 try {
@@ -2771,6 +2760,10 @@
                     
                     // 初始化图片上传功能
                     initImageUpload();
+                    
+                    // 立即尝试加载用户资料（有重试机制）
+                    loadUserProfile();
+                    
                 } catch (error) {
                     console.error('初始化聊天室控制器失败:', error);
                     showToast('聊天室初始化失败: ' + error.message, 'error');
@@ -2803,6 +2796,56 @@
                 });
             }
         });
+
+        // ========================================
+        // 👤 用户资料加载功能
+        // ========================================
+        
+        // 加载用户资料并更新导航栏显示
+        async function loadUserProfile(retryCount = 0) {
+            try {
+                // 检查API客户端是否可用，最多重试5次
+                if (typeof window.apiClient === 'undefined') {
+                    if (retryCount < 5) {
+                        console.warn(`⚠️ API客户端未初始化，1秒后重试 (${retryCount + 1}/5)`);
+                        setTimeout(() => loadUserProfile(retryCount + 1), 1000);
+                        return;
+                    } else {
+                        console.error('❌ API客户端初始化超时，放弃加载用户资料');
+                        return;
+                    }
+                }
+                
+                console.log('📡 开始加载用户资料...');
+                const response = await window.apiClient.get('/api/users/profile');
+                if (response.success && response.data) {
+                    const user = response.data;
+                    console.log('📋 用户资料加载成功:', user);
+                    
+                    // 更新导航栏用户名显示
+                    const currentUsernameNav = document.getElementById('currentUsername');
+                    if (currentUsernameNav) {
+                        currentUsernameNav.textContent = user.nickname || user.username || '用户';
+                        console.log('✅ 导航栏用户名已更新为:', currentUsernameNav.textContent);
+                    } else {
+                        console.warn('⚠️ 找不到ID为currentUsername的元素');
+                    }
+                } else {
+                    console.warn('⚠️ 用户资料加载失败:', response);
+                }
+            } catch (error) {
+                console.error('❌ 加载用户资料时出错:', error);
+                // 失败时保持默认显示，不影响页面功能
+            }
+        }
+
+        // 调试函数：手动触发用户资料加载
+        window.debugLoadUserProfile = function() {
+            console.log('🔧 手动触发用户资料加载...');
+            console.log('🔧 API客户端状态:', typeof window.apiClient);
+            console.log('🔧 Token状态:', !!TokenManager.getAccessToken());
+            loadUserProfile();
+        };
 
         // 用户搜索处理函数
         async function handleUserSearch() {
@@ -4629,16 +4672,5 @@
     
     <!-- 强力上传修复脚本（移动端Action Sheet） -->
     <script src="./assets/js/force-upload-fix.js"></script>
-    
-    <!-- 移动端调试工具（开发模式） -->
-    <script>
-        // 检查是否为开发环境或需要调试
-        const isDevelopment = location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.search.includes('debug=true');
-        if (isDevelopment) {
-            const debugScript = document.createElement('script');
-            debugScript.src = './assets/js/mobile-debug-tool.js';
-            document.head.appendChild(debugScript);
-        }
-    </script>
 </body>
 </html>
