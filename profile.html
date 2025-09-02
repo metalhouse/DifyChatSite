@@ -1024,7 +1024,7 @@
 
                 console.log('📤 发送更新数据:', updateData);
 
-                const response = await apiClient.put('/api/users/profile', updateData);
+                const response = await apiClient.put('/users/profile', updateData);
 
                 if (response.success) {
                     showToast('用户资料更新成功！', 'success');

@@ -2817,7 +2817,7 @@
                 }
                 
                 console.log('📡 开始加载用户资料...');
-                const response = await window.apiClient.get('/api/users/profile');
+                const response = await window.apiClient.get('/users/profile');
                 if (response.success && response.data) {
                     const user = response.data;
                     console.log('📋 用户资料加载成功:', user);
