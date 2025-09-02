@@ -1,12 +1,12 @@
 /**
- * 图片优化服务
- * 实现渐进式图片加载，充分利用后端的缩略图功能
+ * 图片优化服务 v2.0
+ * 实现懒加载和渐进式图片加载，充分利用后端的缩略图功能
  */
 class ImageOptimizationService {
     constructor() {
         // 缩略图尺寸配置（与后端一致）
         this.thumbnailSizes = {
-            small: 150,   // 小缩略图，用于列表
+            small: 150,   // 小缩略图，用于快速预览
             medium: 400,  // 中等缩略图，用于聊天消息
             full: null    // 原图
         };
@@ -14,9 +14,66 @@ class ImageOptimizationService {
         // 图片加载状态缓存
         this.loadingImages = new Map();
         
-        // 预加载队列
-        this.preloadQueue = [];
-        this.isPreloading = false;
+        // Intersection Observer for lazy loading
+        this.observer = this.createIntersectionObserver();
+    }
+
+    /**
+     * 创建并返回一个 IntersectionObserver 实例
+     */
+    createIntersectionObserver() {
+        const options = {
+            root: document.getElementById('chatMessages'), // 在聊天消息容器内滚动
+            rootMargin: '0px 0px 200px 0px', // 提前200px开始加载
+            threshold: 0.01
+        };
+
+        return new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    console.log('🖼️ [懒加载] 图片进入视口，开始加载:', img.alt);
+                    this.loadImage(img);
+                    observer.unobserve(img); // 加载后停止观察
+                }
+            });
+        }, options);
+    }
+
+    /**
+     * 实际加载图片的逻辑
+     * @param {HTMLImageElement} img - 目标图片元素
+     */
+    loadImage(img) {
+        const smallSrc = img.dataset.srcSmall;
+        const mediumSrc = img.dataset.srcMedium;
+
+        // 1. 加载小缩略图以快速显示
+        const smallLoader = new Image();
+        smallLoader.onload = () => {
+            img.src = smallSrc;
+            img.style.filter = 'blur(2px)'; // 轻微模糊效果
+            console.log(`✅ [优化] small尺寸图片加载完成:`, smallSrc);
+
+            // 2. 接着加载中等尺寸图片
+            const mediumLoader = new Image();
+            mediumLoader.onload = () => {
+                img.src = mediumSrc;
+                img.style.filter = 'none'; // 加载完成后移除模糊
+                console.log(`✅ [优化] medium尺寸图片加载完成:`, mediumSrc);
+            };
+            mediumLoader.onerror = () => {
+                console.error(`❌ [优化] medium尺寸图片加载失败:`, mediumSrc);
+                // 如果中图加载失败，至少保留小图
+            };
+            mediumLoader.src = mediumSrc;
+        };
+        smallLoader.onerror = () => {
+            console.error(`❌ [优化] small尺寸图片加载失败:`, smallSrc);
+            img.alt = '图片加载失败';
+            // 可以设置一个加载失败的占位图
+        };
+        smallLoader.src = smallSrc;
     }
 
     /**
@@ -26,96 +83,48 @@ class ImageOptimizationService {
      * @returns {string} 图片URL
      */
     buildImageUrl(attachment, size = 'medium') {
-        // 获取token
         const token = this.getAccessToken();
         if (!token) {
             console.warn('⚠️ 无法获取认证token');
             return '';
         }
 
-        // 获取API基础URL
         const apiUrl = window.ENV_CONFIG?.getApiUrl() || 'http://127.0.0.1:4005/api';
-        
-        let fileId = '';
-        
-        // 处理不同格式的附件数据
-        if (typeof attachment === 'string') {
-            fileId = attachment;
-        } else if (attachment && typeof attachment === 'object') {
-            fileId = attachment.id || attachment.fileId;
-            
-            // 如果有预构建的带token URL，优先使用
-            if (size === 'small' && attachment.thumbnailUrlWithToken) {
-                return this.ensureFullUrl(attachment.thumbnailUrlWithToken);
-            } else if (size === 'full' && attachment.urlWithToken) {
-                return this.ensureFullUrl(attachment.urlWithToken);
-            }
-        }
+        let fileId = (typeof attachment === 'string') ? attachment : (attachment?.id || attachment?.fileId);
         
         if (!fileId) {
             console.error('❌ 无效的附件数据:', attachment);
             return '';
         }
 
-        // 根据尺寸构建不同的URL
-        let url = '';
         if (size === 'full') {
-            // 原图
-            url = `${apiUrl}/files/${fileId}/view?token=${token}`;
+            return `${apiUrl}/files/${fileId}/view?token=${token}`;
         } else {
-            // 缩略图
             const sizeParam = this.thumbnailSizes[size] || this.thumbnailSizes.medium;
-            url = `${apiUrl}/files/${fileId}/thumbnail?size=${sizeParam}&token=${token}`;
+            return `${apiUrl}/files/${fileId}/thumbnail?size=${sizeParam}&token=${token}`;
         }
-        
-        console.log(`🖼️ [图片优化] 构建${size}尺寸URL:`, url);
-        return url;
-    }
-
-    /**
-     * 确保URL是完整的
-     */
-    ensureFullUrl(url) {
-        if (!url) return '';
-        
-        if (url.startsWith('http')) {
-            return url;
-        }
-        
-        const backendUrl = window.ENV_CONFIG?.API_BASE_URL || 'http://127.0.0.1:4005';
-        return `${backendUrl}${url}`;
     }
 
     /**
      * 获取访问令牌
      */
     getAccessToken() {
-        // 尝试多种方式获取token
         if (window.TokenManager && typeof window.TokenManager.getAccessToken === 'function') {
             return window.TokenManager.getAccessToken();
         }
-        
-        return localStorage.getItem('dify_access_token') || 
-               localStorage.getItem('access_token');
+        return localStorage.getItem('dify_access_token');
     }
 
     /**
-     * 创建并返回一个支持渐进式加载的图片容器
+     * 创建并返回一个支持懒加载和渐进式加载的图片容器
      * @param {string} fileId - 文件ID
      * @param {string} altText - 图片的alt文本
-     * @param {object} options - 加载选项
-     * @returns {HTMLElement} 包含渐进式加载逻辑的DOM元素
+     * @returns {HTMLElement} 包含懒加载逻辑的DOM元素
      */
-    progressiveLoadImage(fileId, altText, options = {}) {
-        const {
-            initialSize = 'medium', // 初始加载的尺寸，聊天窗口用中尺寸更合适
-            targetSize = 'full',    // 目标尺寸（用于点击放大）
-            containerClass = 'progressive-image-container'
-        } = options;
-
+    progressiveLoadImage(fileId, altText) {
         // 1. 创建容器和图片元素
         const container = document.createElement('div');
-        container.className = containerClass;
+        container.className = 'progressive-image-container';
         container.style.position = 'relative';
         container.style.minHeight = '100px'; // 占位高度
 
@@ -129,90 +138,76 @@ class ImageOptimizationService {
             max-width: 100%; 
             height: auto; 
             display: block;
-            filter: blur(5px);
-            transition: filter 0.5s ease;
+            transition: filter 0.3s ease;
         `;
         
         // 2. 构建URL
-        const initialUrl = this.buildImageUrl(fileId, initialSize);
-        const targetUrl = this.buildImageUrl(fileId, targetSize);
+        const smallUrl = this.buildImageUrl(fileId, 'small');
+        const mediumUrl = this.buildImageUrl(fileId, 'medium');
+        const fullUrl = this.buildImageUrl(fileId, 'full');
 
-        // 3. 设置初始图片源（占位符）
+        // 3. 设置占位符和data-*属性
         img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect width="100%25" height="100%25" fill="%23f0f0f0"/%3E%3C/svg%3E';
+        img.dataset.srcSmall = smallUrl;
+        img.dataset.srcMedium = mediumUrl;
 
-        // 4. 加载初始图片
-        const initialLoader = new Image();
-        initialLoader.onload = () => {
-            img.src = initialUrl;
-            img.style.filter = 'none'; // 加载完成后移除模糊
-            console.log(`✅ [优化] ${initialSize}尺寸图片加载完成:`, initialUrl);
-        };
-        initialLoader.onerror = () => {
-            console.error(`❌ [优化] ${initialSize}尺寸图片加载失败:`, initialUrl);
-            container.innerHTML = `<div style="padding: 10px; background: #f5f5f5; border-radius: 4px; color: #666;">图片加载失败: ${altText}</div>`;
-        };
-        initialLoader.src = initialUrl;
-
-        // 5. 设置点击放大事件
+        // 4. 设置点击放大事件
         container.onclick = () => {
-            this.showImageModal(targetUrl, altText);
+            this.showImageModal(fullUrl, altText);
         };
-        
-        // 6. 预加载原图
-        this.preloadImage(targetUrl);
+
+        // 5. 将图片添加到观察器
+        this.observer.observe(img);
 
         container.appendChild(img);
         return container;
     }
 
     /**
-     * 预加载图片
+     * 显示图片查看模态框
+     * @param {string} imageUrl - 要显示的原图URL
+     * @param {string} altText - 图片的alt文本
      */
-    preloadImage(url) {
-        // 避免重复预加载
-        if (this.loadingImages.has(url)) {
-            return this.loadingImages.get(url);
-        }
+    showImageModal(imageUrl, altText) {
+        const modal = this.createImageModal();
+        const modalImg = modal.querySelector('.modal-image');
+        const loadingIndicator = modal.querySelector('.modal-loading');
+        const downloadBtn = modal.querySelector('.btn-download');
 
-        console.log('🔄 [预加载] 开始预加载原图:', url);
-        
-        const promise = new Promise((resolve, reject) => {
-            const img = new Image();
-            
-            img.onload = () => {
-                console.log('✅ [预加载] 原图预加载完成:', url);
-                this.loadingImages.delete(url);
-                resolve(url);
-            };
-            
-            img.onerror = (error) => {
-                console.error('❌ [预加载] 原图预加载失败:', url);
-                this.loadingImages.delete(url);
-                reject(error);
-            };
-            
-            // 延迟加载，避免阻塞主要内容
-            setTimeout(() => {
-                img.src = url;
-            }, 1000);
-        });
+        loadingIndicator.style.display = 'block';
+        modalImg.style.filter = 'blur(5px)';
 
-        this.loadingImages.set(url, promise);
-        return promise;
+        const imageLoader = new Image();
+        imageLoader.onload = () => {
+            loadingIndicator.style.display = 'none';
+            modalImg.src = imageUrl;
+            modalImg.style.filter = 'none';
+        };
+        imageLoader.onerror = () => {
+            loadingIndicator.style.display = 'none';
+            this.showToast('原图加载失败', 'error');
+            modalImg.alt = '原图加载失败';
+        };
+        imageLoader.src = imageUrl;
+
+        downloadBtn.onclick = () => {
+            // 创建一个隐藏的a标签来触发下载
+            const link = document.createElement('a');
+            link.href = imageUrl;
+            link.download = altText || 'image.jpg';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
     }
-
 
     /**
      * 创建图片查看模态框
      */
     createImageModal() {
-        // 移除已存在的模态框
         const existingModal = document.getElementById('imageViewModal');
-        if (existingModal) {
-            document.body.removeChild(existingModal);
-        }
+        if (existingModal) existingModal.remove();
 
-        // 创建新模态框
         const modal = document.createElement('div');
         modal.id = 'imageViewModal';
         modal.className = 'image-view-modal';
@@ -229,71 +224,40 @@ class ImageOptimizationService {
                     </div>
                 </div>
                 <div class="modal-controls">
-                    <button class="btn-zoom-in" title="放大">
-                        <i class="fas fa-search-plus"></i>
-                    </button>
-                    <button class="btn-zoom-out" title="缩小">
-                        <i class="fas fa-search-minus"></i>
-                    </button>
-                    <button class="btn-download" title="下载原图">
-                        <i class="fas fa-download"></i>
-                    </button>
+                    <button class="btn-zoom-in" title="放大"><i class="fas fa-search-plus"></i></button>
+                    <button class="btn-zoom-out" title="缩小"><i class="fas fa-search-minus"></i></button>
+                    <button class="btn-download" title="下载原图"><i class="fas fa-download"></i></button>
                 </div>
             </div>
         `;
 
-        // 添加样式
         this.injectModalStyles();
-
-        // 添加到页面
         document.body.appendChild(modal);
 
-        // 绑定事件
-        const closeBtn = modal.querySelector('.modal-close');
-        const backdrop = modal.querySelector('.modal-backdrop');
-        const zoomInBtn = modal.querySelector('.btn-zoom-in');
-        const zoomOutBtn = modal.querySelector('.btn-zoom-out');
-        const modalImg = modal.querySelector('.modal-image');
-        
-        let currentZoom = 1;
-
-        const closeModal = () => {
+        const close = () => {
             modal.classList.add('closing');
-            setTimeout(() => {
-                if (modal.parentNode) {
-                    document.body.removeChild(modal);
-                }
-            }, 300);
+            setTimeout(() => modal.remove(), 300);
+            document.removeEventListener('keydown', handleEsc);
         };
 
-        closeBtn.onclick = closeModal;
-        backdrop.onclick = closeModal;
+        const handleEsc = (e) => e.key === 'Escape' && close();
         
-        // 缩放功能
-        zoomInBtn.onclick = () => {
-            currentZoom = Math.min(currentZoom * 1.2, 3);
-            modalImg.style.transform = `scale(${currentZoom})`;
-        };
-        
-        zoomOutBtn.onclick = () => {
-            currentZoom = Math.max(currentZoom / 1.2, 0.5);
-            modalImg.style.transform = `scale(${currentZoom})`;
-        };
-
-        // ESC键关闭
-        const handleEsc = (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-                document.removeEventListener('keydown', handleEsc);
-            }
-        };
+        modal.querySelector('.modal-close').onclick = close;
+        modal.querySelector('.modal-backdrop').onclick = close;
         document.addEventListener('keydown', handleEsc);
 
-        // 显示动画
-        requestAnimationFrame(() => {
-            modal.classList.add('show');
-        });
+        let zoom = 1;
+        const modalImg = modal.querySelector('.modal-image');
+        modal.querySelector('.btn-zoom-in').onclick = () => {
+            zoom = Math.min(zoom * 1.2, 3);
+            modalImg.style.transform = `scale(${zoom})`;
+        };
+        modal.querySelector('.btn-zoom-out').onclick = () => {
+            zoom = Math.max(zoom / 1.2, 0.5);
+            modalImg.style.transform = `scale(${zoom})`;
+        };
 
+        requestAnimationFrame(() => modal.classList.add('show'));
         return modal;
     }
 
@@ -302,123 +266,23 @@ class ImageOptimizationService {
      */
     injectModalStyles() {
         if (document.getElementById('image-modal-styles')) return;
-
         const style = document.createElement('style');
         style.id = 'image-modal-styles';
         style.textContent = `
-            .image-view-modal {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                z-index: 10000;
-                opacity: 0;
-                transition: opacity 0.3s ease;
-            }
-            
-            .image-view-modal.show {
-                opacity: 1;
-            }
-            
-            .image-view-modal.closing {
-                opacity: 0;
-            }
-            
-            .modal-backdrop {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0, 0, 0, 0.9);
-            }
-            
-            .modal-content {
-                position: relative;
-                width: 100%;
-                height: 100%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-            
-            .modal-body {
-                position: relative;
-                max-width: 90%;
-                max-height: 90%;
-            }
-            
-            .modal-image {
-                max-width: 100%;
-                max-height: 90vh;
-                object-fit: contain;
-                transition: transform 0.3s ease, filter 0.3s ease;
-                border-radius: 8px;
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            }
-            
-            .modal-close {
-                position: absolute;
-                top: 20px;
-                right: 30px;
-                font-size: 40px;
-                color: white;
-                background: none;
-                border: none;
-                cursor: pointer;
-                z-index: 10001;
-                opacity: 0.8;
-                transition: opacity 0.2s;
-            }
-            
-            .modal-close:hover {
-                opacity: 1;
-            }
-            
-            .modal-controls {
-                position: absolute;
-                bottom: 30px;
-                left: 50%;
-                transform: translateX(-50%);
-                display: flex;
-                gap: 15px;
-                background: rgba(0, 0, 0, 0.7);
-                padding: 10px 20px;
-                border-radius: 25px;
-            }
-            
-            .modal-controls button {
-                background: rgba(255, 255, 255, 0.2);
-                color: white;
-                border: none;
-                padding: 10px 15px;
-                border-radius: 50%;
-                cursor: pointer;
-                transition: background 0.2s;
-            }
-            
-            .modal-controls button:hover {
-                background: rgba(255, 255, 255, 0.3);
-            }
-            
-            .modal-loading {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                display: none;
-            }
-            
-            .loading-image {
-                transition: filter 0.3s ease;
-            }
-            
-            .failed-image {
-                opacity: 0.5;
-            }
+            .image-view-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 10000; opacity: 0; transition: opacity 0.3s ease; }
+            .image-view-modal.show { opacity: 1; }
+            .image-view-modal.closing { opacity: 0; }
+            .modal-backdrop { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); }
+            .modal-content { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+            .modal-body { position: relative; max-width: 90%; max-height: 90%; }
+            .modal-image { max-width: 100%; max-height: 90vh; object-fit: contain; transition: transform 0.3s ease, filter 0.3s ease; border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5); }
+            .modal-close { position: absolute; top: 20px; right: 30px; font-size: 40px; color: white; background: none; border: none; cursor: pointer; z-index: 10001; opacity: 0.8; transition: opacity 0.2s; }
+            .modal-close:hover { opacity: 1; }
+            .modal-controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; background: rgba(0, 0, 0, 0.7); padding: 10px 20px; border-radius: 25px; }
+            .modal-controls button { background: rgba(255, 255, 255, 0.2); color: white; border: none; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; justify-content: center; }
+            .modal-controls button:hover { background: rgba(255, 255, 255, 0.3); }
+            .modal-loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
         `;
-        
         document.head.appendChild(style);
     }
 
