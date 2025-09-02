@@ -1193,6 +1193,69 @@
         .message-history::-webkit-scrollbar-thumb:hover {
             background: rgba(0, 0, 0, 0.3);
         }
+
+        /* 消息附件样式 */
+        .message-attachments {
+            margin-top: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .message-attachment {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            padding: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .attachment-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .attachment-link {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .attachment-link:hover {
+            color: white;
+            text-decoration: underline;
+        }
+
+        /* 图片附件特殊样式 */
+        .message-image {
+            border-radius: 8px;
+            cursor: pointer;
+            max-width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 0.2s ease;
+        }
+
+        .message-image:hover {
+            transform: scale(1.02);
+        }
+
+        /* 图片容器样式 */
+        .progressive-image-container {
+            position: relative;
+            min-height: 100px;
+            margin: 0.5rem 0;
+        }
+
+        /* 图片气泡调整 */
+        .message-bubble:has(.message-attachments) {
+            max-width: 400px;
+        }
+
+        .message-bubble:has(.message-image) {
+            padding: 0.5rem;
+            max-width: 400px;
+        }
     </style>
 </head>
 <body>
@@ -1453,6 +1516,15 @@
     <!-- 开发工具 -->
     <script src="js/utils/dev-tools.js?v=1.0.0"></script>
     <script src="js/utils/health-checker.js?v=1.0.0"></script>
+    
+    <!-- 图片优化服务 -->
+    <script src="js/services/image-optimization-service.js"></script>
+    
+    <!-- 图片优化测试脚本（仅开发环境） -->
+    <script src="js/utils/image-optimization-test.js"></script>
+    
+    <!-- 图片加载可视化监控器 -->
+    <script src="js/utils/image-loading-visualizer.js"></script>
     
     <!-- ES6 模块化聊天系统 -->
     <script type="module">

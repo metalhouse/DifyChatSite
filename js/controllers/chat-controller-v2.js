@@ -19,6 +19,9 @@ export class SimpleChatController {
         this.currentVersions = new Map(); // messageId -> currentVersionIndex
         this.messageRelations = new Map(); // aiMessageId -> userMessageId
         
+        // 初始化图片优化服务
+        this.imageOptimizer = null;
+        
         // DOM 元素
         this.agentList = null;
         this.chatMessages = null;
@@ -43,6 +46,14 @@ export class SimpleChatController {
             // 验证必要元素
             if (!this.agentList || !this.chatMessages || !this.messageInput || !this.sendButton) {
                 throw new Error('缺少必要的DOM元素');
+            }
+
+            // 初始化图片优化服务
+            if (window.imageOptimizer) {
+                this.imageOptimizer = window.imageOptimizer;
+                console.log('✅ [私聊] 图片优化服务已连接');
+            } else {
+                console.warn('⚠️ [私聊] 图片优化服务未找到，将使用默认图片加载');
             }
 
             // 绑定事件
@@ -755,6 +766,111 @@ export class SimpleChatController {
     }
 
     /**
+     * 添加带附件的消息（支持图片优化）
+     */
+    addMessageWithAttachments(type, content, attachments = [], isTemporary = false, usage = null) {
+        const messageId = this.addMessage(type, content, isTemporary, usage);
+        
+        // 如果有附件，处理附件显示
+        if (attachments && attachments.length > 0) {
+            const messageElement = document.getElementById(messageId);
+            const messageContent = messageElement.querySelector('.message-content');
+            
+            // 创建附件容器
+            const attachmentsContainer = document.createElement('div');
+            attachmentsContainer.className = 'message-attachments';
+            
+            // 处理每个附件
+            attachments.forEach(attachment => {
+                this.renderAttachment(attachment, attachmentsContainer);
+            });
+            
+            // 将附件容器添加到消息内容后面
+            messageContent.appendChild(attachmentsContainer);
+        }
+        
+        return messageId;
+    }
+
+    /**
+     * 渲染附件（特别处理图片）
+     */
+    renderAttachment(attachment, container) {
+        // 判断是否为图片
+        const isImage = this.isImageFile(attachment);
+        
+        if (isImage) {
+            // 使用图片优化服务渲染图片
+            this.renderImageAttachment(attachment, container);
+        } else {
+            // 处理其他类型的附件
+            this.renderGenericAttachment(attachment, container);
+        }
+    }
+
+    /**
+     * 渲染图片附件（使用图片优化服务）
+     */
+    renderImageAttachment(attachment, container) {
+        const fileName = attachment.name || attachment.filename || '图片';
+        const fileId = attachment.id || attachment.fileId;
+        
+        if (this.imageOptimizer && fileId) {
+            console.log('🖼️ [私聊] 使用图片优化服务渲染图片:', fileId);
+            const imageContainer = this.imageOptimizer.progressiveLoadImage(fileId, fileName);
+            container.appendChild(imageContainer);
+        } else {
+            // 降级方案：直接显示图片
+            console.log('⚠️ [私聊] 图片优化服务不可用，使用降级方案');
+            const img = document.createElement('img');
+            img.className = 'message-image img-fluid';
+            img.alt = fileName;
+            img.src = attachment.url || attachment.src || '';
+            img.style.cssText = 'max-width: 100%; height: auto; border-radius: 8px; cursor: pointer;';
+            img.onclick = () => {
+                window.open(img.src, '_blank');
+            };
+            container.appendChild(img);
+        }
+    }
+
+    /**
+     * 渲染通用附件
+     */
+    renderGenericAttachment(attachment, container) {
+        const fileName = attachment.name || attachment.filename || '文件';
+        const fileUrl = attachment.url || attachment.src || '#';
+        
+        const attachmentElement = document.createElement('div');
+        attachmentElement.className = 'message-attachment';
+        attachmentElement.innerHTML = `
+            <div class="attachment-info">
+                <i class="fas fa-file me-2"></i>
+                <a href="${fileUrl}" target="_blank" class="attachment-link">${fileName}</a>
+            </div>
+        `;
+        
+        container.appendChild(attachmentElement);
+    }
+
+    /**
+     * 判断是否为图片文件
+     */
+    isImageFile(attachment) {
+        const fileName = attachment.name || attachment.filename || '';
+        const mimeType = attachment.mimeType || attachment.type || '';
+        
+        // 通过MIME类型判断
+        if (mimeType && mimeType.startsWith('image/')) {
+            return true;
+        }
+        
+        // 通过文件扩展名判断
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'];
+        return imageExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
+    }
+
+    /**
      * 移除消息
      */
     removeMessage(messageId) {
@@ -1217,8 +1333,24 @@ export class SimpleChatController {
                     usage = message.metadata.usage;
                 }
                 
-                // 添加消息到界面
-                const messageId = this.addMessage(messageType, message.content, false, usage);
+                // 检查是否有附件
+                const attachments = message.attachments || [];
+                
+                // 添加消息到界面（支持附件）
+                const messageId = attachments.length > 0 
+                    ? this.addMessageWithAttachments(messageType, message.content, attachments, false, usage)
+                    : this.addMessage(messageType, message.content, false, usage);
+                
+                console.log('📎 [私聊历史] 消息附件:', {
+                    messageId,
+                    attachmentCount: attachments.length,
+                    attachments: attachments.map(att => ({
+                        id: att.id,
+                        name: att.name,
+                        type: att.type || att.mimeType,
+                        isImage: this.isImageFile(att)
+                    }))
+                });
                 
                 // 设置消息的实际ID和时间戳
                 const messageElement = document.getElementById(messageId);
