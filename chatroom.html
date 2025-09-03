@@ -797,6 +797,124 @@
             border: 1px solid rgba(25, 118, 210, 0.2);
         }
 
+        /* 流式消息样式 - 按照后端文档优化 */
+        .message.streaming .message-bubble {
+            border-left: 3px solid #00bcd4;
+            background: linear-gradient(135deg, #f0f9ff, #e0f7fa);
+            position: relative;
+        }
+
+        .message.streaming .message-content {
+            position: relative;
+        }
+
+        /* 光标样式 */
+        .typing-cursor {
+            animation: blink 1s infinite;
+            color: #00bcd4;
+            font-weight: bold;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* 流式响应状态指示器 */
+        .streaming-indicator {
+            color: #00bcd4;
+            font-size: 12px;
+            animation: pulse 1.5s ease-in-out infinite;
+            margin-left: 8px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* 移除旧的光标动画 */
+        .message.streaming .message-content::after {
+            display: none;
+        }
+
+        /* 智能体错误状态 */
+        .message.error .message-bubble {
+            background: linear-gradient(135deg, #ffebee, #ffcdd2) !important;
+            color: #c62828 !important;
+            border: 1px solid rgba(198, 40, 40, 0.3) !important;
+        }
+
+        .agent-error {
+            color: #c62828;
+            font-style: italic;
+        }
+
+        /* Token使用量显示 */
+        .token-usage {
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: #666;
+            border-left: 3px solid #28a745;
+        }
+
+        .token-usage .fas {
+            color: #28a745;
+        }
+
+        /* 智能体建议列表样式增强 */
+        .agent-suggestions-list {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            min-width: 200px;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 5px;
+        }
+
+        .agent-suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s ease;
+        }
+        
+        .agent-suggestion-item:hover,
+        .agent-suggestion-item.selected {
+            background-color: #f8f9fa;
+        }
+        
+        .agent-suggestion-item:last-child {
+            border-bottom: none;
+        }
+        
+        .agent-suggestion-item.no-results {
+            color: #666;
+            font-style: italic;
+            cursor: default;
+        }
+        
+        .agent-suggestion-item .agent-name {
+            font-weight: 500;
+        }
+        
+        .agent-suggestion-item i {
+            color: #28a745;
+        }
+
         .message-system .message-bubble {
             background: rgba(255, 193, 7, 0.2);
             color: #856404;
@@ -2967,6 +3085,48 @@
         window.showCreateRoomModal = showCreateRoomModal;
         window.showAddFriendModal = showAddFriendModal;
         window.showFriendRequestsModal = showFriendRequestsModal;
+        
+        // @智能体相关的全局函数
+        window.selectAgentFromSuggestions = function(agentName) {
+            console.log('🎯 [全局] 选择智能体:', agentName);
+            if (window.chatroomController) {
+                window.chatroomController.selectAgentFromSuggestions(agentName);
+            }
+        };
+
+        window.handleAgentSuggestionKeydown = function(event) {
+            if (window.chatroomController && window.chatroomController.agentSuggestionsList) {
+                return window.chatroomController.handleAgentSuggestionKeydown(event);
+            }
+        };
+
+        window.copyMessage = function(button) {
+            const content = button.getAttribute('data-content');
+            if (content) {
+                navigator.clipboard.writeText(content).then(() => {
+                    // 临时显示复制成功
+                    const originalIcon = button.querySelector('i');
+                    const originalClass = originalIcon.className;
+                    originalIcon.className = 'fas fa-check';
+                    setTimeout(() => {
+                        originalIcon.className = originalClass;
+                    }, 1000);
+                }).catch(err => {
+                    console.error('复制失败:', err);
+                });
+            }
+        };
+
+        window.regenerateMessage = function(button) {
+            const messageElement = button.closest('.message');
+            const messageId = messageElement.getAttribute('data-message-id');
+            
+            if (window.chatroomController && messageId) {
+                console.log('🔄 [全局] 重新生成智能体回复:', messageId);
+                // 这里可以扩展重新生成功能
+                window.chatroomController.showInfo('重新生成功能开发中...');
+            }
+        };
         
         // 房间成员管理功能
         let selectedFriends = [];

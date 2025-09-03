@@ -26,6 +26,15 @@ class ChatroomController {
         // 初始化图片优化服务
         this.imageOptimizer = null;
         
+        // 智能体和流式响应相关
+        this.agents = []; // 可用智能体列表
+        this.currentStreamingMessageId = null; // 当前流式消息ID
+        this.processingMessages = new Set(); // 防重复处理
+        this.eventsSetup = false; // WebSocket事件设置标记
+        this.agentSuggestionsList = null; // 智能体建议列表DOM
+        this.selectedSuggestionIndex = -1; // 选中的建议索引
+        this.atPosition = -1; // @符号位置
+        
         // DOM 元素
         this.elements = {
             roomList: document.getElementById('roomList'),
@@ -52,6 +61,11 @@ class ChatroomController {
         // 输入状态管理
         this.typingTimer = null;
         this.isTyping = false;
+        
+        // @智能体建议列表相关
+        this.agentSuggestionsList = null;
+        this.selectedSuggestionIndex = -1;
+        this.atPosition = -1;
     }
 
     /**
@@ -169,6 +183,14 @@ class ChatroomController {
      * 设置WebSocket事件监听
      */
     setupWebSocketEvents() {
+        // 防止重复绑定 - 先移除所有已存在的监听器
+        if (this.eventsSetup) {
+            console.log('🔄 [前端] 清理旧的WebSocket事件监听器');
+            this.websocket.removeAllListeners();
+        }
+
+        console.log('🎯 [前端] 设置WebSocket事件监听器...');
+
         // 连接事件
         this.websocket.on('connect', () => {
             console.log('✅ [前端] WebSocket连接成功:', this.websocket.id);
@@ -476,48 +498,154 @@ class ChatroomController {
             this.updateTypingIndicator(data);
         });
 
-        // 智能体相关事件
-        this.websocket.on('agent-typing', (data) => {
-            console.log('智能体正在思考:', data);
+        // 智能体流式响应处理 - 按照后端文档方案B实现
+        this.streamingMessages = new Map(); // 管理流式消息
+
+        // 🚫 不再监听 agent-stream-start（后端不发送此事件）
+        
+        this.websocket.on('agent-typing-start', (data) => {
+            console.log('🤖 [前端] 智能体开始思考:', data);
             this.showAgentTyping(data);
         });
 
         this.websocket.on('agent-typing-stop', (data) => {
-            console.log('智能体思考完成:', data);
+            console.log('🤖 [前端] 智能体思考完成:', data);
             this.hideAgentTyping(data.agentId);
         });
 
-        // 支持API指南中的新智能体事件
+        // 1. 监听流式片段，实时更新 - 关键事件
+        this.websocket.on('agent-stream-chunk', (data) => {
+            console.log('� [前端] 收到智能体流式片段:', {
+                messageId: data.messageId,
+                chunk: data.chunk,
+                chunkLength: data.chunk?.length
+            });
+            
+            let streamingMsg = this.streamingMessages.get(data.messageId);
+            if (!streamingMsg) {
+                // 创建新的流式消息
+                streamingMsg = {
+                    id: data.messageId,
+                    agentId: data.agentId,
+                    agentName: data.agentName,
+                    content: '',
+                    isStreaming: true,
+                    timestamp: data.timestamp,
+                    replyToId: data.replyToId
+                };
+                this.streamingMessages.set(data.messageId, streamingMsg);
+                
+                // 显示开始流式响应的占位符
+                this.displayStreamingMessageStart(streamingMsg);
+                console.log('✨ [前端] 创建新的流式消息:', data.messageId);
+            }
+            
+            // 累积内容并更新UI
+            streamingMsg.content += data.chunk;
+            this.updateStreamingMessageContent(data.messageId, streamingMsg.content);
+        });
+
+        // 2. 监听完整响应，完成流式消息
+        this.websocket.on('agent-response', (data) => {
+            console.log('🎯 [前端] 智能体响应完成:', {
+                id: data.id,
+                messageId: data.messageId,
+                isStreamingResponse: data.isStreamingResponse,
+                agentName: data.agentName || data.username,
+                contentLength: data.content?.length
+            });
+            
+            if (data.isStreamingResponse) {
+                console.log('✅ [前端] 这是流式响应的最终消息');
+                
+                // 🔧 修复：尝试找到对应的流式消息
+                let foundStreamingId = null;
+                
+                // 先尝试用 data.messageId 查找
+                if (data.messageId && this.streamingMessages.has(data.messageId)) {
+                    foundStreamingId = data.messageId;
+                    console.log('🔍 [前端] 通过 messageId 找到流式消息:', foundStreamingId);
+                }
+                // 再尝试用 data.id 查找
+                else if (data.id && this.streamingMessages.has(data.id)) {
+                    foundStreamingId = data.id;
+                    console.log('🔍 [前端] 通过 id 找到流式消息:', foundStreamingId);
+                }
+                // 最后尝试查找同一智能体最近的流式消息
+                else {
+                    for (let [msgId, streamingMsg] of this.streamingMessages) {
+                        if (streamingMsg.agentId === data.agentId) {
+                            foundStreamingId = msgId;
+                            console.log('🔍 [前端] 通过 agentId 找到流式消息:', foundStreamingId);
+                            break;
+                        }
+                    }
+                }
+                
+                if (foundStreamingId) {
+                    // 从流式管理中移除
+                    this.streamingMessages.delete(foundStreamingId);
+                    
+                    // 完成流式消息显示，使用找到的流式消息ID
+                    this.finalizeStreamingMessage({
+                        ...data,
+                        streamingMessageId: foundStreamingId
+                    });
+                } else {
+                    console.warn('⚠️ [前端] 未找到对应的流式消息，直接添加完整消息');
+                    // 没有找到流式消息，直接添加完整消息
+                    this.addMessage({
+                        id: data.id,
+                        content: data.content,
+                        username: data.agentName || data.username || 'AI智能体',
+                        agentId: data.agentId,
+                        createdAt: data.createdAt,
+                        type: 'agent_response',
+                        replyToId: data.replyToId
+                    });
+                }
+            } else {
+                // 如果不是流式响应，直接添加消息
+                console.log('📝 [前端] 这是直接的完整响应');
+                this.addMessage({
+                    id: data.id,
+                    content: data.content,
+                    username: data.agentName || data.username || 'AI智能体',
+                    agentId: data.agentId,
+                    createdAt: data.createdAt,
+                    type: 'agent_response',
+                    replyToId: data.replyToId
+                });
+            }
+            
+            this.hideAgentTyping(data.agentId);
+        });
+
+        // 智能体错误处理
+        this.websocket.on('agent-error', (data) => {
+            console.error('❌ [前端] 智能体响应错误:', data);
+            this.hideAgentTyping(data.agentId);
+            this.showAgentError(data);
+        });
+
+        // 智能体权限错误
+        this.websocket.on('agent-no-permission', (data) => {
+            console.warn('⚠️ [前端] 智能体权限不足:', data);
+            this.showWarning(`您没有权限使用智能体 @${data.agentName}`);
+        });
+
+        // 兼容旧版本事件名
+        this.websocket.on('agent-typing', (data) => {
+            console.log('🤖 [前端] 智能体正在思考 (旧版):', data);
+            this.showAgentTyping(data);
+        });
+
         this.websocket.on('agent-thinking', (data) => {
-            console.log('🤖 [前端] AI助手正在思考 (新格式):', data);
+            console.log('🤖 [前端] 智能体思考中 (兼容):', data);
             this.showAgentTyping({
                 agentId: data.agentId,
-                agentName: 'AI助手'
+                agentName: data.agentName || 'AI助手'
             });
-        });
-
-        this.websocket.on('agent-response', (data) => {
-            console.log('🤖 [前端] AI助手回复 (新格式):', data);
-            this.hideAgentTyping(data.agentId);
-            
-            // 将AI助手响应作为消息显示
-            const agentMessage = {
-                id: data.messageId || 'agent_' + Date.now(),
-                content: data.content,
-                username: 'AI助手',
-                agentId: data.agentId,
-                createdAt: data.timestamp || new Date().toISOString(),
-                encrypted: data.encrypted || false,
-                type: 'agent_response'
-            };
-            
-            this.addMessage(agentMessage);
-        });
-
-        this.websocket.on('agent-error', (data) => {
-            console.error('🤖 [前端] AI助手错误 (新格式):', data);
-            this.hideAgentTyping();
-            this.showError('AI助手错误: ' + data.error);
         });
 
         // 增强房间管理事件 - 基于后端报告
@@ -593,6 +721,17 @@ class ChatroomController {
             console.error('WebSocket错误:', error);
             this.showError('WebSocket错误: ' + error.message);
         });
+
+        // 🔍 调试：监听所有WebSocket事件
+        if (this.websocket.onAny) {
+            this.websocket.onAny((eventName, data) => {
+                console.log('🌐 [WebSocket] 收到事件:', eventName, data);
+            });
+        }
+
+        // 标记事件已设置，防止重复绑定
+        this.eventsSetup = true;
+        console.log('✅ [前端] WebSocket事件监听器设置完成');
     }
 
     /**
@@ -606,20 +745,40 @@ class ChatroomController {
 
         // 消息输入框
         this.elements.messageInput.addEventListener('keydown', (e) => {
+            // 如果智能体建议列表显示，不处理Enter键发送消息
+            if (this.agentSuggestionsList && this.agentSuggestionsList.style.display !== 'none') {
+                return;
+            }
+            
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 this.sendMessage();
             }
         });
 
-        // 输入状态检测
-        this.elements.messageInput.addEventListener('input', () => {
+        // 输入状态检测和@智能体功能
+        this.elements.messageInput.addEventListener('input', (e) => {
             this.handleTypingStatus();
+            this.handleAtMention(e);
         });
 
-        // @智能体按钮
+        // 添加键盘导航支持
+        this.elements.messageInput.addEventListener('keydown', (e) => {
+            if (this.agentSuggestionsList && this.agentSuggestionsList.style.display !== 'none') {
+                this.handleAgentSuggestionKeydown(e);
+            }
+        });
+
+        // 点击其他地方隐藏智能体建议列表
+        document.addEventListener('click', (e) => {
+            if (this.agentSuggestionsList && !this.agentSuggestionsList.contains(e.target) && e.target !== this.elements.messageInput) {
+                this.hideAgentSuggestions();
+            }
+        });
+
+        // @智能体按钮 - 现在只是简单地插入@符号到输入框
         this.elements.mentionButton.addEventListener('click', () => {
-            this.showMentionAgentModal();
+            this.insertAtSymbol();
         });
 
         // 创建房间按钮 - 在模态框中的实际创建按钮
@@ -1145,6 +1304,9 @@ width: ${computedStyle.width}`;
 
         // 重新渲染房间列表以更新激活状态
         this.renderRoomList();
+        
+        // 重新加载智能体列表（因为现在使用全局智能体，不依赖特定聊天室）
+        await this.loadAgents();
     }
 
     /**
@@ -1312,11 +1474,14 @@ width: ${computedStyle.width}`;
         if (mentionMatch) {
             this.mentionAgent(mentionMatch[1], content);
         } else {
-            // 发送普通消息
+            // 发送普通消息 - 但仍然检测是否包含@智能体
+            const agentMentions = this.extractAgentMentions(content);
+            
             console.log('📤 [前端] 发送普通消息:', {
                 roomId: this.currentRoom.id || this.currentRoom.roomId,
                 content: content,
-                type: 'text'
+                type: 'text',
+                agentMentions: agentMentions
             });
             
             const messageData = {
@@ -1324,7 +1489,8 @@ width: ${computedStyle.width}`;
                 content: content,
                 type: 'text',
                 timestamp: Date.now(),
-                clientId: this.websocket.id  // 客户端标识，用于消息确认
+                clientId: this.websocket.id,  // 客户端标识，用于消息确认
+                agentMentions: agentMentions  // 添加智能体提及信息
             };
             
             // 先在本地显示消息（乐观更新）
@@ -1373,31 +1539,82 @@ width: ${computedStyle.width}`;
     }
 
     /**
-     * @智能体
+     * @智能体 - 根据后端反馈优化版本
      */
-    mentionAgent(agentName, content) {
-        // 查找智能体
-        const agent = this.agents.find(a => 
-            a.name === agentName || a.id === agentName || a.agentName === agentName
-        );
+    async mentionAgent(agentName, content) {
+        try {
+            // 查找智能体（确保智能体存在）
+            const agent = this.agents.find(a => 
+                a.name === agentName || a.id === agentName || a.agentName === agentName
+            );
 
-        if (!agent) {
-            this.showError(`未找到智能体: ${agentName}`);
-            return;
+            if (!agent) {
+                this.showError(`未找到智能体: ${agentName}`);
+                return;
+            }
+
+            // 提取所有@智能体提及
+            const agentMentions = this.extractAgentMentions(content);
+
+            console.log('🤖 [前端] @智能体发送 (优化版):', {
+                agentId: agent.id,
+                agentName: agent.name || agent.agentName,
+                content: content,
+                agentMentions: agentMentions,
+                roomId: this.currentRoom.id || this.currentRoom.roomId
+            });
+
+            // 根据后端反馈的消息格式
+            const messageData = {
+                roomId: this.currentRoom.id || this.currentRoom.roomId,
+                content: content, // 包含@智能体名称的完整消息内容
+                type: 'text',
+                timestamp: Date.now(),
+                clientId: this.websocket.id,
+                agentMentions: agentMentions, // 后端要求的字段
+                metadata: {
+                    mentionedAgent: {
+                        id: agent.id,
+                        name: agent.name
+                    }
+                }
+            };
+            
+            // 先在本地显示消息（乐观更新）
+            const localMessageId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const localMessage = {
+                id: localMessageId,
+                content: content,
+                type: 'text',
+                senderId: this.currentUser.id,
+                userId: this.currentUser.id,
+                senderName: this.currentUser.username,
+                username: this.currentUser.username,
+                timestamp: Date.now(),
+                createdAt: new Date().toISOString(),
+                isLocalPending: true  // 标记为本地待确认消息
+            };
+            
+            this.addMessage(localMessage);
+            console.log('📤 [前端] 添加本地@智能体消息:', localMessageId);
+            
+            // 通过WebSocket发送
+            this.websocket.emit('send-message', messageData);
+            
+            // 设置超时检查
+            const timeoutId = setTimeout(() => {
+                if (localMessage.isLocalPending) {
+                    console.warn('⚠️ [前端] @智能体消息5秒内未收到确认:', localMessageId);
+                    this.showWarning('@智能体消息发送可能延迟，请稍候...');
+                }
+            }, 5000);
+
+            localMessage.timeoutId = timeoutId;
+
+        } catch (error) {
+            console.error('💥 [前端] @智能体失败:', error);
+            this.showError('@智能体失败: ' + error.message);
         }
-
-        console.log('🤖 [前端] @智能体 (根据API指南):', {
-            agentId: agent.id,
-            agentName: agent.name || agent.agentName,
-            query: content
-        });
-        
-        // 根据API指南使用 mention-agent 事件
-        this.websocket.emit('mention-agent', {
-            roomId: this.currentRoom.id || this.currentRoom.roomId,
-            agentId: agent.id,
-            query: content  // API指南中使用 query 字段而不是 content
-        });
     }
 
     /**
@@ -1412,11 +1629,20 @@ width: ${computedStyle.width}`;
             content: message.content?.substring(0, 50) + '...',
             currentUserId: this.currentUser?.id,
             currentUsername: this.currentUser?.username,
-            currentRoomId: this.currentRoom?.id || this.currentRoom?.roomId
+            currentRoomId: this.currentRoom?.id || this.currentRoom?.roomId,
+            isStreaming: message.isStreaming,
+            type: message.type
         });
         
         const messageElement = document.createElement('div');
         messageElement.className = 'message';
+        
+        // 设置消息ID和流式状态
+        messageElement.setAttribute('data-message-id', message.id);
+        if (message.isStreaming) {
+            messageElement.setAttribute('data-streaming', 'true');
+            messageElement.classList.add('streaming');
+        }
 
         // 判断消息类型
         let messageClass = 'message-other';
@@ -1541,6 +1767,7 @@ width: ${computedStyle.width}`;
             }
         }
         
+        // 流式消息特殊处理：即使内容为空也要创建内容元素
         if (contentToShow && contentToShow.trim()) {
             console.log('✅ [调试] 将显示消息内容:', {
                 messageId: message.id,
@@ -1549,6 +1776,14 @@ width: ${computedStyle.width}`;
             });
             messageHTML += `
                 <div class="message-content">${this.formatMessageContent(contentToShow)}</div>
+            `;
+        } else if (message.isStreaming) {
+            console.log('🌊 [调试] 流式消息创建空内容元素:', {
+                messageId: message.id,
+                isStreaming: message.isStreaming
+            });
+            messageHTML += `
+                <div class="message-content"><span class="typing-cursor">|</span></div>
             `;
         } else {
             console.log('⚠️ [调试] 消息内容为空，不显示:', {
@@ -2513,58 +2748,82 @@ justifyContent: ${debugInfo.justifyContent}
     }
 
     /**
-     * 加载智能体列表
+     * 加载智能体列表 - 使用与simple-agent-service.js相同的逻辑
      */
     async loadAgents() {
         try {
             console.log('🤖 [前端] 开始加载智能体列表');
             
-            // 获取API基础URL，优先使用环境配置
-            const apiBaseUrl = (window.ENV_CONFIG && window.ENV_CONFIG.getApiUrl) ? 
-                window.ENV_CONFIG.getApiUrl() : 
-                (globalConfig ? globalConfig.api.baseURL : 'http://localhost:4005/api');
+            // 使用固定的API基础URL，与simple-agent-service.js保持一致
+            const baseURL = 'http://localhost:4005';
+            const url = `${baseURL}/api/agents`;
+            console.log('🔗 [前端] 请求智能体列表URL:', url);
             
-            // 调用智能体管理API（根据API指南第8章）
-            if (window.AuthService) {
-                const response = await fetch(apiBaseUrl + '/agents', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': 'Bearer ' + TokenManager.getAccessToken(),
-                        'Content-Type': 'application/json'
-                    }
-                });
+            // 获取访问令牌
+            const token = TokenManager.getAccessToken();
+            console.log('🔐 [前端] Token状态:', !!token);
+            
+            // 构建请求头，如果有token则添加认证信息
+            const headers = {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            };
 
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.success && result.data) {
-                        this.agents = result.data;
-                        console.log('✅ [前端] 智能体列表加载成功:', this.agents.length, '个智能体');
-                    } else {
-                        throw new Error(result.message || '获取智能体列表失败');
-                    }
-                } else {
-                    throw new Error('智能体API请求失败');
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+                console.log('🔐 [前端] 使用认证token请求智能体列表');
+                
+                // 解析token显示用户信息（调试用）
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    console.log('👤 [前端] 当前用户:', payload.username, `(${payload.role})`);
+                } catch (e) {
+                    console.warn('⚠️ [前端] token解析失败，但继续请求');
                 }
             } else {
-                // 如果AuthService不可用，使用模拟数据
-                console.warn('⚠️ [前端] AuthService不可用，使用模拟智能体数据');
-                this.agents = [
-                    { id: 'agent_1', name: 'AI助手', description: '通用AI助手' },
-                    { id: 'agent_2', name: '代码助手', description: '编程专家' },
-                    { id: 'agent_3', name: '翻译助手', description: '多语言翻译' }
-                ];
+                console.log('👤 [前端] 未登录用户，只能获取公开智能体');
             }
             
-            console.log('🎯 [前端] 智能体列表加载完成:', this.agents);
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: headers
+            });
+
+            console.log('📡 [前端] API响应状态:', response.status, response.statusText);
+
+            if (response.ok) {
+                const result = await response.json();
+                console.log('📦 [前端] API响应数据:', result);
+                
+                if (result.success && result.data && Array.isArray(result.data.agents)) {
+                    this.agents = result.data.agents;
+                    const total = result.data.total || this.agents.length;
+                    
+                    console.log(`✅ [前端] 成功获取 ${this.agents.length} 个可访问智能体 (总计: ${total})`);
+                    console.log('📋 [前端] 智能体详情:', this.agents.map(a => ({
+                        id: a.id,
+                        name: a.name,
+                        description: a.description
+                    })));
+                } else {
+                    console.warn('⚠️ [前端] 智能体数据格式异常:', result);
+                    throw new Error(result.message || '数据格式异常');
+                }
+            } else {
+                const errorText = await response.text();
+                console.error('❌ [前端] 智能体API响应错误:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    body: errorText
+                });
+                throw new Error(`智能体API请求失败: ${response.status} ${response.statusText}`);
+            }
+            
         } catch (error) {
             console.error('💥 [前端] 加载智能体失败:', error);
-            // 发生错误时使用模拟数据
-            this.agents = [
-                { id: 'agent_1', name: 'AI助手', description: '通用AI助手' },
-                { id: 'agent_2', name: '代码助手', description: '编程专家' },
-                { id: 'agent_3', name: '翻译助手', description: '多语言翻译' }
-            ];
-            this.showWarning('加载智能体列表失败，使用默认列表');
+            // 发生错误时清空列表
+            this.agents = [];
+            this.showError('加载智能体列表失败: ' + error.message);
         }
     }
 
@@ -3122,6 +3381,642 @@ justifyContent: ${debugInfo.justifyContent}
             // 降级为直接加载
             img.src = imageUrl;
         }
+    }
+
+    /**
+     * 处理@智能体输入
+     */
+    handleAtMention(event) {
+        const input = this.elements.messageInput;
+        const text = input.value;
+        const cursorPosition = input.selectionStart;
+        
+        // 获取光标前的文本
+        const textBeforeCursor = text.substring(0, cursorPosition);
+        
+        // 检查是否有@符号且在@符号后输入内容
+        const atMatch = textBeforeCursor.match(/@(\w*)$/);
+        
+        if (atMatch) {
+            const searchText = atMatch[1]; // @符号后的文本
+            console.log('🎯 [前端] 检测到@输入:', { searchText, cursorPosition });
+            
+            // 过滤智能体列表
+            const filteredAgents = this.agents.filter(agent => 
+                agent.name.toLowerCase().includes(searchText.toLowerCase())
+            );
+            
+            if (filteredAgents.length > 0) {
+                this.showAgentSuggestions(filteredAgents, atMatch.index);
+            } else if (searchText === '') {
+                // 刚输入@符号，显示所有智能体
+                this.showAgentSuggestions(this.agents, atMatch.index);
+            } else {
+                // 没有匹配的智能体
+                this.hideAgentSuggestions();
+            }
+        } else {
+            // 没有@符号，隐藏建议列表
+            this.hideAgentSuggestions();
+        }
+    }
+
+    /**
+     * 显示智能体建议列表
+     */
+    showAgentSuggestions(agents, atPosition) {
+        if (!this.agentSuggestionsList) {
+            this.createAgentSuggestionsList();
+        }
+
+        // 清空现有内容
+        this.agentSuggestionsList.innerHTML = '';
+        
+        if (agents.length === 0) {
+            const noResults = document.createElement('div');
+            noResults.className = 'agent-suggestion-item no-results';
+            noResults.textContent = '没有找到匹配的智能体';
+            this.agentSuggestionsList.appendChild(noResults);
+        } else {
+            agents.forEach((agent, index) => {
+                const item = document.createElement('div');
+                item.className = 'agent-suggestion-item';
+                item.innerHTML = `
+                    <i class="fas fa-robot me-2"></i>
+                    <span class="agent-name">${this.escapeHtml(agent.name)}</span>
+                `;
+                item.setAttribute('data-agent-id', agent.id);
+                item.setAttribute('data-agent-name', agent.name);
+                item.setAttribute('data-index', index);
+                
+                // 点击事件
+                item.addEventListener('click', () => {
+                    this.selectAgentFromSuggestions(agent.name);
+                });
+                
+                // 鼠标悬停事件
+                item.addEventListener('mouseenter', () => {
+                    this.setSelectedSuggestion(index);
+                });
+                
+                this.agentSuggestionsList.appendChild(item);
+            });
+        }
+
+        // 显示列表
+        this.agentSuggestionsList.style.display = 'block';
+        this.selectedSuggestionIndex = 0;
+        this.updateSelectedSuggestion();
+        this.atPosition = atPosition;
+    }
+
+    /**
+     * 创建智能体建议列表DOM元素
+     */
+    createAgentSuggestionsList() {
+        this.agentSuggestionsList = document.createElement('div');
+        this.agentSuggestionsList.className = 'agent-suggestions-list';
+        this.agentSuggestionsList.style.cssText = `
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            min-width: 200px;
+            bottom: 100%;
+            left: 0;
+            margin-bottom: 5px;
+        `;
+
+        // 添加到聊天输入区域的父元素
+        const chatInput = document.querySelector('.chat-input');
+        if (chatInput) {
+            chatInput.style.position = 'relative';
+            chatInput.appendChild(this.agentSuggestionsList);
+        }
+
+        // 添加CSS样式（如果还没有的话）
+        if (!document.getElementById('agent-suggestions-styles')) {
+            const style = document.createElement('style');
+            style.id = 'agent-suggestions-styles';
+            style.textContent = `
+                .agent-suggestion-item {
+                    padding: 8px 12px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    border-bottom: 1px solid #f0f0f0;
+                    transition: background-color 0.2s ease;
+                }
+                
+                .agent-suggestion-item:hover,
+                .agent-suggestion-item.selected {
+                    background-color: #f8f9fa;
+                }
+                
+                .agent-suggestion-item:last-child {
+                    border-bottom: none;
+                }
+                
+                .agent-suggestion-item.no-results {
+                    color: #666;
+                    font-style: italic;
+                    cursor: default;
+                }
+                
+                .agent-suggestion-item .agent-name {
+                    font-weight: 500;
+                }
+                
+                .agent-suggestion-item i {
+                    color: #28a745;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    /**
+     * 隐藏智能体建议列表
+     */
+    hideAgentSuggestions() {
+        if (this.agentSuggestionsList) {
+            this.agentSuggestionsList.style.display = 'none';
+        }
+        this.selectedSuggestionIndex = -1;
+    }
+
+    /**
+     * 处理智能体建议列表的键盘导航
+     */
+    handleAgentSuggestionKeydown(event) {
+        const items = this.agentSuggestionsList.querySelectorAll('.agent-suggestion-item:not(.no-results)');
+        
+        switch (event.key) {
+            case 'ArrowDown':
+                event.preventDefault();
+                this.selectedSuggestionIndex = Math.min(this.selectedSuggestionIndex + 1, items.length - 1);
+                this.updateSelectedSuggestion();
+                break;
+                
+            case 'ArrowUp':
+                event.preventDefault();
+                this.selectedSuggestionIndex = Math.max(this.selectedSuggestionIndex - 1, 0);
+                this.updateSelectedSuggestion();
+                break;
+                
+            case 'Enter':
+                event.preventDefault();
+                const selectedItem = items[this.selectedSuggestionIndex];
+                if (selectedItem) {
+                    const agentName = selectedItem.getAttribute('data-agent-name');
+                    this.selectAgentFromSuggestions(agentName);
+                }
+                break;
+                
+            case 'Escape':
+                event.preventDefault();
+                this.hideAgentSuggestions();
+                break;
+        }
+    }
+
+    /**
+     * 更新选中的建议项样式
+     */
+    updateSelectedSuggestion() {
+        const items = this.agentSuggestionsList.querySelectorAll('.agent-suggestion-item');
+        items.forEach((item, index) => {
+            if (index === this.selectedSuggestionIndex) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    }
+
+    /**
+     * 设置选中的建议项索引
+     */
+    setSelectedSuggestion(index) {
+        this.selectedSuggestionIndex = index;
+        this.updateSelectedSuggestion();
+    }
+
+    /**
+     * 从建议列表中选择智能体
+     */
+    selectAgentFromSuggestions(agentName) {
+        const input = this.elements.messageInput;
+        const text = input.value;
+        const cursorPosition = input.selectionStart;
+        
+        // 获取光标前的文本
+        const textBeforeCursor = text.substring(0, cursorPosition);
+        const textAfterCursor = text.substring(cursorPosition);
+        
+        // 找到@符号的位置
+        const atMatch = textBeforeCursor.match(/@(\w*)$/);
+        if (atMatch) {
+            const beforeAt = textBeforeCursor.substring(0, atMatch.index);
+            const newText = beforeAt + `@${agentName} ` + textAfterCursor;
+            
+            input.value = newText;
+            
+            // 设置光标位置到@智能体名称之后
+            const newCursorPosition = beforeAt.length + agentName.length + 2; // @智能体名 + 空格
+            input.setSelectionRange(newCursorPosition, newCursorPosition);
+        }
+        
+        this.hideAgentSuggestions();
+        input.focus();
+    }
+
+    /**
+     * 插入@符号到输入框
+     */
+    insertAtSymbol() {
+        const input = this.elements.messageInput;
+        const cursorPosition = input.selectionStart;
+        const text = input.value;
+        
+        // 在光标位置插入@符号
+        const newText = text.substring(0, cursorPosition) + '@' + text.substring(cursorPosition);
+        input.value = newText;
+        
+        // 设置光标位置到@符号之后
+        input.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
+        input.focus();
+        
+        // 触发input事件以显示智能体建议
+        const inputEvent = new Event('input', { bubbles: true });
+        input.dispatchEvent(inputEvent);
+    }
+
+    /**
+     * 提取消息中的智能体提及
+     */
+    extractAgentMentions(content) {
+        const regex = /@(\S+)/g;
+        const mentions = [];
+        let match;
+        
+        while ((match = regex.exec(content)) !== null) {
+            const agentName = match[1];
+            const agent = this.agents.find(a => 
+                a.name === agentName || a.id === agentName || a.agentName === agentName
+            );
+            
+            if (agent) {
+                mentions.push({
+                    name: agent.name,
+                    id: agent.id,
+                    position: match.index
+                });
+            }
+        }
+        
+        console.log('🎯 [前端] 提取智能体提及:', mentions);
+        return mentions;
+    }
+
+    /**
+     * 显示开始流式响应的占位符 - 按照后端文档方案B
+     */
+    displayStreamingMessageStart(streamingMsg) {
+        const agentMessage = {
+            id: streamingMsg.id,
+            content: '', // 开始时内容为空
+            username: streamingMsg.agentName || 'AI智能体',
+            agentId: streamingMsg.agentId,
+            createdAt: streamingMsg.timestamp || new Date().toISOString(),
+            type: 'agent_response',
+            isStreaming: true,
+            replyToId: streamingMsg.replyToId
+        };
+        
+        this.addMessage(agentMessage);
+        this.scrollToBottom();
+    }
+
+    /**
+     * 更新流式消息内容 - 按照后端文档方案B
+     */
+    updateStreamingMessageContent(messageId, content) {
+        console.log('📝 [前端] 更新流式消息内容:', {
+            messageId,
+            contentLength: content.length,
+            contentPreview: content.substring(0, 50) + (content.length > 50 ? '...' : '')
+        });
+        
+        const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${messageId}"]`);
+        if (!messageElement) {
+            console.warn('⚠️ [前端] 未找到流式消息元素:', messageId);
+            return;
+        }
+        
+        const contentElement = messageElement.querySelector('.message-content');
+        if (contentElement) {
+            // 更新内容，使用formatMessageContent处理换行符，保留光标效果
+            contentElement.innerHTML = this.formatMessageContent(content) + '<span class="typing-cursor">|</span>';
+            this.scrollToBottom();
+            console.log('✅ [前端] 流式内容已更新');
+        } else {
+            console.warn('⚠️ [前端] 未找到消息内容元素');
+        }
+    }
+
+    /**
+     * 完成流式消息 - 按照后端文档方案B，修复ID不匹配问题
+     */
+    finalizeStreamingMessage(data) {
+        // 使用传入的 streamingMessageId 或者 data.id
+        const targetMessageId = data.streamingMessageId || data.id;
+        
+        console.log('🎯 [前端] 完成流式消息:', {
+            targetMessageId: targetMessageId,
+            dataId: data.id,
+            agentName: data.agentName || data.username,
+            contentLength: data.content?.length
+        });
+        
+        const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${targetMessageId}"]`);
+        if (messageElement) {
+            // 移除流式样式
+            messageElement.classList.remove('streaming');
+            delete messageElement.dataset.streaming;
+            
+            // 更新为最终内容（移除光标）
+            const contentElement = messageElement.querySelector('.message-content');
+            if (contentElement) {
+                contentElement.innerHTML = this.formatMessageContent(data.content);
+            }
+            
+            // 添加使用量信息（如果有）
+            if (data.usage || data.metadata?.usage) {
+                this.addTokenUsageToMessage(targetMessageId, data.usage || data.metadata.usage);
+            }
+            
+            console.log('✅ [前端] 流式消息已完成:', targetMessageId);
+        } else {
+            console.warn('⚠️ [前端] 未找到要完成的流式消息元素:', targetMessageId);
+            console.log('🔍 [调试] 当前DOM中的消息元素:', 
+                Array.from(this.elements.chatMessages.querySelectorAll('[data-message-id]'))
+                     .map(el => el.getAttribute('data-message-id')));
+        }
+    }
+
+    /**
+     * 防重复处理机制
+     */
+    initializeMessageProcessing() {
+        if (!this.processingMessages) {
+            this.processingMessages = new Set();
+        }
+    }
+
+    /**
+     * 检查是否正在处理中
+     */
+    isMessageProcessing(messageKey) {
+        this.initializeMessageProcessing();
+        return this.processingMessages.has(messageKey);
+    }
+
+    /**
+     * 标记消息为处理中
+     */
+    markMessageProcessing(messageKey) {
+        this.initializeMessageProcessing();
+        this.processingMessages.add(messageKey);
+    }
+
+    /**
+     * 清除消息处理标记
+     */
+    clearMessageProcessing(messageKey) {
+        this.initializeMessageProcessing();
+        this.processingMessages.delete(messageKey);
+    }
+
+    /**
+     * 处理智能体流式响应片段
+     */
+    handleAgentStreamChunk(data) {
+        console.log('📝 [前端] 处理流式片段:', {
+            messageId: data.messageId,
+            chunk: data.chunk,
+            chunkLength: data.chunk?.length,
+            currentStreamingId: this.currentStreamingMessageId
+        });
+        
+        // 查找或创建智能体回复消息
+        let streamingMessageId = this.currentStreamingMessageId;
+        
+        if (!streamingMessageId) {
+            // 第一次收到流式数据，创建新的智能体消息
+            const agentMessage = {
+                id: data.messageId || 'agent_stream_' + Date.now(),
+                content: data.chunk || '',
+                username: data.agentName || 'AI智能体',
+                agentId: data.agentId,
+                createdAt: new Date().toISOString(),
+                type: 'agent_response',
+                isStreaming: true,
+                replyToId: data.replyToId // 关联到用户消息
+            };
+            
+            this.addMessage(agentMessage);
+            this.currentStreamingMessageId = agentMessage.id;
+            streamingMessageId = agentMessage.id;
+            
+            console.log('✨ [前端] 创建新的流式智能体消息:', streamingMessageId);
+        } else {
+            // 更新现有的流式消息内容
+            this.appendToStreamingMessage(streamingMessageId, data.chunk);
+        }
+    }
+
+    /**
+     * 追加内容到流式消息
+     */
+    appendToStreamingMessage(messageId, chunk) {
+        const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${messageId}"]`);
+        if (!messageElement) {
+            console.warn('⚠️ [前端] 未找到流式消息元素:', messageId);
+            return;
+        }
+        
+        const contentElement = messageElement.querySelector('.message-content');
+        if (contentElement) {
+            // 追加新的chunk到现有内容
+            contentElement.textContent += chunk;
+            this.scrollToBottom();
+            console.log('📝 [前端] 已追加流式内容，当前长度:', contentElement.textContent.length);
+        }
+    }
+
+    /**
+     * 完成智能体消息 - 防重复优化版
+     */
+    finalizeAgentMessage(data) {
+        console.log('✅ [前端] 完成智能体消息:', {
+            dataId: data.id,
+            dataMessageId: data.messageId,
+            currentStreamingId: this.currentStreamingMessageId,
+            hasStreamingMessage: !!this.currentStreamingMessageId
+        });
+        
+        if (this.currentStreamingMessageId) {
+            // 有流式消息，更新其最终状态
+            const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${this.currentStreamingMessageId}"]`);
+            if (messageElement) {
+                const contentElement = messageElement.querySelector('.message-content');
+                if (contentElement) {
+                    // 确保显示完整内容（但优先保留流式累积的内容）
+                    const currentContent = contentElement.textContent;
+                    const finalContent = data.content || currentContent;
+                    
+                    if (finalContent !== currentContent) {
+                        console.log('🔄 [前端] 更新最终内容:', {
+                            from: currentContent.substring(0, 50),
+                            to: finalContent.substring(0, 50)
+                        });
+                        contentElement.textContent = finalContent;
+                    }
+                }
+                
+                // 移除流式状态
+                messageElement.classList.remove('streaming');
+                delete messageElement.dataset.streaming;
+                
+                // 添加使用量信息（如果有）
+                if (data.usage) {
+                    this.addTokenUsageToMessage(this.currentStreamingMessageId, data.usage);
+                }
+            }
+            
+            console.log('✅ [前端] 流式消息已完成:', this.currentStreamingMessageId);
+            this.currentStreamingMessageId = null;
+        } else {
+            // 没有流式消息，说明可能是直接接收完整回复，避免重复添加
+            console.log('⚠️ [前端] 没有流式消息，检查是否已存在相同消息');
+            
+            // 检查是否已有相同内容的消息
+            const existingMessage = this.findExistingAgentMessage(data);
+            if (existingMessage) {
+                console.log('🔍 [前端] 发现重复消息，跳过添加:', existingMessage.id);
+                return;
+            }
+            
+            // 确实没有相同消息，添加新消息
+            const agentMessage = {
+                id: data.id || data.messageId || 'agent_final_' + Date.now(),
+                content: data.content,
+                username: data.agentName || 'AI智能体',
+                agentId: data.agentId,
+                createdAt: data.timestamp || new Date().toISOString(),
+                type: 'agent_response',
+                replyToId: data.replyToId
+            };
+            
+            console.log('➕ [前端] 添加完整智能体消息:', agentMessage.id);
+            this.addMessage(agentMessage);
+            
+            if (data.usage) {
+                this.addTokenUsageToMessage(agentMessage.id, data.usage);
+            }
+        }
+    }
+
+    /**
+     * 查找是否已存在相同的智能体消息
+     */
+    findExistingAgentMessage(data) {
+        if (!data.content) return null;
+        
+        const messageElements = this.elements.chatMessages.querySelectorAll('.message-agent');
+        for (const element of messageElements) {
+            const contentElement = element.querySelector('.message-content');
+            if (contentElement && contentElement.textContent.trim() === data.content.trim()) {
+                return {
+                    id: element.getAttribute('data-message-id'),
+                    content: contentElement.textContent
+                };
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 显示智能体错误
+     */
+    showAgentError(data) {
+        console.error('❌ [前端] 智能体错误:', data);
+        
+        // 如果有正在进行的流式消息，将其标记为错误
+        if (this.currentStreamingMessageId) {
+            const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${this.currentStreamingMessageId}"]`);
+            if (messageElement) {
+                const contentElement = messageElement.querySelector('.message-content');
+                if (contentElement) {
+                    contentElement.innerHTML = `
+                        <div class="agent-error">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            智能体响应失败: ${data.error || '未知错误'}
+                        </div>
+                    `;
+                }
+                messageElement.classList.add('error');
+            }
+            this.currentStreamingMessageId = null;
+        } else {
+            // 添加一个错误消息
+            const errorMessage = {
+                id: 'error_' + Date.now(),
+                content: `❌ 智能体响应失败: ${data.error || '未知错误'}`,
+                username: 'System',
+                type: 'system',
+                createdAt: new Date().toISOString()
+            };
+            this.addMessage(errorMessage);
+        }
+        
+        this.showError('智能体回复失败: ' + (data.error || '未知错误'));
+    }
+
+    /**
+     * 为消息添加Token使用量信息
+     */
+    addTokenUsageToMessage(messageId, usage) {
+        const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${messageId}"]`);
+        if (!messageElement || !usage) return;
+        
+        const messageBubble = messageElement.querySelector('.message-bubble');
+        if (!messageBubble) return;
+        
+        // 检查是否已经有使用量信息
+        const existingUsage = messageBubble.querySelector('.token-usage');
+        if (existingUsage) {
+            existingUsage.remove();
+        }
+        
+        const usageElement = document.createElement('div');
+        usageElement.className = 'token-usage';
+        usageElement.innerHTML = `
+            <small class="text-muted">
+                <i class="fas fa-chart-bar me-1"></i>
+                Token: ${usage.prompt_tokens || 0}输入 + ${usage.completion_tokens || 0}输出 = ${usage.total_tokens || 0}总计
+                ${usage.latency ? ` | 耗时: ${parseFloat(usage.latency).toFixed(2)}s` : ''}
+            </small>
+        `;
+        
+        // 添加到消息气泡的末尾
+        messageBubble.appendChild(usageElement);
     }
 
 }
