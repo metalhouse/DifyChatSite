@@ -283,8 +283,35 @@ class ChatroomController {
                 roomName: data.roomName || data.name,
                 memberCount: data.memberCount,
                 onlineUsers: data.onlineUsers?.length || 0,
-                recentMessages: data.recentMessages?.length || 0
+                recentMessages: data.recentMessages?.length || 0,
+                recentMessagesDetail: data.recentMessages
             });
+            
+            // 检查是否有智能体消息
+            if (data.recentMessages && data.recentMessages.length > 0) {
+                const agentMessages = data.recentMessages.filter(msg => 
+                    msg.senderType === 'agent' || msg.type === 'agent_response' || msg.agentId
+                );
+                console.log('🤖 [前端] WebSocket中的智能体消息数量:', agentMessages.length);
+                if (agentMessages.length > 0) {
+                    console.log('🤖 [前端] 智能体消息详情:', agentMessages);
+                    
+                    // 详细分析第一条智能体消息的数据结构
+                    console.log('🔍 [WebSocket智能体消息] 第一条消息详细结构:', {
+                        id: agentMessages[0].id,
+                        senderType: agentMessages[0].senderType,
+                        type: agentMessages[0].type,
+                        agentId: agentMessages[0].agentId,
+                        agentName: agentMessages[0].agentName,
+                        userId: agentMessages[0].userId,
+                        username: agentMessages[0].username,
+                        sender_username: agentMessages[0].sender_username,
+                        content: agentMessages[0].content?.substring(0, 50) + '...',
+                        createdAt: agentMessages[0].createdAt,
+                        allFields: Object.keys(agentMessages[0]).sort()
+                    });
+                }
+            }
             
             // 清除timeout
             if (this.joinRoomTimeout) {
@@ -592,29 +619,49 @@ class ChatroomController {
                         streamingMessageId: foundStreamingId
                     });
                 } else {
-                    console.warn('⚠️ [前端] 未找到对应的流式消息，直接添加完整消息');
-                    // 没有找到流式消息，直接添加完整消息
+                    console.warn('⚠️ [前端] 未找到对应的流式消息，检查是否已存在相同消息');
+                    
+                    // 检查是否已经存在相同ID的消息（避免重复）
+                    if (data.id && this.processedMessages.has(data.id)) {
+                        console.log('🔄 [前端] 消息已存在，跳过添加:', data.id);
+                        return;
+                    }
+                    
+                    // 没有找到流式消息，且消息不存在，才添加完整消息
                     this.addMessage({
                         id: data.id,
                         content: data.content,
                         username: data.agentName || data.username || 'AI智能体',
                         agentId: data.agentId,
+                        agentName: data.agentName,
                         createdAt: data.createdAt,
                         type: 'agent_response',
-                        replyToId: data.replyToId
+                        senderType: 'agent',
+                        replyToId: data.replyToId,
+                        replyToContent: data.replyToContent
                     });
                 }
             } else {
-                // 如果不是流式响应，直接添加消息
+                // 如果不是流式响应，检查是否已存在，然后添加消息
                 console.log('📝 [前端] 这是直接的完整响应');
+                
+                // 检查是否已经存在相同ID的消息（避免重复）
+                if (data.id && this.processedMessages.has(data.id)) {
+                    console.log('🔄 [前端] 消息已存在，跳过添加:', data.id);
+                    return;
+                }
+                
                 this.addMessage({
                     id: data.id,
                     content: data.content,
                     username: data.agentName || data.username || 'AI智能体',
                     agentId: data.agentId,
+                    agentName: data.agentName,
                     createdAt: data.createdAt,
                     type: 'agent_response',
-                    replyToId: data.replyToId
+                    senderType: 'agent',
+                    replyToId: data.replyToId,
+                    replyToContent: data.replyToContent
                 });
             }
             
@@ -1272,14 +1319,24 @@ width: ${computedStyle.width}`;
 
         // 只有当API调用失败时，才使用WebSocket返回的消息作为备用
         if (!apiSuccess && roomData.recentMessages && roomData.recentMessages.length > 0) {
-            console.log('� [前端] API加载失败，使用WebSocket备用消息:', roomData.recentMessages.length);
+            console.log('🔄 [前端] API加载失败，使用WebSocket备用消息:', roomData.recentMessages.length);
+            console.log('📋 [前端] WebSocket消息详情:', roomData.recentMessages);
             
             roomData.recentMessages.forEach((message, index) => {
-                console.log(`📜 [调试] WebSocket备用消息 ${index + 1}:`, {
+                // 检查是否是智能体消息
+                const isAgent = message.senderType === 'agent' || message.type === 'agent_response' || message.agentId;
+                
+                console.log(`📜 [WebSocket备用消息] ${index + 1}:`, {
                     id: message.id,
                     content: message.content?.substring(0, 50) + '...',
+                    type: message.type,
+                    senderType: message.senderType,
+                    agentId: message.agentId,
+                    agentName: message.agentName,
+                    userId: message.userId,
+                    username: message.username,
+                    isAgentMessage: isAgent,
                     hasAttachments: !!message.attachments,
-                    attachments: message.attachments,
                     messageType: message.type || message.message_type
                 });
                 this.addMessage(message, false);
@@ -1293,6 +1350,8 @@ width: ${computedStyle.width}`;
         
         // 如果没有任何消息，显示欢迎信息
         if (!apiSuccess && (!roomData.recentMessages || roomData.recentMessages.length === 0)) {
+            console.log('📭 [前端] 没有找到任何历史消息');
+            console.log('🔍 [前端] 当前聊天区域消息数量:', this.elements.chatMessages?.children?.length || 0);
             this.elements.chatMessages.innerHTML = `
                 <div class="text-center text-muted mt-3">
                     <i class="fas fa-comments fa-2x mb-2"></i>
@@ -1335,6 +1394,12 @@ width: ${computedStyle.width}`;
         try {
             console.log('🚀 [前端] 开始通过API加载房间历史消息:', roomId);
             
+            // 检查 roomManagementService 是否存在
+            if (!this.roomManagementService) {
+                console.error('❌ [前端] roomManagementService 未初始化');
+                return false;
+            }
+            
             // 调用房间管理服务获取历史消息
             const result = await this.roomManagementService.getRoomMessages(roomId, {
                 limit: 50,
@@ -1348,9 +1413,90 @@ width: ${computedStyle.width}`;
                 hasMessages: !!(result?.messages?.length),
                 fullResult: result
             });
+            
+            // 显示API返回的原始数据结构
+            if (result && result.messages && result.messages.length > 0) {
+                console.log('🔍 [API原始数据] 前3条消息的完整数据结构:', 
+                    result.messages.slice(0, 3).map(msg => ({
+                        id: msg.id,
+                        content: msg.content?.substring(0, 30) + '...',
+                        allFields: Object.keys(msg),
+                        rawMessage: msg
+                    }))
+                );
+            }
 
             if (result && result.messages && result.messages.length > 0) {
                 console.log('✅ [前端] 找到API历史消息，开始渲染:', result.messages.length);
+                
+                // 检查API返回的消息中是否有智能体消息
+                const apiAgentMessages = result.messages.filter(msg => 
+                    msg.senderType === 'agent' || msg.type === 'agent_response' || msg.agentId || 
+                    (msg.userId === null && msg.agentName)
+                );
+                console.log('🤖 [API智能体消息] API返回的智能体消息数量:', apiAgentMessages.length);
+                
+                if (apiAgentMessages.length > 0) {
+                    console.log('🤖 [API智能体消息] 第一条智能体消息详细结构:', {
+                        id: apiAgentMessages[0].id,
+                        senderType: apiAgentMessages[0].senderType,
+                        type: apiAgentMessages[0].type,
+                        agentId: apiAgentMessages[0].agentId,
+                        agentName: apiAgentMessages[0].agentName,
+                        userId: apiAgentMessages[0].userId,
+                        username: apiAgentMessages[0].username,
+                        sender_username: apiAgentMessages[0].sender_username,
+                        content: apiAgentMessages[0].content?.substring(0, 50) + '...',
+                        allFields: Object.keys(apiAgentMessages[0]).sort()
+                    });
+                    
+                    // 🔍 检查是否有重复的智能体消息
+                    console.log('🔍 [重复检查] 检查所有智能体消息的ID和内容:');
+                    apiAgentMessages.forEach((msg, index) => {
+                        console.log(`   智能体消息 ${index + 1}:`, {
+                            id: msg.id,
+                            agentId: msg.agentId,
+                            agentName: msg.agentName,
+                            username: msg.username,
+                            content: msg.content?.substring(0, 100) + '...',
+                            createdAt: msg.createdAt
+                        });
+                    });
+                    
+                    // 检查是否有相同内容的消息
+                    const contentGroups = {};
+                    apiAgentMessages.forEach(msg => {
+                        const content = msg.content;
+                        if (!contentGroups[content]) {
+                            contentGroups[content] = [];
+                        }
+                        contentGroups[content].push({
+                            id: msg.id,
+                            agentName: msg.agentName || msg.username,
+                            agentId: msg.agentId
+                        });
+                    });
+                    
+                    Object.keys(contentGroups).forEach(content => {
+                        if (contentGroups[content].length > 1) {
+                            console.error('❌ [重复内容] 发现相同内容的多条消息:', {
+                                content: content?.substring(0, 100) + '...',
+                                messages: contentGroups[content]
+                            });
+                        }
+                    });
+                } else {
+                    console.log('❌ [API问题] API返回的消息中没有智能体标识字段！');
+                    console.log('🔍 [API问题] 第一条消息的字段:', {
+                        id: result.messages[0].id,
+                        allFields: Object.keys(result.messages[0]).sort(),
+                        senderType: result.messages[0].senderType,
+                        type: result.messages[0].type,
+                        agentId: result.messages[0].agentId,
+                        userId: result.messages[0].userId,
+                        sender_username: result.messages[0].sender_username
+                    });
+                }
                 
                 // 检查消息格式并添加调试信息
                 result.messages.forEach((message, index) => {
@@ -1374,6 +1520,24 @@ width: ${computedStyle.width}`;
                     if (!message.username && message.sender_username) {
                         message.username = message.sender_username;
                     }
+                    
+                    // 处理智能体消息字段
+                    if (message.senderType === 'agent' || message.type === 'agent_response' || message.agentId) {
+                        // 确保智能体消息有正确的agentName
+                        if (!message.agentName && message.username) {
+                            message.agentName = message.username;
+                        }
+                        if (!message.agentName && message.sender_username) {
+                            message.agentName = message.sender_username;
+                        }
+                        console.log('🤖 [API智能体消息] 处理智能体字段:', {
+                            agentId: message.agentId,
+                            agentName: message.agentName,
+                            senderType: message.senderType,
+                            type: message.type
+                        });
+                    }
+                    
                     if (!message.senderId) {
                         // 尝试多种可能的发送者ID字段
                         message.senderId = message.sender_id || message.user_id || message.senderId;
@@ -1395,10 +1559,13 @@ width: ${computedStyle.width}`;
                         content: message.content?.substring(0, 50) + '...',
                         content_type: message.content_type,
                         messageType: message.messageType,
+                        type: message.type,
+                        senderType: message.senderType,
+                        agentId: message.agentId,
+                        agentName: message.agentName,
+                        userId: message.userId,
                         hasAttachments: !!(message.attachments && message.attachments.length > 0),
                         attachments: message.attachments,
-                        attachmentsType: typeof message.attachments,
-                        attachmentsLength: message.attachments?.length,
                         sender: message.sender_username || message.senderInfo?.username,
                         mappedFields: {
                             senderName: message.senderName,
@@ -1412,6 +1579,8 @@ width: ${computedStyle.width}`;
                 });
 
                 console.log('✅ [前端] API历史消息渲染完成');
+                console.log('📊 [前端] 当前聊天区域消息总数:', this.elements.chatMessages?.children?.length || 0);
+                console.log('🔍 [前端] 聊天区域HTML内容预览:', this.elements.chatMessages?.innerHTML?.substring(0, 200) + '...');
                 
                 // 确保在所有消息渲染完成后滚动到底部
                 setTimeout(() => {
@@ -1657,9 +1826,17 @@ width: ${computedStyle.width}`;
             (message.username && message.username === this.currentUser.username)
         );
         
+        // 根据后端修复后的数据格式识别智能体消息
+        const isAgentMessage = (
+            message.senderType === 'agent' || 
+            message.type === 'agent_response' || 
+            message.agentId ||
+            (message.userId === null && message.agentName)
+        );
+
         if (isCurrentUser) {
             messageClass = 'message-user';
-        } else if (message.type === 'agent_response' || message.agentId) {
+        } else if (isAgentMessage) {
             messageClass = 'message-agent';
         } else if (message.type === 'system') {
             messageClass = 'message-system';
@@ -1669,11 +1846,13 @@ width: ${computedStyle.width}`;
             messageClass: messageClass,
             messageId: message.id,
             senderId: message.senderId,
-            sender_username: message.sender_username,
+            senderType: message.senderType,
+            agentId: message.agentId,
+            agentName: message.agentName,
+            userId: message.userId,
             currentUserId: this.currentUser.id,
-            currentUsername: this.currentUser.username,
             isCurrentUser: isCurrentUser,
-            isAgent: message.type === 'agent_response' || message.agentId,
+            isAgentMessage: isAgentMessage,
             isSystem: message.type === 'system'
         });
 
@@ -1684,24 +1863,61 @@ width: ${computedStyle.width}`;
 
         // 消息头部（发送者和时间）
         if (messageClass !== 'message-system') {
-            const senderName = message.senderName || message.username || message.agentName || '未知用户';
+            // 根据消息类型选择合适的发送者名称
+            let senderName;
+            if (isAgentMessage) {
+                // 智能体消息：优先使用 agentName，然后是 username
+                senderName = message.agentName || message.username || '智能体';
+            } else {
+                // 用户消息：使用 username 或 senderName
+                senderName = message.username || message.senderName || '未知用户';
+            }
+            
             const timestamp = this.formatTime(message.createdAt || message.timestamp);
             
             messageHTML += `
                 <div class="message-header">
-                    <span class="message-sender">${this.escapeHtml(senderName)}</span>
+                    <span class="message-sender">
+                        ${isAgentMessage ? '🤖 ' : '👤 '}${this.escapeHtml(senderName)}
+                    </span>
                     <span class="message-time">${timestamp}</span>
                 </div>
             `;
         }
 
-        // 回复预览
+        // 回复预览 - 检查是否为加密内容
         if (message.replyToContent) {
-            messageHTML += `
-                <div class="reply-preview">
-                    回复: ${this.escapeHtml(message.replyToContent)}
-                </div>
-            `;
+            // 检查回复内容是否是加密格式（包含冒号分隔的加密字符串）
+            const isEncryptedReply = message.replyToContent.includes(':') && 
+                                   message.replyToContent.split(':').length >= 3 &&
+                                   /^[a-f0-9:]+$/i.test(message.replyToContent);
+            
+            if (isEncryptedReply) {
+                // 如果是加密内容，显示简化的回复标识
+                messageHTML += `
+                    <div class="reply-preview">
+                        <i class="fas fa-reply me-1"></i>回复消息
+                    </div>
+                `;
+                console.log('🔒 [回复] 检测到加密回复内容，使用简化显示:', {
+                    messageId: message.id,
+                    encryptedContent: message.replyToContent?.substring(0, 50) + '...'
+                });
+            } else {
+                // 正常的回复内容，截断显示
+                const replyContent = message.replyToContent.length > 50 
+                    ? message.replyToContent.substring(0, 50) + '...' 
+                    : message.replyToContent;
+                messageHTML += `
+                    <div class="reply-preview">
+                        <i class="fas fa-reply me-1"></i>回复: ${this.escapeHtml(replyContent)}
+                    </div>
+                `;
+                console.log('💬 [回复] 显示正常回复内容:', {
+                    messageId: message.id,
+                    replyContent: replyContent
+                });
+            }
         }
 
         // 消息内容处理 - 对于图片消息，不显示加密文本
@@ -2059,8 +2275,32 @@ width: ${computedStyle.width}`;
         
         // 消息去重：检查是否已经处理过这条消息
         if (message.id && this.processedMessages.has(message.id)) {
-            console.log('🔄 [前端] 跳过重复消息:', message.id);
+            console.log('🔄 [前端] 跳过重复消息:', {
+                messageId: message.id,
+                content: message.content?.substring(0, 50) + '...',
+                source: '消息去重检查'
+            });
             return;
+        }
+        
+        // 额外检查：对于智能体消息，按内容和时间戳去重
+        if (message.type === 'agent_response' || message.senderType === 'agent' || message.agentId) {
+            const contentHash = message.content + '_' + (message.createdAt || message.timestamp);
+            const duplicateCheckKey = `agent_${message.agentId || 'unknown'}_${contentHash}`;
+            
+            if (this.processedMessages.has(duplicateCheckKey)) {
+                console.log('🔄 [智能体去重] 跳过重复的智能体消息:', {
+                    messageId: message.id,
+                    agentId: message.agentId,
+                    agentName: message.agentName || message.username,
+                    content: message.content?.substring(0, 50) + '...',
+                    duplicateCheckKey: duplicateCheckKey
+                });
+                return;
+            }
+            
+            // 记录智能体消息的内容哈希
+            this.processedMessages.add(duplicateCheckKey);
         }
         
         // 记录已处理的消息ID
@@ -2754,8 +2994,8 @@ justifyContent: ${debugInfo.justifyContent}
         try {
             console.log('🤖 [前端] 开始加载智能体列表');
             
-            // 使用固定的API基础URL，与simple-agent-service.js保持一致
-            const baseURL = 'http://localhost:4005';
+            // 使用环境配置的API基础URL，支持生产环境反代
+            const baseURL = window.ENV_CONFIG?.API_BASE_URL || 'http://localhost:4005';
             const url = `${baseURL}/api/agents`;
             console.log('🔗 [前端] 请求智能体列表URL:', url);
             
