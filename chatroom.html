@@ -1719,9 +1719,51 @@
         }
 
         .message-checkbox {
-            margin-right: 0.5rem;
+            margin-right: 0.75rem;
             margin-top: 0.25rem;
             flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #28a745;
+            border-radius: 3px;
+            transform: scale(1.2);
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        
+        .message-checkbox:hover {
+            transform: scale(1.3);
+        }
+        
+        .message-checkbox:checked {
+            background-color: #28a745;
+            border-color: #28a745;
+        }
+
+        /* 消息选中状态样式 */
+        .message-selected {
+            background-color: rgba(40, 167, 69, 0.05);
+            border-left: 3px solid #28a745;
+            transition: all 0.3s ease;
+        }
+
+        .message-selected .message-bubble {
+            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
+        }
+
+        /* 选择模式下的消息样式 */
+        .selection-mode .message {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .selection-mode .message:hover {
+            background-color: rgba(0, 0, 0, 0.02);
+            transform: translateX(2px);
+        }
+
+        .selection-mode .message:hover .message-checkbox {
+            transform: scale(1.4);
         }
 
         .message-actions {
@@ -1740,9 +1782,73 @@
             position: sticky;
             top: 0;
             z-index: 10;
-            background: #f8f9fa;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
             border-bottom: 1px solid #dee2e6;
             border-radius: 8px 8px 0 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .message-selection-toolbar .btn {
+            margin: 0 2px;
+            padding: 0.375rem 0.75rem;
+            font-weight: 500;
+        }
+
+        .message-selection-toolbar .btn small {
+            opacity: 0.8;
+            font-size: 0.75em;
+            font-weight: 400;
+        }
+
+        .message-selection-toolbar .btn-outline-primary {
+            border-color: #28a745;
+            color: #28a745;
+        }
+
+        .message-selection-toolbar .btn-outline-primary:hover {
+            background-color: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+
+        .message-selection-toolbar .btn-outline-secondary:hover {
+            background-color: #6c757d;
+            border-color: #6c757d;
+        }
+
+        .selection-count {
+            font-weight: 600;
+            color: #495057;
+            background: rgba(255,255,255,0.8);
+            padding: 0.25rem 0.75rem;
+            border-radius: 15px;
+            border: 1px solid #dee2e6;
+            transition: all 0.3s ease;
+        }
+
+        .selection-count.selected {
+            background: rgba(40, 167, 69, 0.1);
+            border-color: #28a745;
+            color: #28a745;
+        }
+
+        /* 工具栏按钮状态动画 */
+        .message-selection-toolbar .btn {
+            transition: all 0.2s ease;
+        }
+
+        .message-selection-toolbar .btn:disabled {
+            opacity: 0.5;
+        }
+
+        .message-selection-toolbar .btn-success {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
 
         .message-context-menu {
@@ -2183,6 +2289,10 @@
                             </a></li>
                             <li><a class="dropdown-item" href="./settings.html">
                                 <i class="fas fa-cog me-2"></i>设置
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" id="toggleAutoRestore" onclick="toggleAutoRestoreChat()">
+                                <i class="fas fa-history me-2"></i>
+                                <span id="autoRestoreText">自动恢复聊天: 开启</span>
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="#" id="nav-logout">
@@ -2878,6 +2988,9 @@
                     // 立即尝试加载用户资料（有重试机制）
                     loadUserProfile();
                     
+                    // 初始化自动恢复功能显示
+                    initAutoRestoreDisplay();
+                    
                 } catch (error) {
                     console.error('初始化聊天室控制器失败:', error);
                     showToast('聊天室初始化失败: ' + error.message, 'error');
@@ -2988,6 +3101,43 @@
             } catch (error) {
                 console.error('搜索用户失败:', error);
                 resultsList.innerHTML = '<div class="text-danger">搜索失败: ' + error.message + '</div>';
+            }
+        }
+
+        // 切换自动恢复聊天功能
+        function toggleAutoRestoreChat() {
+            try {
+                const currentSetting = localStorage.getItem('dify_auto_restore_chat');
+                const newSetting = currentSetting === 'false' ? 'true' : 'false';
+                
+                localStorage.setItem('dify_auto_restore_chat', newSetting);
+                
+                const autoRestoreText = document.getElementById('autoRestoreText');
+                const isEnabled = newSetting !== 'false';
+                
+                if (autoRestoreText) {
+                    autoRestoreText.textContent = `自动恢复聊天: ${isEnabled ? '开启' : '关闭'}`;
+                }
+                
+                const message = isEnabled ? '已开启自动恢复聊天功能' : '已关闭自动恢复聊天功能';
+                const type = isEnabled ? 'success' : 'info';
+                showToast(message, type);
+                
+                console.log(`🔄 自动恢复聊天功能已${isEnabled ? '开启' : '关闭'}`);
+            } catch (error) {
+                console.error('切换自动恢复功能失败:', error);
+                showToast('设置失败，请重试', 'error');
+            }
+        }
+
+        // 初始化自动恢复功能状态显示
+        function initAutoRestoreDisplay() {
+            const autoRestoreText = document.getElementById('autoRestoreText');
+            const currentSetting = localStorage.getItem('dify_auto_restore_chat');
+            const isEnabled = currentSetting !== 'false'; // 默认开启
+            
+            if (autoRestoreText) {
+                autoRestoreText.textContent = `自动恢复聊天: ${isEnabled ? '开启' : '关闭'}`;
             }
         }
 

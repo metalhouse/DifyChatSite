@@ -109,10 +109,205 @@ class ChatroomController {
             // 加载智能体列表
             await this.loadAgents();
             
+            // 恢复上次的聊天状态
+            this.restoreLastChatState();
+            
             console.log('聊天室控制器初始化完成');
         } catch (error) {
             console.error('初始化聊天室失败:', error);
             this.showError('初始化聊天室失败，请刷新页面重试');
+        }
+    }
+
+    /**
+     * 保存当前聊天状态到localStorage
+     */
+    saveCurrentChatState() {
+        try {
+            const chatState = {
+                timestamp: Date.now(),
+                userId: this.currentUser?.id,
+                type: null, // 'room' 或 'private'
+                data: null
+            };
+
+            if (this.currentRoom) {
+                // 当前在聊天室
+                chatState.type = 'room';
+                chatState.data = {
+                    roomId: this.currentRoom.id || this.currentRoom.roomId,
+                    roomName: this.currentRoom.name || this.currentRoom.roomName
+                };
+            } else if (this.friendsManager?.currentPrivateChat) {
+                // 当前在私聊
+                chatState.type = 'private';
+                chatState.data = {
+                    friendId: this.friendsManager.currentPrivateChat.friendId,
+                    friendName: this.friendsManager.currentPrivateChat.friendName
+                };
+            }
+
+            if (chatState.type && chatState.data) {
+                localStorage.setItem('dify_last_chat_state', JSON.stringify(chatState));
+                console.log('💾 聊天状态已保存:', chatState);
+            }
+        } catch (error) {
+            console.warn('⚠️ 保存聊天状态失败:', error);
+        }
+    }
+
+    /**
+     * 恢复上次的聊天状态
+     */
+    async restoreLastChatState() {
+        try {
+            // 检查用户是否启用了自动恢复功能
+            const autoRestore = localStorage.getItem('dify_auto_restore_chat');
+            if (autoRestore === 'false') {
+                console.log('🚫 用户已禁用自动恢复聊天功能');
+                return;
+            }
+
+            const savedState = localStorage.getItem('dify_last_chat_state');
+            if (!savedState) {
+                console.log('📭 没有保存的聊天状态');
+                return;
+            }
+
+            const chatState = JSON.parse(savedState);
+            
+            // 验证状态有效性（检查用户是否匹配，时间是否过期等）
+            if (!chatState.userId || chatState.userId !== this.currentUser?.id) {
+                console.log('👤 用户不匹配，清除保存的状态');
+                localStorage.removeItem('dify_last_chat_state');
+                return;
+            }
+
+            // 检查是否超过7天（可配置）
+            const maxAge = 7 * 24 * 60 * 60 * 1000; // 7天
+            if (Date.now() - chatState.timestamp > maxAge) {
+                console.log('⏰ 保存的状态已过期，清除');
+                localStorage.removeItem('dify_last_chat_state');
+                return;
+            }
+
+            console.log('🔄 准备恢复聊天状态:', chatState);
+
+            // 等待一段时间确保WebSocket连接和数据加载完成
+            // 使用更智能的等待机制
+            this.waitForDataReady().then(() => {
+                this.doRestoreChatState(chatState);
+            });
+
+        } catch (error) {
+            console.warn('⚠️ 恢复聊天状态失败:', error);
+            // 清除损坏的状态
+            localStorage.removeItem('dify_last_chat_state');
+        }
+    }
+
+    /**
+     * 等待数据准备就绪
+     */
+    async waitForDataReady() {
+        return new Promise((resolve) => {
+            let attempts = 0;
+            const maxAttempts = 20; // 最多等待10秒
+            
+            const checkReady = () => {
+                attempts++;
+                
+                // 检查WebSocket连接状态
+                const isWebSocketReady = this.websocket && this.websocket.connected;
+                
+                // 检查房间列表是否已加载
+                const hasRooms = this.rooms && this.rooms.length > 0;
+                
+                // 检查好友列表是否已加载
+                const hasFriends = this.friendsManager && 
+                                  this.friendsManager.friends && 
+                                  this.friendsManager.friends.length >= 0; // 可能没有好友，所以>=0
+                
+                console.log(`🔍 数据就绪检查 (${attempts}/${maxAttempts}):`, {
+                    websocket: isWebSocketReady,
+                    rooms: hasRooms,
+                    roomsCount: this.rooms?.length || 0,
+                    friends: hasFriends,
+                    friendsCount: this.friendsManager?.friends?.length || 0
+                });
+                
+                if ((isWebSocketReady && hasRooms) || attempts >= maxAttempts) {
+                    console.log('✅ 数据就绪，开始恢复聊天状态');
+                    resolve();
+                } else {
+                    // 每500ms检查一次
+                    setTimeout(checkReady, 500);
+                }
+            };
+            
+            // 初始延迟1秒后开始检查
+            setTimeout(checkReady, 1000);
+        });
+    }
+
+    /**
+     * 执行聊天状态恢复
+     */
+    async doRestoreChatState(chatState) {
+        try {
+            if (chatState.type === 'private' && chatState.data) {
+                // 恢复私聊
+                console.log('🔄 尝试恢复私聊:', chatState.data.friendName);
+                
+                // 确保好友管理器已初始化并且好友列表已加载
+                if (!this.friendsManager || !this.friendsManager.friends) {
+                    console.log('❌ 好友管理器未就绪，无法恢复私聊');
+                    showToast('好友数据未加载完成，无法恢复聊天', 'warning');
+                    return;
+                }
+                
+                // 验证好友是否仍在好友列表中
+                const friend = this.friendsManager.friends.find(f => f.id === chatState.data.friendId);
+                if (friend) {
+                    // 等待额外500ms确保好友管理器完全初始化
+                    setTimeout(() => {
+                        this.friendsManager.startPrivateChat(chatState.data.friendId, chatState.data.friendName);
+                        showToast(`已恢复与 ${chatState.data.friendName} 的私聊`, 'success');
+                        console.log('✅ 私聊恢复成功');
+                    }, 500);
+                } else {
+                    console.log('❌ 好友不存在，无法恢复私聊');
+                    showToast('上次的聊天好友已不存在', 'info');
+                    // 清除无效的状态
+                    localStorage.removeItem('dify_last_chat_state');
+                }
+                
+            } else if (chatState.type === 'room' && chatState.data) {
+                // 恢复聊天室
+                console.log('🔄 尝试恢复聊天室:', chatState.data.roomName);
+                
+                // 验证房间是否仍存在
+                const room = this.rooms.find(r => 
+                    (r.id === chatState.data.roomId || r.roomId === chatState.data.roomId)
+                );
+                if (room) {
+                    this.joinRoom(chatState.data.roomId);
+                    showToast(`已恢复聊天室: ${chatState.data.roomName}`, 'success');
+                    console.log('✅ 聊天室恢复成功');
+                } else {
+                    console.log('❌ 聊天室不存在，无法恢复');
+                    showToast('上次的聊天室已不存在', 'info');
+                    // 清除无效的状态
+                    localStorage.removeItem('dify_last_chat_state');
+                }
+            } else {
+                console.log('❓ 未知的聊天状态类型:', chatState.type);
+                // 清除无效的状态
+                localStorage.removeItem('dify_last_chat_state');
+            }
+        } catch (error) {
+            console.error('❌ 执行聊天状态恢复失败:', error);
+            showToast('恢复上次聊天失败', 'warning');
         }
     }
 
@@ -322,6 +517,9 @@ class ChatroomController {
             this.currentRoom = data;
             await this.updateRoomInfo(data);
             this.showSuccess(`成功加入房间: ${data.roomName || data.name || data.roomId}`);
+            
+            // 保存聊天状态
+            this.saveCurrentChatState();
             
             // 主动请求房间状态和在线用户信息
             setTimeout(() => {
@@ -1135,6 +1333,9 @@ width: ${computedStyle.width}`;
                 
                 await this.updateRoomInfo(this.currentRoom);
                 this.showSuccess(`已选择房间: ${this.currentRoom.roomName}`);
+                
+                // 保存聊天状态
+                this.saveCurrentChatState();
                 
                 // 请求房间状态和在线用户信息
                 setTimeout(() => {

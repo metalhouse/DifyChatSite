@@ -274,6 +274,11 @@ class FriendsManager {
         // 清空当前群聊房间状态
         this.chatroomController.currentRoom = null;
         
+        // 保存聊天状态
+        if (this.chatroomController.saveCurrentChatState) {
+            this.chatroomController.saveCurrentChatState();
+        }
+        
         // 更新房间列表中的活跃状态
         this.updateActiveStates();
 
@@ -1121,6 +1126,20 @@ class FriendsManager {
     clearPrivateChat() {
         this.currentPrivateChat = null;
         this.updateActiveStates();
+        
+        // 清除保存的聊天状态（如果当前是私聊状态）
+        try {
+            const savedState = localStorage.getItem('dify_last_chat_state');
+            if (savedState) {
+                const chatState = JSON.parse(savedState);
+                if (chatState.type === 'private') {
+                    localStorage.removeItem('dify_last_chat_state');
+                    console.log('🧹 已清除私聊状态');
+                }
+            }
+        } catch (error) {
+            console.warn('清除私聊状态时出错:', error);
+        }
     }
 
     /**
@@ -1924,7 +1943,29 @@ class FriendsManager {
         const checkbox = document.querySelector(`input[data-message-id="${messageId}"]`);
         if (checkbox) {
             checkbox.checked = !checkbox.checked;
-            this.updateDeleteToolbar();
+            
+            // 触发 change 事件以确保工具栏更新
+            checkbox.dispatchEvent(new Event('change'));
+            
+            // 添加视觉反馈
+            const messageElement = checkbox.closest('.message');
+            if (messageElement) {
+                if (checkbox.checked) {
+                    messageElement.classList.add('message-selected');
+                    // 选中时的动画效果
+                    messageElement.style.transform = 'scale(1.02)';
+                    setTimeout(() => {
+                        messageElement.style.transform = '';
+                    }, 150);
+                } else {
+                    messageElement.classList.remove('message-selected');
+                    // 取消选中时的动画效果
+                    messageElement.style.transform = 'scale(0.98)';
+                    setTimeout(() => {
+                        messageElement.style.transform = '';
+                    }, 150);
+                }
+            }
         }
     }
 
@@ -1937,12 +1978,23 @@ class FriendsManager {
         // 关闭右键菜单
         this.closeAllContextMenus();
         
+        // 为聊天容器添加选择模式类
+        const chatContainer = document.querySelector('.chat-container') || document.querySelector('.chat-area');
+        if (chatContainer) {
+            chatContainer.classList.add('selection-mode');
+        }
+        
         // 显示所有复选框，允许选择所有消息
-        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
+        document.querySelectorAll('.message-checkbox').forEach((checkbox, index) => {
             checkbox.style.display = 'block';
             checkbox.disabled = false;
             checkbox.style.opacity = '1';
-            checkbox.title = '';
+            checkbox.title = '选择此消息';
+            
+            // 添加淡入动画效果
+            setTimeout(() => {
+                checkbox.style.transform = 'scale(1.2)';
+            }, index * 20);
         });
 
         // 显示工具栏
@@ -1957,6 +2009,7 @@ class FriendsManager {
         }
         if (exitSelectionBtn) exitSelectionBtn.style.display = 'inline-block';
         
+        showToast('已进入消息选择模式，点击消息前的复选框来选择', 'info');
         console.log('✅ 进入多选模式');
     }
 
@@ -1969,10 +2022,29 @@ class FriendsManager {
         // 关闭右键菜单
         this.closeAllContextMenus();
         
-        // 隐藏所有复选框
-        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
-            checkbox.style.display = 'none';
+        // 移除选择模式类
+        const chatContainer = document.querySelector('.chat-container') || document.querySelector('.chat-area');
+        if (chatContainer) {
+            chatContainer.classList.remove('selection-mode');
+        }
+        
+        // 隐藏所有复选框并清除选中状态
+        document.querySelectorAll('.message-checkbox').forEach((checkbox, index) => {
             checkbox.checked = false;
+            checkbox.style.opacity = '0';
+            
+            // 添加淡出动画效果
+            setTimeout(() => {
+                checkbox.style.display = 'none';
+                checkbox.style.transform = 'scale(1)';
+            }, index * 10);
+            
+            // 清除消息选中状态样式
+            const messageElement = checkbox.closest('.message');
+            if (messageElement) {
+                messageElement.classList.remove('message-selected');
+                messageElement.style.background = '';
+            }
         });
 
         // 隐藏工具栏
@@ -1984,6 +2056,7 @@ class FriendsManager {
         if (quickDeleteBtn) quickDeleteBtn.style.display = 'none';
         if (exitSelectionBtn) exitSelectionBtn.style.display = 'none';
         
+        showToast('已退出消息选择模式', 'info');
         console.log('✅ 退出多选模式');
     }
 
@@ -1997,22 +2070,23 @@ class FriendsManager {
             toolbar.id = 'messageSelectionToolbar';
             toolbar.className = 'message-selection-toolbar';
             toolbar.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center p-2 bg-light border">
-                    <div>
-                        <button class="btn btn-sm btn-outline-primary" onclick="window.friendsManager.selectAllMessages()">
+                <div class="d-flex justify-content-between align-items-center p-3 bg-gradient">
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="window.friendsManager.selectAllMessages()" title="选择所有消息">
                             <i class="fas fa-check-double"></i> 全选
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="window.friendsManager.clearSelection()">
-                            <i class="fas fa-times"></i> 清除
+                        <button class="btn btn-sm btn-outline-secondary" onclick="window.friendsManager.clearSelection()" title="清除所有选择">
+                            <i class="fas fa-square"></i> 取消
                         </button>
+                        <div class="vr"></div>
+                        <span id="selectedCount" class="selection-count">已选择: 0 条</span>
                     </div>
-                    <div>
-                        <span id="selectedCount" class="me-3">已选择: 0 条</span>
-                        <button class="btn btn-sm btn-danger" onclick="window.friendsManager.deleteSelectedMessages()" disabled>
-                            <i class="fas fa-trash"></i> 删除选中
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-sm btn-danger" onclick="window.friendsManager.deleteSelectedMessages()" disabled title="删除选中的消息">
+                            <i class="fas fa-trash-alt"></i> 删除选中
                         </button>
-                        <button class="btn btn-sm btn-secondary" onclick="window.friendsManager.exitSelectionMode()">
-                            <i class="fas fa-times"></i> 取消
+                        <button class="btn btn-sm btn-secondary" onclick="window.friendsManager.exitSelectionMode()" title="退出选择模式">
+                            <i class="fas fa-times-circle"></i> 退出
                         </button>
                     </div>
                 </div>
@@ -2047,37 +2121,141 @@ class FriendsManager {
      */
     updateDeleteToolbar() {
         const selectedCheckboxes = document.querySelectorAll('.message-checkbox:checked');
+        const totalCheckboxes = document.querySelectorAll('.message-checkbox[style*="block"]');
         const selectedCount = selectedCheckboxes.length;
+        const totalCount = totalCheckboxes.length;
         
         const countElement = document.getElementById('selectedCount');
         const deleteButton = document.querySelector('#messageSelectionToolbar .btn-danger');
         const quickDeleteBtn = document.getElementById('quickDeleteBtn');
+        const selectAllBtn = document.querySelector('#messageSelectionToolbar .btn-outline-primary');
+        const clearBtn = document.querySelector('#messageSelectionToolbar .btn-outline-secondary');
         
+        // 更新选择计数显示
         if (countElement) {
-            countElement.textContent = `已选择: ${selectedCount} 条`;
+            countElement.innerHTML = selectedCount > 0 
+                ? `已选择: <strong>${selectedCount}</strong> / ${totalCount} 条`
+                : `已选择: 0 条`;
+            
+            // 添加视觉状态指示
+            countElement.className = selectedCount > 0 
+                ? 'selection-count selected' 
+                : 'selection-count';
         }
         
+        // 更新删除按钮状态
         if (deleteButton) {
             deleteButton.disabled = selectedCount === 0;
+            deleteButton.innerHTML = selectedCount > 0 
+                ? `<i class="fas fa-trash-alt"></i> 删除选中 (${selectedCount})`
+                : `<i class="fas fa-trash-alt"></i> 删除选中`;
         }
         
-        // 同时更新快捷删除按钮
+        // 更新快捷删除按钮
         if (quickDeleteBtn) {
             quickDeleteBtn.disabled = selectedCount === 0;
-            quickDeleteBtn.textContent = selectedCount > 0 ? ` 删除 (${selectedCount})` : ' 删除';
             quickDeleteBtn.innerHTML = selectedCount > 0 
                 ? `<i class="fas fa-trash"></i> 删除 (${selectedCount})`
                 : `<i class="fas fa-trash"></i> 删除`;
         }
+        
+        // 更新全选按钮状态
+        if (selectAllBtn) {
+            if (selectedCount === totalCount && totalCount > 0) {
+                // 完全全选状态 - 显示可点击取消全选
+                selectAllBtn.innerHTML = '<i class="fas fa-check-double"></i> 已全选 <small>(点击取消)</small>';
+                selectAllBtn.classList.add('btn-success');
+                selectAllBtn.classList.remove('btn-outline-primary');
+                selectAllBtn.disabled = false; // 仍然可以点击
+                selectAllBtn.title = '点击取消全选';
+            } else if (selectedCount > 0) {
+                // 部分选择状态
+                selectAllBtn.innerHTML = `<i class="fas fa-check-double"></i> 全选 <small>(${selectedCount}/${totalCount})</small>`;
+                selectAllBtn.classList.remove('btn-success');
+                selectAllBtn.classList.add('btn-outline-primary');
+                selectAllBtn.disabled = false;
+                selectAllBtn.title = '选择所有消息';
+            } else {
+                // 未选择状态
+                selectAllBtn.innerHTML = '<i class="fas fa-check-double"></i> 全选';
+                selectAllBtn.classList.remove('btn-success');
+                selectAllBtn.classList.add('btn-outline-primary');
+                selectAllBtn.disabled = totalCount === 0; // 没有消息时禁用
+                selectAllBtn.title = totalCount > 0 ? '选择所有消息' : '没有可选择的消息';
+            }
+        }
+        
+        // 更新清除按钮状态
+        if (clearBtn) {
+            clearBtn.disabled = selectedCount === 0;
+            if (selectedCount > 0) {
+                clearBtn.classList.remove('btn-outline-secondary');
+                clearBtn.classList.add('btn-outline-warning');
+            } else {
+                clearBtn.classList.add('btn-outline-secondary');
+                clearBtn.classList.remove('btn-outline-warning');
+            }
+        }
     }
 
     /**
-     * 全选消息
+     * 全选消息（智能切换）
      */
     selectAllMessages() {
-        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
-            checkbox.checked = true;
-        });
+        const checkboxes = document.querySelectorAll('.message-checkbox');
+        const visibleCheckboxes = Array.from(checkboxes).filter(checkbox => 
+            checkbox.style.display !== 'none' && !checkbox.disabled
+        );
+        
+        if (visibleCheckboxes.length === 0) {
+            showToast('没有可选择的消息', 'warning');
+            return;
+        }
+        
+        // 检查是否已经全选
+        const selectedCount = visibleCheckboxes.filter(checkbox => checkbox.checked).length;
+        const isAllSelected = selectedCount === visibleCheckboxes.length;
+        
+        if (isAllSelected) {
+            // 如果已经全选，则取消全选
+            visibleCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                // 移除选中状态样式
+                const messageElement = checkbox.closest('.message');
+                if (messageElement) {
+                    messageElement.classList.remove('message-selected');
+                    // 短暂动画效果
+                    messageElement.style.background = 'rgba(108, 117, 125, 0.1)';
+                    setTimeout(() => {
+                        messageElement.style.background = '';
+                    }, 200);
+                }
+            });
+            showToast(`已取消全选 ${visibleCheckboxes.length} 条消息`, 'info');
+            console.log(`✅ 取消全选了 ${visibleCheckboxes.length} 条消息`);
+        } else {
+            // 如果未全选，则全选
+            visibleCheckboxes.forEach((checkbox, index) => {
+                if (!checkbox.checked) {
+                    checkbox.checked = true;
+                    // 添加选中动画效果
+                    const messageElement = checkbox.closest('.message');
+                    if (messageElement) {
+                        messageElement.classList.add('message-selected');
+                        // 短暂高亮效果，加延迟产生波浪效果
+                        setTimeout(() => {
+                            messageElement.style.background = 'rgba(40, 167, 69, 0.1)';
+                            setTimeout(() => {
+                                messageElement.style.background = '';
+                            }, 300);
+                        }, index * 30);
+                    }
+                }
+            });
+            showToast(`已选择 ${visibleCheckboxes.length} 条消息`, 'success');
+            console.log(`✅ 全选了 ${visibleCheckboxes.length} 条消息`);
+        }
+        
         this.updateDeleteToolbar();
     }
 
@@ -2085,10 +2263,33 @@ class FriendsManager {
      * 清除选择
      */
     clearSelection() {
-        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
+        const checkedCheckboxes = document.querySelectorAll('.message-checkbox:checked');
+        
+        if (checkedCheckboxes.length === 0) {
+            showToast('没有已选择的消息', 'info');
+            return;
+        }
+        
+        const clearedCount = checkedCheckboxes.length;
+        
+        checkedCheckboxes.forEach(checkbox => {
             checkbox.checked = false;
+            // 移除选中状态样式
+            const messageElement = checkbox.closest('.message');
+            if (messageElement) {
+                messageElement.classList.remove('message-selected');
+                // 短暂闪烁效果
+                messageElement.style.background = 'rgba(108, 117, 125, 0.1)';
+                setTimeout(() => {
+                    messageElement.style.background = '';
+                }, 200);
+            }
         });
+        
+        // 更新工具栏状态，这将重置全选按钮状态
         this.updateDeleteToolbar();
+        showToast(`已取消选择 ${clearedCount} 条消息`, 'info');
+        console.log(`✅ 清除了 ${clearedCount} 条消息的选择`);
     }
 
     /**
