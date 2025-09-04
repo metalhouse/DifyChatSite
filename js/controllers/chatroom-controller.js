@@ -42,7 +42,8 @@ class ChatroomController {
             messageInput: document.getElementById('messageInput'),
             sendButton: document.getElementById('sendButton'),
             mentionButton: document.getElementById('mentionButton'),
-            imageUploadButton: document.getElementById('imageUploadButton'),
+            emojiButton: document.getElementById('emojiButton'),
+            imageUploadButton: document.getElementById('addButton'), // 更新为新的addButton
             connectionStatus: document.getElementById('connectionStatus'),
             statusText: document.getElementById('statusText'),
             currentRoomName: document.getElementById('currentRoomName'),
@@ -1420,6 +1421,9 @@ width: ${computedStyle.width}`;
             this.elements.messageInput.disabled = true;
             this.elements.sendButton.disabled = true;
             this.elements.mentionButton.disabled = true;
+            if (this.elements.emojiButton) {
+                this.elements.emojiButton.disabled = true;
+            }
             if (this.elements.imageUploadButton) {
                 this.elements.imageUploadButton.disabled = true;
             }
@@ -1459,6 +1463,9 @@ width: ${computedStyle.width}`;
         this.elements.messageInput.disabled = false;
         this.elements.sendButton.disabled = false;
         this.elements.mentionButton.disabled = false;
+        if (this.elements.emojiButton) {
+            this.elements.emojiButton.disabled = false;
+        }
         if (this.elements.imageUploadButton) {
             this.elements.imageUploadButton.disabled = false;
         }
@@ -3060,7 +3067,7 @@ justifyContent: ${debugInfo.justifyContent}
     }
 
     /**
-     * 显示图片放大模态框
+     * 显示图片放大模态框 - 支持缩放功能
      */
     showImageModal(imageUrl, altText) {
         // 检查是否已有放大模态框
@@ -3084,7 +3091,19 @@ justifyContent: ${debugInfo.justifyContent}
             display: flex;
             justify-content: center;
             align-items: center;
-            cursor: pointer;
+            cursor: zoom-out;
+        `;
+        
+        // 创建图片容器
+        const imageContainer = document.createElement('div');
+        imageContainer.style.cssText = `
+            position: relative;
+            overflow: hidden;
+            max-width: 90%;
+            max-height: 90%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         `;
         
         // 创建放大的图片
@@ -3092,23 +3111,207 @@ justifyContent: ${debugInfo.justifyContent}
         enlargedImg.src = imageUrl;
         enlargedImg.alt = altText;
         enlargedImg.style.cssText = `
-            max-width: 90%;
-            max-height: 90%;
+            max-width: 100%;
+            max-height: 100%;
             object-fit: contain;
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            cursor: pointer;
+            cursor: grab;
+            transition: transform 0.2s ease;
+            transform-origin: center center;
         `;
         
-        // 点击模态框或图片时关闭
-        modal.onclick = function() {
-            document.body.removeChild(modal);
-        };
+        // 缩放控制变量
+        let scale = 1;
+        let isDragging = false;
+        let startX, startY, translateX = 0, translateY = 0;
+        const minScale = 1;
+        const maxScale = 5;
         
-        // 阻止图片点击事件冒泡
-        enlargedImg.onclick = function(e) {
+        // 更新图片变换
+        function updateTransform() {
+            enlargedImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        }
+        
+        // 重置图片位置和缩放
+        function resetTransform() {
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+        }
+        
+        // PC端：鼠标滚轮缩放
+        function handleWheel(e) {
+            e.preventDefault();
+            
+            const rect = enlargedImg.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            // 计算缩放中心点
+            const centerX = mouseX / rect.width;
+            const centerY = mouseY / rect.height;
+            
+            const oldScale = scale;
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            scale = Math.min(Math.max(scale + delta, minScale), maxScale);
+            
+            if (scale !== oldScale) {
+                // 调整平移以保持鼠标位置为缩放中心
+                const scaleRatio = scale / oldScale;
+                const containerRect = imageContainer.getBoundingClientRect();
+                const offsetX = (mouseX - containerRect.width / 2) * (scaleRatio - 1);
+                const offsetY = (mouseY - containerRect.height / 2) * (scaleRatio - 1);
+                
+                translateX = (translateX - offsetX);
+                translateY = (translateY - offsetY);
+                
+                updateTransform();
+            }
+        }
+        
+        // 移动端：双指缩放
+        let lastTouchDistance = 0;
+        let lastTouchX = 0;
+        let lastTouchY = 0;
+        
+        function getTouchDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+        
+        function getTouchCenter(touches) {
+            return {
+                x: (touches[0].clientX + touches[1].clientX) / 2,
+                y: (touches[0].clientY + touches[1].clientY) / 2
+            };
+        }
+        
+        function handleTouchStart(e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                lastTouchDistance = getTouchDistance(e.touches);
+                const center = getTouchCenter(e.touches);
+                lastTouchX = center.x;
+                lastTouchY = center.y;
+            } else if (e.touches.length === 1 && scale > 1) {
+                isDragging = true;
+                startX = e.touches[0].clientX - translateX;
+                startY = e.touches[0].clientY - translateY;
+                enlargedImg.style.cursor = 'grabbing';
+            }
+        }
+        
+        function handleTouchMove(e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                
+                const currentDistance = getTouchDistance(e.touches);
+                const currentCenter = getTouchCenter(e.touches);
+                
+                if (lastTouchDistance > 0) {
+                    const scaleChange = currentDistance / lastTouchDistance;
+                    const newScale = Math.min(Math.max(scale * scaleChange, minScale), maxScale);
+                    
+                    if (newScale !== scale) {
+                        // 计算缩放中心相对于图片容器的偏移
+                        const containerRect = imageContainer.getBoundingClientRect();
+                        const centerX = currentCenter.x - containerRect.left - containerRect.width / 2;
+                        const centerY = currentCenter.y - containerRect.top - containerRect.height / 2;
+                        
+                        // 调整平移以保持双指中心为缩放中心
+                        const scaleRatio = newScale / scale;
+                        translateX = translateX - centerX * (scaleRatio - 1);
+                        translateY = translateY - centerY * (scaleRatio - 1);
+                        
+                        scale = newScale;
+                        updateTransform();
+                    }
+                }
+                
+                lastTouchDistance = currentDistance;
+                lastTouchX = currentCenter.x;
+                lastTouchY = currentCenter.y;
+            } else if (e.touches.length === 1 && isDragging && scale > 1) {
+                e.preventDefault();
+                translateX = e.touches[0].clientX - startX;
+                translateY = e.touches[0].clientY - startY;
+                updateTransform();
+            }
+        }
+        
+        function handleTouchEnd(e) {
+            if (e.touches.length < 2) {
+                lastTouchDistance = 0;
+            }
+            if (e.touches.length === 0) {
+                isDragging = false;
+                enlargedImg.style.cursor = 'grab';
+            }
+        }
+        
+        // PC端：鼠标拖拽
+        function handleMouseDown(e) {
+            if (scale > 1) {
+                isDragging = true;
+                startX = e.clientX - translateX;
+                startY = e.clientY - translateY;
+                enlargedImg.style.cursor = 'grabbing';
+                e.preventDefault();
+            }
+        }
+        
+        function handleMouseMove(e) {
+            if (isDragging && scale > 1) {
+                translateX = e.clientX - startX;
+                translateY = e.clientY - startY;
+                updateTransform();
+            }
+        }
+        
+        function handleMouseUp() {
+            isDragging = false;
+            enlargedImg.style.cursor = scale > 1 ? 'grab' : 'grab';
+        }
+        
+        // 双击重置缩放
+        let lastClickTime = 0;
+        function handleImageClick(e) {
             e.stopPropagation();
-            document.body.removeChild(modal);
+            
+            const currentTime = Date.now();
+            if (currentTime - lastClickTime < 300) {
+                // 双击重置
+                resetTransform();
+                enlargedImg.style.cursor = 'grab';
+            } else if (scale === 1) {
+                // 单击放大到2倍
+                scale = 2;
+                updateTransform();
+                enlargedImg.style.cursor = 'grab';
+            }
+            lastClickTime = currentTime;
+        }
+        
+        // 绑定事件
+        enlargedImg.addEventListener('wheel', handleWheel, { passive: false });
+        enlargedImg.addEventListener('touchstart', handleTouchStart, { passive: false });
+        enlargedImg.addEventListener('touchmove', handleTouchMove, { passive: false });
+        enlargedImg.addEventListener('touchend', handleTouchEnd);
+        enlargedImg.addEventListener('mousedown', handleMouseDown);
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        enlargedImg.addEventListener('click', handleImageClick);
+        
+        // 点击模态框背景关闭
+        modal.onclick = function(e) {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+            }
         };
         
         // ESC键关闭
@@ -3116,11 +3319,31 @@ justifyContent: ${debugInfo.justifyContent}
             if (e.key === 'Escape') {
                 document.body.removeChild(modal);
                 document.removeEventListener('keydown', handleKeyPress);
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
             }
         };
         document.addEventListener('keydown', handleKeyPress);
         
-        modal.appendChild(enlargedImg);
+        // 添加缩放提示
+        const hint = document.createElement('div');
+        hint.style.cssText = `
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1;
+        `;
+        hint.textContent = 'PC: 滚轮缩放 | 移动端: 双指缩放 | 双击重置';
+        
+        imageContainer.appendChild(enlargedImg);
+        modal.appendChild(imageContainer);
+        modal.appendChild(hint);
         document.body.appendChild(modal);
     }
 

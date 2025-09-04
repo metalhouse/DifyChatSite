@@ -2244,6 +2244,220 @@
                 max-width: 280px !important;
             }
         }
+
+        /* 集成输入框设计 */
+        .integrated-input-container {
+            display: flex;
+            align-items: stretch;
+            background: white;
+            border-radius: 25px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            padding: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .integrated-input-container:focus-within {
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+
+        .input-action-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .input-action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .add-btn {
+            background: #f8f9fa;
+            color: #6c757d;
+            margin-right: 4px;
+        }
+
+        .add-btn:hover:not(:disabled) {
+            background: #e9ecef;
+            transform: scale(1.05);
+        }
+
+        .mention-btn {
+            background: #e3f2fd;
+            color: #1976d2;
+            margin-right: 4px;
+        }
+
+        .mention-btn:hover:not(:disabled) {
+            background: #bbdefb;
+            transform: scale(1.05);
+        }
+
+        .emoji-btn {
+            background: #fff3e0;
+            color: #f57c00;
+            margin-right: 4px;
+        }
+
+        .emoji-btn:hover:not(:disabled) {
+            background: #ffe0b2;
+            transform: scale(1.05);
+        }
+
+        .send-btn {
+            background: #007bff;
+            color: white;
+            margin-left: 4px;
+        }
+
+        .send-btn:hover:not(:disabled) {
+            background: #0056b3;
+            transform: scale(1.05);
+        }
+
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            min-width: 0;
+        }
+
+        .input-wrapper textarea {
+            width: 100%;
+            border: none;
+            outline: none;
+            resize: none;
+            padding: 8px 12px;
+            font-size: 14px;
+            line-height: 1.4;
+            background: transparent;
+            min-height: 20px;
+            max-height: 120px;
+            font-family: inherit;
+        }
+
+        .input-wrapper textarea::placeholder {
+            color: #6c757d;
+        }
+
+        /* 添加菜单样式 */
+        .add-menu {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            margin-bottom: 8px;
+            z-index: 1000;
+            min-width: 120px;
+        }
+
+        .add-menu-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s ease;
+            font-size: 14px;
+        }
+
+        .add-menu-item:hover {
+            background: #f8f9fa;
+        }
+
+        .add-menu-item:first-child {
+            border-radius: 8px 8px 0 0;
+        }
+
+        .add-menu-item:last-child {
+            border-radius: 0 0 8px 8px;
+        }
+
+        .add-menu-item i {
+            color: #6c757d;
+            width: 16px;
+        }
+
+        /* 表情菜单样式 */
+        .emoji-menu {
+            position: absolute;
+            bottom: 100%;
+            left: 40px; /* 位置在表情按钮下方 */
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            margin-bottom: 8px;
+            z-index: 1000;
+            width: 320px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .emoji-category {
+            padding: 8px;
+        }
+
+        .emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+        }
+
+        .emoji-item {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            font-size: 18px;
+            user-select: none;
+        }
+
+        .emoji-item:hover {
+            background: #f8f9fa;
+            transform: scale(1.1);
+        }
+
+        .emoji-item:active {
+            transform: scale(0.95);
+        }
+
+        /* 表情菜单滚动条样式 */
+        .emoji-menu::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .emoji-menu::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+
+        .emoji-menu::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+
+        .emoji-menu::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
     </style>
 </head>
 <body>
@@ -2460,34 +2674,183 @@
                 <!-- 正在输入的用户列表将动态添加 -->
             </div>
 
-            <!-- 输入区域 -->
+            <!-- 输入区域 - 集成设计 -->
             <div class="chat-input">
-                <div class="input-group">
-                    <textarea 
-                        id="messageInput" 
-                        placeholder="输入您的消息... (Shift+Enter换行，Enter发送，@智能体名 可以@智能体)"
-                        rows="2"
-                        disabled
-                    ></textarea>
-                    <div class="input-actions">
-                        <!-- 图片上传按钮组 -->
-                        <div class="image-upload-group">
-                            <button id="imageUploadButton" class="action-button image-button" title="发送图片" disabled>
-                                <i class="fas fa-image"></i>
-                            </button>
-                            <!-- 相册选择 -->
-                            <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
-                            <!-- 相机拍照（移动端） -->
-                            <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display: none;">
-                        </div>
-                        <button id="mentionButton" class="action-button mention-button" title="@智能体" disabled>
-                            <i class="fas fa-at"></i>
-                        </button>
-                        <button id="sendButton" class="action-button send-button" type="button" title="发送消息" disabled>
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
+                <div class="integrated-input-container">
+                    <button id="addButton" class="input-action-btn add-btn" title="添加内容" disabled>
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <button id="emojiButton" class="input-action-btn emoji-btn" title="表情" disabled>
+                        <i class="fas fa-smile"></i>
+                    </button>
+                    <button id="mentionButton" class="input-action-btn mention-btn" title="@智能体" disabled>
+                        <i class="fas fa-at"></i>
+                    </button>
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="messageInput" 
+                            placeholder="输入您的消息..."
+                            rows="1"
+                            disabled
+                        ></textarea>
+                    </div>
+                    <button id="sendButton" class="input-action-btn send-btn" title="发送消息" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                
+                <!-- 隐藏的文件输入 -->
+                <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
+                <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display: none;">
+                
+                <!-- 添加菜单 -->
+                <div id="addMenu" class="add-menu" style="display: none;">
+                    <div class="add-menu-item" data-action="image">
+                        <i class="fas fa-image"></i> 图片
+                    </div>
+                    <div class="add-menu-item" data-action="camera">
+                        <i class="fas fa-camera"></i> 拍照
                     </div>
                 </div>
+                
+                <!-- 表情菜单 -->
+                <div id="emojiMenu" class="emoji-menu" style="display: none;">
+                    <div class="emoji-category">
+                        <div class="emoji-grid">
+                            <div class="emoji-item" data-emoji="😀">😀</div>
+                            <div class="emoji-item" data-emoji="😃">😃</div>
+                            <div class="emoji-item" data-emoji="😄">😄</div>
+                            <div class="emoji-item" data-emoji="😁">😁</div>
+                            <div class="emoji-item" data-emoji="😆">😆</div>
+                            <div class="emoji-item" data-emoji="😅">😅</div>
+                            <div class="emoji-item" data-emoji="😂">😂</div>
+                            <div class="emoji-item" data-emoji="🤣">🤣</div>
+                            <div class="emoji-item" data-emoji="😊">😊</div>
+                            <div class="emoji-item" data-emoji="😇">😇</div>
+                            <div class="emoji-item" data-emoji="🙂">🙂</div>
+                            <div class="emoji-item" data-emoji="🙃">🙃</div>
+                            <div class="emoji-item" data-emoji="😉">😉</div>
+                            <div class="emoji-item" data-emoji="😌">😌</div>
+                            <div class="emoji-item" data-emoji="😍">😍</div>
+                            <div class="emoji-item" data-emoji="🥰">🥰</div>
+                            <div class="emoji-item" data-emoji="😘">😘</div>
+                            <div class="emoji-item" data-emoji="😗">😗</div>
+                            <div class="emoji-item" data-emoji="😙">😙</div>
+                            <div class="emoji-item" data-emoji="😚">😚</div>
+                            <div class="emoji-item" data-emoji="😋">😋</div>
+                            <div class="emoji-item" data-emoji="😛">😛</div>
+                            <div class="emoji-item" data-emoji="😝">😝</div>
+                            <div class="emoji-item" data-emoji="😜">😜</div>
+                            <div class="emoji-item" data-emoji="🤪">🤪</div>
+                            <div class="emoji-item" data-emoji="🤨">🤨</div>
+                            <div class="emoji-item" data-emoji="🧐">🧐</div>
+                            <div class="emoji-item" data-emoji="🤓">🤓</div>
+                            <div class="emoji-item" data-emoji="😎">😎</div>
+                            <div class="emoji-item" data-emoji="🤩">🤩</div>
+                            <div class="emoji-item" data-emoji="🥳">🥳</div>
+                            <div class="emoji-item" data-emoji="😏">😏</div>
+                            <div class="emoji-item" data-emoji="😒">😒</div>
+                            <div class="emoji-item" data-emoji="😞">😞</div>
+                            <div class="emoji-item" data-emoji="😔">😔</div>
+                            <div class="emoji-item" data-emoji="😟">😟</div>
+                            <div class="emoji-item" data-emoji="😕">😕</div>
+                            <div class="emoji-item" data-emoji="🙁">🙁</div>
+                            <div class="emoji-item" data-emoji="☹️">☹️</div>
+                            <div class="emoji-item" data-emoji="😣">😣</div>
+                            <div class="emoji-item" data-emoji="😖">😖</div>
+                            <div class="emoji-item" data-emoji="😫">😫</div>
+                            <div class="emoji-item" data-emoji="😩">😩</div>
+                            <div class="emoji-item" data-emoji="🥺">🥺</div>
+                            <div class="emoji-item" data-emoji="😢">😢</div>
+                            <div class="emoji-item" data-emoji="😭">😭</div>
+                            <div class="emoji-item" data-emoji="😤">😤</div>
+                            <div class="emoji-item" data-emoji="😠">😠</div>
+                            <div class="emoji-item" data-emoji="😡">😡</div>
+                            <div class="emoji-item" data-emoji="🤬">🤬</div>
+                            <div class="emoji-item" data-emoji="🤯">🤯</div>
+                            <div class="emoji-item" data-emoji="😳">😳</div>
+                            <div class="emoji-item" data-emoji="🥵">🥵</div>
+                            <div class="emoji-item" data-emoji="🥶">🥶</div>
+                            <div class="emoji-item" data-emoji="😱">😱</div>
+                            <div class="emoji-item" data-emoji="😨">😨</div>
+                            <div class="emoji-item" data-emoji="😰">😰</div>
+                            <div class="emoji-item" data-emoji="😥">😥</div>
+                            <div class="emoji-item" data-emoji="😓">😓</div>
+                            <div class="emoji-item" data-emoji="🤗">🤗</div>
+                            <div class="emoji-item" data-emoji="🤔">🤔</div>
+                            <div class="emoji-item" data-emoji="🤭">🤭</div>
+                            <div class="emoji-item" data-emoji="🤫">🤫</div>
+                            <div class="emoji-item" data-emoji="🤥">🤥</div>
+                            <div class="emoji-item" data-emoji="😶">😶</div>
+                            <div class="emoji-item" data-emoji="😐">😐</div>
+                            <div class="emoji-item" data-emoji="😑">😑</div>
+                            <div class="emoji-item" data-emoji="😬">😬</div>
+                            <div class="emoji-item" data-emoji="🙄">🙄</div>
+                            <div class="emoji-item" data-emoji="😯">😯</div>
+                            <div class="emoji-item" data-emoji="😦">😦</div>
+                            <div class="emoji-item" data-emoji="😧">😧</div>
+                            <div class="emoji-item" data-emoji="😮">😮</div>
+                            <div class="emoji-item" data-emoji="😲">😲</div>
+                            <div class="emoji-item" data-emoji="🥱">🥱</div>
+                            <div class="emoji-item" data-emoji="😴">😴</div>
+                            <div class="emoji-item" data-emoji="🤤">🤤</div>
+                            <div class="emoji-item" data-emoji="😪">😪</div>
+                            <div class="emoji-item" data-emoji="😵">😵</div>
+                            <div class="emoji-item" data-emoji="🤐">🤐</div>
+                            <div class="emoji-item" data-emoji="🥴">🥴</div>
+                            <div class="emoji-item" data-emoji="🤢">🤢</div>
+                            <div class="emoji-item" data-emoji="🤮">🤮</div>
+                            <div class="emoji-item" data-emoji="🤧">🤧</div>
+                            <div class="emoji-item" data-emoji="😷">😷</div>
+                            <div class="emoji-item" data-emoji="🤒">🤒</div>
+                            <div class="emoji-item" data-emoji="🤕">🤕</div>
+                            <div class="emoji-item" data-emoji="🤑">🤑</div>
+                            <div class="emoji-item" data-emoji="🤠">🤠</div>
+                            <div class="emoji-item" data-emoji="👍">👍</div>
+                            <div class="emoji-item" data-emoji="👎">👎</div>
+                            <div class="emoji-item" data-emoji="👌">👌</div>
+                            <div class="emoji-item" data-emoji="✌️">✌️</div>
+                            <div class="emoji-item" data-emoji="🤞">🤞</div>
+                            <div class="emoji-item" data-emoji="🤟">🤟</div>
+                            <div class="emoji-item" data-emoji="🤘">🤘</div>
+                            <div class="emoji-item" data-emoji="🤙">🤙</div>
+                            <div class="emoji-item" data-emoji="👈">👈</div>
+                            <div class="emoji-item" data-emoji="👉">👉</div>
+                            <div class="emoji-item" data-emoji="👆">👆</div>
+                            <div class="emoji-item" data-emoji="🖕">🖕</div>
+                            <div class="emoji-item" data-emoji="👇">👇</div>
+                            <div class="emoji-item" data-emoji="☝️">☝️</div>
+                            <div class="emoji-item" data-emoji="👏">👏</div>
+                            <div class="emoji-item" data-emoji="🙌">🙌</div>
+                            <div class="emoji-item" data-emoji="👐">👐</div>
+                            <div class="emoji-item" data-emoji="🤲">🤲</div>
+                            <div class="emoji-item" data-emoji="🤝">🤝</div>
+                            <div class="emoji-item" data-emoji="🙏">🙏</div>
+                            <div class="emoji-item" data-emoji="❤️">❤️</div>
+                            <div class="emoji-item" data-emoji="🧡">🧡</div>
+                            <div class="emoji-item" data-emoji="💛">💛</div>
+                            <div class="emoji-item" data-emoji="💚">💚</div>
+                            <div class="emoji-item" data-emoji="💙">💙</div>
+                            <div class="emoji-item" data-emoji="💜">💜</div>
+                            <div class="emoji-item" data-emoji="🤎">🤎</div>
+                            <div class="emoji-item" data-emoji="🖤">🖤</div>
+                            <div class="emoji-item" data-emoji="🤍">🤍</div>
+                            <div class="emoji-item" data-emoji="💯">💯</div>
+                            <div class="emoji-item" data-emoji="💢">💢</div>
+                            <div class="emoji-item" data-emoji="💥">💥</div>
+                            <div class="emoji-item" data-emoji="💫">💫</div>
+                            <div class="emoji-item" data-emoji="💦">💦</div>
+                            <div class="emoji-item" data-emoji="💨">💨</div>
+                            <div class="emoji-item" data-emoji="🕳️">🕳️</div>
+                            <div class="emoji-item" data-emoji="💬">💬</div>
+                            <div class="emoji-item" data-emoji="🗨️">🗨️</div>
+                            <div class="emoji-item" data-emoji="🗯️">🗯️</div>
+                            <div class="emoji-item" data-emoji="💭">💭</div>
+                            <div class="emoji-item" data-emoji="💤">💤</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             </div>
         </div>
     </div>
@@ -2957,6 +3320,14 @@
             // 移动端输入框优化处理
             if (window.innerWidth <= 768) {
                 setupMobileInputOptimization();
+            }
+            
+            // 初始化集成输入框（优先级高，立即执行）
+            try {
+                initIntegratedInput();
+                console.log('✅ 集成输入框初始化完成');
+            } catch (error) {
+                console.error('❌ 集成输入框初始化失败:', error);
             }
             
             // 检查用户登录状态
@@ -4405,11 +4776,10 @@
                 return;
             }
             
-            const imageUploadButton = document.getElementById('imageUploadButton');
             const imageFileInput = document.getElementById('imageFileInput');
             const cameraFileInput = document.getElementById('cameraFileInput');
             
-            if (!imageUploadButton || !imageFileInput) {
+            if (!imageFileInput) {
                 console.warn('图片上传元素未找到');
                 return;
             }
@@ -4419,31 +4789,6 @@
 
             // 检测是否为移动设备
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-            // 点击上传按钮 - 移动端显示选择选项，桌面端直接选择文件
-            imageUploadButton.addEventListener('click', function() {
-                if (this.disabled) {
-                    console.warn('上传按钮已禁用，忽略点击事件');
-                    return;
-                }
-                
-                // 检查是否有选中的聊天室或好友
-                const hasActiveRoom = window.chatroomController?.currentRoom;
-                const hasActiveFriend = window.friendsManager?.currentPrivateChat;
-                
-                if (!hasActiveRoom && !hasActiveFriend) {
-                    showToast('请先选择一个聊天室或好友', 'warning');
-                    return;
-                }
-
-                if (isMobile && cameraFileInput) {
-                    // 移动端显示选择菜单
-                    showImageSourceModal();
-                } else {
-                    // 桌面端直接打开文件选择
-                    imageFileInput.click();
-                }
-            });
 
             // 文件选择后自动上传 - 相册
             imageFileInput.addEventListener('change', async function(e) {
@@ -4648,7 +4993,7 @@
          * 上传并发送图片
          */
         async function uploadAndSendImage(file) {
-            const imageUploadButton = document.getElementById('imageUploadButton');
+            const imageUploadButton = document.getElementById('addButton'); // 更新为新的addButton ID
             
             // 防重复提交检查
             if (imageUploadButton && imageUploadButton.disabled) {
@@ -4678,7 +5023,7 @@
                     }
                     imageUploadButton.classList.add('uploading');
                     imageUploadButton.disabled = true;
-                    imageUploadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                    // 不修改按钮内容，保持加号图标
                 }
 
                 // 创建进度提示
@@ -4794,7 +5139,7 @@
                 if (imageUploadButton) {
                     imageUploadButton.classList.remove('uploading');
                     imageUploadButton.disabled = false;
-                    imageUploadButton.innerHTML = '<i class="fas fa-image"></i>';
+                    // 不修改按钮内容，保持加号图标
                 }
 
                 // 移除进度提示
@@ -4971,18 +5316,143 @@
                 timeout = setTimeout(later, wait);
             };
         }
+
+        // 集成输入框功能
+        function initIntegratedInput() {
+            const textarea = document.getElementById('messageInput');
+            const addButton = document.getElementById('addButton');
+            const addMenu = document.getElementById('addMenu');
+            const emojiButton = document.getElementById('emojiButton');
+            const emojiMenu = document.getElementById('emojiMenu');
+            
+            if (!textarea || !addButton || !addMenu) return;
+
+            // 自动调整textarea高度
+            function adjustTextareaHeight() {
+                textarea.style.height = 'auto';
+                const scrollHeight = textarea.scrollHeight;
+                const maxHeight = 120; // 最大高度
+                textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
+            }
+
+            // 监听输入变化
+            textarea.addEventListener('input', adjustTextareaHeight);
+            
+            // 初始化高度
+            adjustTextareaHeight();
+
+            // 处理加号按钮点击
+            addButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                addMenu.style.display = addMenu.style.display === 'none' ? 'block' : 'none';
+                // 关闭表情菜单
+                if (emojiMenu) emojiMenu.style.display = 'none';
+            });
+
+            // 处理菜单项点击
+            addMenu.addEventListener('click', (e) => {
+                const menuItem = e.target.closest('.add-menu-item');
+                if (!menuItem) return;
+
+                const action = menuItem.dataset.action;
+                if (action === 'image') {
+                    // 检查是否有选中的聊天室或好友
+                    const hasActiveRoom = window.chatroomController?.currentRoom;
+                    const hasActiveFriend = window.friendsManager?.currentPrivateChat;
+                    
+                    if (!hasActiveRoom && !hasActiveFriend) {
+                        showToast('请先选择一个聊天室或好友', 'warning');
+                        addMenu.style.display = 'none';
+                        return;
+                    }
+                    
+                    document.getElementById('imageFileInput').click();
+                } else if (action === 'camera') {
+                    // 检查是否有选中的聊天室或好友
+                    const hasActiveRoom = window.chatroomController?.currentRoom;
+                    const hasActiveFriend = window.friendsManager?.currentPrivateChat;
+                    
+                    if (!hasActiveRoom && !hasActiveFriend) {
+                        showToast('请先选择一个聊天室或好友', 'warning');
+                        addMenu.style.display = 'none';
+                        return;
+                    }
+                    
+                    document.getElementById('cameraFileInput').click();
+                }
+                
+                addMenu.style.display = 'none';
+            });
+
+            // 处理表情按钮点击
+            if (emojiButton && emojiMenu) {
+                emojiButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    emojiMenu.style.display = emojiMenu.style.display === 'none' ? 'block' : 'none';
+                    // 关闭添加菜单
+                    addMenu.style.display = 'none';
+                });
+
+                // 处理表情选择
+                emojiMenu.addEventListener('click', (e) => {
+                    const emojiItem = e.target.closest('.emoji-item');
+                    if (!emojiItem) return;
+
+                    const emoji = emojiItem.dataset.emoji;
+                    if (emoji) {
+                        insertEmojiAtCursor(textarea, emoji);
+                        adjustTextareaHeight();
+                    }
+                    
+                    emojiMenu.style.display = 'none';
+                });
+            }
+
+            // 插入表情到光标位置
+            function insertEmojiAtCursor(textarea, emoji) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const currentValue = textarea.value;
+                
+                const newValue = currentValue.substring(0, start) + emoji + currentValue.substring(end);
+                textarea.value = newValue;
+                
+                // 设置光标位置到表情后面
+                const newCursorPos = start + emoji.length;
+                textarea.selectionStart = newCursorPos;
+                textarea.selectionEnd = newCursorPos;
+                
+                // 触发input事件，让其他监听器知道内容已改变
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+                
+                // 聚焦到textarea
+                textarea.focus();
+            }
+
+            // 点击其他地方关闭菜单
+            document.addEventListener('click', (e) => {
+                if (!addButton.contains(e.target) && !addMenu.contains(e.target)) {
+                    addMenu.style.display = 'none';
+                }
+                if (emojiButton && emojiMenu && 
+                    !emojiButton.contains(e.target) && !emojiMenu.contains(e.target)) {
+                    emojiMenu.style.display = 'none';
+                }
+            });
+        }
+
     </script>
     
     <!-- 图片显示修复脚本 v2.0 - 基于file-api.js标准 -->
-    <script src="./assets/js/image-display-fix.js"></script>
+    <script src="./assets/js/image-display-fix.js" async></script>
     
     <!-- 强力上传修复脚本（移动端Action Sheet） -->
     <script src="./assets/js/force-upload-fix.js"></script>
     
     <!-- 图片优化测试脚本（仅开发环境） -->
-    <script src="js/utils/image-optimization-test.js"></script>
+    <script src="js/utils/image-optimization-test.js" async></script>
     
     <!-- 图片加载可视化监控器 -->
-    <script src="js/utils/image-loading-visualizer.js"></script>
+    <script src="js/utils/image-loading-visualizer.js" async></script>
 </body>
 </html>
