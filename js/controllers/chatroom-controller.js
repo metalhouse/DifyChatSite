@@ -77,6 +77,9 @@ class ChatroomController {
             // 获取当前用户信息
             await this.loadUserInfo();
             
+            // PIN验证检查
+            await this.checkPinVerification(true); // 进入页面时强制验证
+            
             // 初始化房间管理服务
             this.roomManagementService = new RoomManagementService();
             
@@ -112,6 +115,9 @@ class ChatroomController {
             
             // 恢复上次的聊天状态
             this.restoreLastChatState();
+            
+            // 初始化用户活动监听器（用于PIN验证自动锁定）
+            this.initializeActivityListeners();
             
             console.log('聊天室控制器初始化完成');
         } catch (error) {
@@ -331,6 +337,296 @@ class ChatroomController {
             console.error('加载用户信息失败:', error);
             throw error;
         }
+    }
+
+    /**
+     * 初始化用户活动监听器
+     * 用于PIN验证的自动锁定功能
+     */
+    initializeActivityListeners() {
+        if (!window.pinVerification || !window.pinVerification.isEnabled()) {
+            return;
+        }
+
+        const activities = ['click', 'keypress', 'scroll', 'mousemove', 'touchstart'];
+        
+        // 防抖处理，避免频繁重置定时器
+        let resetTimer = null;
+        const resetAutoLockDebounced = () => {
+            if (resetTimer) clearTimeout(resetTimer);
+            resetTimer = setTimeout(() => {
+                this.resetAutoLockTimer();
+            }, 1000); // 1秒内的多次操作只重置一次
+        };
+
+        activities.forEach(activity => {
+            document.addEventListener(activity, resetAutoLockDebounced, { passive: true });
+        });
+
+        console.log('✅ PIN验证用户活动监听器已初始化');
+    }
+
+    /**
+     * 检查PIN验证
+     * @param {boolean} forceVerify - 是否强制验证（进入页面时为true）
+     */
+    async checkPinVerification(forceVerify = true) {
+        try {
+            // 检查是否启用了PIN验证
+            if (!window.pinVerification || !window.pinVerification.isEnabled()) {
+                console.log('PIN验证未启用，跳过验证');
+                return;
+            }
+
+            // 检查是否需要解锁（超时锁定）
+            const lockStatus = this.checkAutoLockStatus();
+            if (lockStatus.needsUnlock) {
+                await this.performPinVerification('界面已自动锁定，请输入PIN码解锁');
+                this.resetAutoLockTimer();
+                return;
+            }
+
+            let needVerification = forceVerify; // 进入页面时强制验证
+
+            if (!forceVerify) {
+                // 页面内部操作时，根据时间判断
+                const lastVerification = localStorage.getItem('pin_last_verification');
+                const verificationTimeout = window.pinVerification.getLockTimeout();
+                const now = Date.now();
+                needVerification = !lastVerification || (now - parseInt(lastVerification)) > verificationTimeout;
+            }
+
+            if (needVerification) {
+                const message = forceVerify ? '请输入PIN码以访问聊天功能' : '会话已过期，请重新输入PIN码';
+                await this.performPinVerification(message);
+                
+                // 记录本次验证时间，用于自动锁定计时
+                const now = Date.now();
+                localStorage.setItem('pin_last_verification', now.toString());
+            }
+
+            // 启动自动锁定定时器
+            this.startAutoLockTimer();
+
+        } catch (error) {
+            console.error('PIN验证失败:', error);
+            // PIN验证失败，重定向到主页
+            showToast('PIN验证失败，无法访问聊天功能', 'error');
+            setTimeout(() => {
+                window.location.href = './index.html';
+            }, 2000);
+        }
+    }
+
+    /**
+     * 执行PIN验证
+     */
+    async performPinVerification(message) {
+        if (!window.pinVerification) {
+            throw new Error('PIN验证功能不可用');
+        }
+
+        return new Promise((resolve, reject) => {
+            window.pinVerification.showVerification(message, () => {
+                // 用户取消验证，重定向到主页
+                window.location.href = './index.html';
+            })
+            .then(() => {
+                console.log('PIN验证成功');
+                resolve();
+            })
+            .catch((error) => {
+                console.error('PIN验证失败:', error);
+                reject(error);
+            });
+        });
+    }
+
+    /**
+     * 启动自动锁定定时器
+     */
+    startAutoLockTimer() {
+        if (!window.pinVerification || !window.pinVerification.isEnabled()) {
+            return;
+        }
+
+        this.clearAutoLockTimer();
+
+        const lockTimeout = window.pinVerification.getLockTimeout();
+        
+        this.autoLockTimer = setTimeout(() => {
+            this.lockInterface();
+        }, lockTimeout);
+
+        console.log(`自动锁定定时器启动，${lockTimeout / 60000}分钟后锁定`);
+    }
+
+    /**
+     * 重置自动锁定定时器
+     */
+    resetAutoLockTimer() {
+        if (window.pinVerification && window.pinVerification.isEnabled()) {
+            this.startAutoLockTimer();
+        }
+    }
+
+    /**
+     * 清除自动锁定定时器
+     */
+    clearAutoLockTimer() {
+        if (this.autoLockTimer) {
+            clearTimeout(this.autoLockTimer);
+            this.autoLockTimer = null;
+        }
+    }
+
+    /**
+     * 锁定界面
+     */
+    lockInterface() {
+        console.log('界面自动锁定');
+        localStorage.setItem('interface_locked', Date.now().toString());
+        this.clearAutoLockTimer();
+        
+        // 显示锁定遮罩
+        this.showLockOverlay();
+    }
+
+    /**
+     * 显示锁定遮罩
+     */
+    showLockOverlay() {
+        // 创建锁定遮罩
+        const overlay = document.createElement('div');
+        overlay.id = 'pin-lock-overlay';
+        overlay.innerHTML = `
+            <div class="pin-lock-content">
+                <i class="fas fa-lock fa-3x mb-3"></i>
+                <h4>界面已锁定</h4>
+                <p class="text-muted mb-4">为了保护您的隐私，界面已自动锁定</p>
+                <button class="btn btn-primary" onclick="chatroomController.unlockInterface()">
+                    <i class="fas fa-unlock me-2"></i>
+                    解锁
+                </button>
+            </div>
+        `;
+        
+        // 添加样式
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            color: white;
+            text-align: center;
+        `;
+        
+        // 添加CSS样式到head中
+        const style = document.createElement('style');
+        style.textContent = `
+            .pin-lock-content {
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                border-radius: 1rem;
+                padding: 2rem;
+                backdrop-filter: blur(20px);
+            }
+            .pin-lock-content .btn {
+                background: linear-gradient(135deg, #28a745, #20c997);
+                border: none;
+                padding: 0.75rem 1.5rem;
+                border-radius: 0.5rem;
+                color: white;
+                font-weight: 500;
+                transition: all 0.3s ease;
+            }
+            .pin-lock-content .btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+            }
+        `;
+        document.head.appendChild(style);
+        
+        document.body.appendChild(overlay);
+    }
+
+    /**
+     * 解锁界面
+     */
+    async unlockInterface() {
+        try {
+            // 修改锁定遮罩显示解锁状态，但保持背景模糊
+            const overlay = document.getElementById('pin-lock-overlay');
+            if (overlay) {
+                // 隐藏解锁按钮和提示文字，但保持背景遮罩
+                const content = overlay.querySelector('.pin-lock-content');
+                if (content) {
+                    content.style.display = 'none';
+                }
+                // 保持遮罩背景以保护隐私
+                overlay.style.background = 'rgba(0, 0, 0, 0.7)';
+            }
+
+            await this.performPinVerification('请输入PIN码解锁界面');
+            
+            // 验证成功后移除锁定遮罩
+            if (overlay) {
+                overlay.remove();
+            }
+            
+            // 清除锁定状态
+            localStorage.removeItem('interface_locked');
+            localStorage.setItem('pin_last_verification', Date.now().toString());
+            
+            // 重新启动自动锁定定时器
+            this.startAutoLockTimer();
+            
+            showToast('界面解锁成功', 'success');
+            
+        } catch (error) {
+            console.error('解锁失败:', error);
+            showToast('解锁失败', 'error');
+            
+            // 恢复锁定遮罩的原始显示状态
+            const overlay = document.getElementById('pin-lock-overlay');
+            if (overlay) {
+                const content = overlay.querySelector('.pin-lock-content');
+                if (content) {
+                    content.style.display = 'block';
+                }
+                overlay.style.background = 'rgba(0, 0, 0, 0.9)';
+            }
+        }
+    }
+
+    /**
+     * 检查自动锁定状态
+     */
+    checkAutoLockStatus() {
+        const lockTimestamp = localStorage.getItem('interface_locked');
+        if (!lockTimestamp) {
+            return { needsUnlock: false };
+        }
+
+        // 检查锁定时间是否有效（避免长时间锁定）
+        const lockTime = parseInt(lockTimestamp);
+        const now = Date.now();
+        const maxLockDuration = 24 * 60 * 60 * 1000; // 24小时
+
+        if ((now - lockTime) > maxLockDuration) {
+            // 超过最大锁定时间，自动解除锁定状态
+            localStorage.removeItem('interface_locked');
+            return { needsUnlock: false };
+        }
+
+        return { needsUnlock: true, lockTime };
     }
 
     /**
@@ -1280,17 +1576,40 @@ width: ${computedStyle.width}`;
     /**
      * 加入房间
      */
-    joinRoom(roomId) {
-        if (!this.websocket || !this.websocket.connected) {
-            this.showError('WebSocket未连接');
-            return;
-        }
+    async joinRoom(roomId) {
+        try {
+            if (!this.websocket || !this.websocket.connected) {
+                this.showError('WebSocket未连接');
+                return;
+            }
 
-        if (this.currentRoom?.roomId === roomId || this.currentRoom?.id === roomId) {
-            return; // 已在当前房间
-        }
+            if (this.currentRoom?.roomId === roomId || this.currentRoom?.id === roomId) {
+                return; // 已在当前房间
+            }
 
-        // 清除私聊状态
+            // PIN验证检查 - 根据自动锁定时间判断
+            if (window.pinVerification && window.pinVerification.isEnabled()) {
+                const lastVerification = localStorage.getItem('pin_last_verification');
+                const verificationTimeout = window.pinVerification.getLockTimeout();
+                const now = Date.now();
+
+                if (!lastVerification || (now - parseInt(lastVerification)) > verificationTimeout) {
+                    try {
+                        await window.pinVerification.showVerification('请输入PIN码以进入房间');
+                        localStorage.setItem('pin_last_verification', now.toString());
+                        this.resetAutoLockTimer();
+                    } catch (error) {
+                        console.log('房间PIN验证失败或取消:', error.message);
+                        showToast('PIN验证失败，无法进入房间', 'warning');
+                        return;
+                    }
+                } else {
+                    // 重置自动锁定定时器
+                    this.resetAutoLockTimer();
+                }
+            }
+
+            // 清除私聊状态
         if (this.friendsManager) {
             this.friendsManager.clearPrivateChat();
         }
@@ -1348,6 +1667,10 @@ width: ${computedStyle.width}`;
 
         // 保存timeout ID以便在成功时清除
         this.joinRoomTimeout = timeoutId;
+        } catch (error) {
+            console.error('加入房间失败:', error);
+            this.showError('加入房间失败: ' + error.message);
+        }
     }
 
     /**

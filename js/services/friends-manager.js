@@ -248,10 +248,40 @@ class FriendsManager {
     /**
      * 开始私聊
      */
-    startPrivateChat(friendId, friendName) {
-        console.log('开始与好友私聊:', friendId, friendName);
-        
-        // 设置当前私聊状态
+    async startPrivateChat(friendId, friendName) {
+        try {
+            console.log('开始与好友私聊:', friendId, friendName);
+            
+            // PIN验证检查 - 根据自动锁定时间判断是否需要验证
+            if (window.pinVerification && window.pinVerification.isEnabled()) {
+                const lastVerification = localStorage.getItem('pin_last_verification');
+                const verificationTimeout = window.pinVerification.getLockTimeout();
+                const now = Date.now();
+
+                if (!lastVerification || (now - parseInt(lastVerification)) > verificationTimeout) {
+                    try {
+                        await window.pinVerification.showVerification('请输入PIN码以开始私聊');
+                        console.log('私聊PIN验证成功');
+                        
+                        // 记录验证时间
+                        localStorage.setItem('pin_last_verification', now.toString());
+                        if (this.chatroomController && this.chatroomController.resetAutoLockTimer) {
+                            this.chatroomController.resetAutoLockTimer();
+                        }
+                    } catch (error) {
+                        console.log('私聊PIN验证失败或取消:', error.message);
+                        showToast('PIN验证失败，无法开始私聊', 'warning');
+                        return; // 验证失败，不继续执行
+                    }
+                } else {
+                    // 重置自动锁定定时器
+                    if (this.chatroomController && this.chatroomController.resetAutoLockTimer) {
+                        this.chatroomController.resetAutoLockTimer();
+                    }
+                }
+            }
+            
+            // 设置当前私聊状态
         this.currentPrivateChat = {
             friendId: friendId,
             friendName: friendName,
@@ -290,9 +320,13 @@ class FriendsManager {
             this.markMessagesAsRead(friendId);
         }, 1500);
 
-        // 在移动设备上隐藏侧边栏
-        if (window.innerWidth <= 768) {
-            this.closeSidebar();
+            // 在移动设备上隐藏侧边栏
+            if (window.innerWidth <= 768) {
+                this.closeSidebar();
+            }
+        } catch (error) {
+            console.error('开始私聊失败:', error);
+            showToast('开始私聊失败: ' + error.message, 'error');
         }
     }
 

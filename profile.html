@@ -562,6 +562,165 @@
         .password-toggle:hover {
             color: var(--text-primary);
         }
+
+        /* PIN验证相关样式 */
+        .pin-settings {
+            margin-top: var(--space-4);
+        }
+
+        .pin-toggle-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: var(--space-4);
+            width: 100%;
+        }
+
+        .pin-toggle-container .info-label {
+            flex: 1;
+        }
+
+        .pin-toggle {
+            flex-shrink: 0;
+        }
+
+        /* 切换开关样式 */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #28a745;
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px #28a745;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /* PIN状态信息 */
+        .pin-status-info {
+            margin-top: var(--space-4);
+            padding: var(--space-4);
+            background-color: rgba(40, 167, 69, 0.05);
+            border: 1px solid rgba(40, 167, 69, 0.2);
+            border-radius: var(--radius-md);
+        }
+
+        .pin-lock-time-select {
+            max-width: 120px;
+            padding: var(--space-2) var(--space-3);
+            font-size: var(--text-sm);
+        }
+
+        .pin-actions {
+            margin-top: var(--space-4);
+            display: flex;
+            gap: var(--space-3);
+        }
+
+        /* PIN输入框样式 */
+        .pin-input {
+            font-family: monospace;
+            font-size: var(--text-lg);
+            letter-spacing: 0.2em;
+            text-align: center;
+        }
+
+        .pin-input:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.2);
+        }
+
+        /* PIN验证错误状态 */
+        .pin-input.is-invalid {
+            border-color: var(--error);
+            box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2);
+        }
+
+        .pin-verify-attempts {
+            margin-top: var(--space-3);
+            padding: var(--space-2);
+            background-color: rgba(255, 193, 7, 0.1);
+            border-radius: var(--radius-sm);
+        }
+
+        /* 模态框增强样式 */
+        .modal-content {
+            border: none;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.1), rgba(32, 201, 151, 0.05));
+            border-bottom: 1px solid rgba(40, 167, 69, 0.2);
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        }
+
+        .modal-title {
+            color: var(--text-primary);
+            font-weight: var(--font-semibold);
+        }
+
+        .modal-body {
+            padding: var(--space-6);
+        }
+
+        .modal-footer {
+            border-top: 1px solid var(--border-light);
+            padding: var(--space-4) var(--space-6);
+        }
+
+        /* PIN验证模态框特殊样式 */
+        #pinVerifyModal .modal-content {
+            border: 2px solid #28a745;
+        }
+
+        #pinVerifyModal .modal-header {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        #pinVerifyModal .modal-title {
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -754,6 +913,65 @@
                         <span class="info-value" id="registerTime">-</span>
                     </div>
 
+                    <!-- PIN验证设置 -->
+                    <hr style="margin: var(--space-6) 0;">
+                    <h3 style="margin-bottom: var(--space-4); font-size: var(--text-lg); color: var(--text-primary);">
+                        <i class="fas fa-lock me-2"></i>PIN验证设置
+                    </h3>
+
+                    <div class="pin-settings">
+                        <div class="info-item">
+                            <div class="pin-toggle-container">
+                                <span class="info-label">
+                                    <i class="fas fa-shield-alt me-2"></i>
+                                    敏感区域PIN验证
+                                    <small class="text-muted d-block">启用后进入聊天室或好友私聊需要验证PIN码</small>
+                                </span>
+                                <div class="pin-toggle">
+                                    <label class="switch">
+                                        <input type="checkbox" id="pinEnabledToggle">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pin-status-info" id="pinStatusInfo" style="display: none;">
+                            <div class="info-item">
+                                <span class="info-label">PIN状态</span>
+                                <span class="info-value">
+                                    <span class="status-badge" id="pinStatus">
+                                        <i class="fas fa-check-circle"></i>
+                                        已设置
+                                    </span>
+                                </span>
+                            </div>
+
+                            <div class="info-item">
+                                <span class="info-label">自动锁定时间</span>
+                                <div class="info-value">
+                                    <select class="form-control pin-lock-time-select" id="pinLockTimeSelect">
+                                        <option value="1">1分钟</option>
+                                        <option value="5" selected>5分钟</option>
+                                        <option value="30">30分钟</option>
+                                        <option value="60">1小时</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pin-actions" id="pinActions" style="display: none;">
+                            <button type="button" class="btn btn-outline" id="setPinBtn" onclick="showSetPinModal()">
+                                <i class="fas fa-plus"></i>
+                                设置PIN码
+                            </button>
+                            <button type="button" class="btn btn-secondary" id="changePinBtn" onclick="showChangePinModal()" style="display: none;">
+                                <i class="fas fa-edit"></i>
+                                修改PIN码
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- 修改密码表单 -->
                     <hr style="margin: var(--space-6) 0;">
                     <h3 style="margin-bottom: var(--space-4); font-size: var(--text-lg); color: var(--text-primary);">
@@ -818,11 +1036,106 @@
         <!-- Toast消息将动态添加到这里 -->
     </div>
 
+    <!-- 设置PIN码模态框 -->
+    <div class="modal fade" id="setPinModal" tabindex="-1" aria-labelledby="setPinModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="setPinModalLabel">
+                        <i class="fas fa-shield-alt me-2"></i>
+                        设置PIN码
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">
+                        <i class="fas fa-info-circle me-1"></i>
+                        PIN码用于保护敏感操作，如进入聊天室或好友私聊。请设置4-6位数字PIN码。
+                    </p>
+                    <form id="setPinForm">
+                        <div class="form-group">
+                            <label class="form-label" for="newPin">PIN码 *</label>
+                            <input type="password" class="form-control pin-input" id="newPin" 
+                                   placeholder="请输入4-6位数字" maxlength="6" 
+                                   pattern="[0-9]*" inputmode="numeric" required>
+                            <small class="form-text text-muted">只能包含数字0-9</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="confirmNewPin">确认PIN码 *</label>
+                            <input type="password" class="form-control pin-input" id="confirmNewPin" 
+                                   placeholder="请再次输入PIN码" maxlength="6" 
+                                   pattern="[0-9]*" inputmode="numeric" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmSetPin()">
+                        <i class="fas fa-check"></i>
+                        设置PIN码
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 修改PIN码模态框 -->
+    <div class="modal fade" id="changePinModal" tabindex="-1" aria-labelledby="changePinModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="changePinModalLabel">
+                        <i class="fas fa-edit me-2"></i>
+                        修改PIN码
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">
+                        <i class="fas fa-info-circle me-1"></i>
+                        为了安全，修改PIN码需要验证当前PIN码。
+                    </p>
+                    <form id="changePinForm">
+                        <div class="form-group">
+                            <label class="form-label" for="currentPin">当前PIN码 *</label>
+                            <input type="password" class="form-control pin-input" id="currentPin" 
+                                   placeholder="请输入当前PIN码" maxlength="6" 
+                                   pattern="[0-9]*" inputmode="numeric" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="newPinChange">新PIN码 *</label>
+                            <input type="password" class="form-control pin-input" id="newPinChange" 
+                                   placeholder="请输入4-6位数字" maxlength="6" 
+                                   pattern="[0-9]*" inputmode="numeric" required>
+                            <small class="form-text text-muted">只能包含数字0-9</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="confirmNewPinChange">确认新PIN码 *</label>
+                            <input type="password" class="form-control pin-input" id="confirmNewPinChange" 
+                                   placeholder="请再次输入新PIN码" maxlength="6" 
+                                   pattern="[0-9]*" inputmode="numeric" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmChangePin()">
+                        <i class="fas fa-check"></i>
+                        修改PIN码
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 隐藏的文件上传输入 -->
     <input type="file" id="avatarInput" accept="image/*" style="display: none;">
 
     <!-- Bootstrap JS -->
     <script src="./vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    
+    <!-- PIN验证服务 -->
+    <script src="js/services/pin-verification-service.js"></script>
     
     <!-- 项目JS -->
     <script type="module">
@@ -931,6 +1244,9 @@
             if (currentUsernameNav) {
                 currentUsernameNav.textContent = user.nickname || user.username || '用户';
             }
+
+            // 初始化PIN验证状态
+            initPinSettings();
         }
 
         // 绑定事件
@@ -939,6 +1255,17 @@
             document.getElementById('passwordForm').addEventListener('submit', changePassword);
             document.getElementById('newPassword').addEventListener('input', checkPasswordStrength);
             document.getElementById('avatarInput').addEventListener('change', handleAvatarUpload);
+            
+            // PIN验证相关事件绑定
+            const pinToggle = document.getElementById('pinEnabledToggle');
+            if (pinToggle) {
+                pinToggle.addEventListener('change', handlePinToggleChange);
+            }
+            
+            const pinLockTimeSelect = document.getElementById('pinLockTimeSelect');
+            if (pinLockTimeSelect) {
+                pinLockTimeSelect.addEventListener('change', handlePinLockTimeChange);
+            }
             
             // 导航栏退出登录
             const logoutBtn = document.getElementById('nav-logout');
@@ -1250,6 +1577,227 @@
                 showLoading(false);
             }
         }
+
+        // PIN验证相关功能 - 使用新的PIN验证服务
+        // 初始化PIN设置
+        async function initPinSettings() {
+            try {
+                if (!window.pinVerificationService) {
+                    console.warn('PIN验证服务未加载');
+                    return;
+                }
+
+                const pinService = window.pinVerificationService;
+                const settings = pinService.getSettings();
+
+                // 如果PIN已启用，检查后端PIN状态
+                if (settings.enabled) {
+                    await pinService.checkPinStatus();
+                }
+
+                updatePinUI();
+            } catch (error) {
+                console.error('初始化PIN设置失败:', error);
+            }
+        }
+
+        // 更新PIN UI
+        function updatePinUI() {
+            if (!window.pinVerificationService) return;
+
+            const pinService = window.pinVerificationService;
+            const settings = pinService.getSettings();
+
+            const pinToggle = document.getElementById('pinEnabledToggle');
+            const pinStatusInfo = document.getElementById('pinStatusInfo');
+            const pinActions = document.getElementById('pinActions');
+            const setPinBtn = document.getElementById('setPinBtn');
+            const changePinBtn = document.getElementById('changePinBtn');
+            const pinStatus = document.getElementById('pinStatus');
+            const pinLockTimeSelect = document.getElementById('pinLockTimeSelect');
+
+            if (pinToggle) {
+                pinToggle.checked = settings.enabled;
+            }
+
+            if (pinStatusInfo && pinActions) {
+                if (settings.enabled) {
+                    pinStatusInfo.style.display = 'block';
+                    pinActions.style.display = 'block';
+
+                    if (settings.hasPin) {
+                        setPinBtn.style.display = 'none';
+                        changePinBtn.style.display = 'inline-block';
+                        pinStatus.innerHTML = '<i class="fas fa-check-circle"></i> 已设置';
+                        pinStatus.className = 'status-badge verified';
+                    } else {
+                        setPinBtn.style.display = 'inline-block';
+                        changePinBtn.style.display = 'none';
+                        pinStatus.innerHTML = '<i class="fas fa-exclamation-circle"></i> 未设置';
+                        pinStatus.className = 'status-badge unverified';
+                    }
+                } else {
+                    pinStatusInfo.style.display = 'none';
+                    pinActions.style.display = 'none';
+                }
+            }
+
+            if (pinLockTimeSelect) {
+                pinLockTimeSelect.value = settings.lockTimeMinutes;
+            }
+        }
+
+        // 处理PIN开关变化
+        async function handlePinToggleChange(event) {
+            if (!window.pinVerificationService) return;
+
+            const pinService = window.pinVerificationService;
+            const isEnabled = event.target.checked;
+            
+            pinService.setEnabled(isEnabled);
+
+            if (isEnabled) {
+                // 启用PIN验证，检查是否已有PIN
+                try {
+                    await pinService.checkPinStatus();
+                    const settings = pinService.getSettings();
+                    
+                    if (!settings.hasPin) {
+                        showToast('请先设置PIN码以启用验证功能', 'info');
+                    }
+                } catch (error) {
+                    showToast('检查PIN状态失败: ' + error.message, 'warning');
+                }
+            }
+            
+            updatePinUI();
+        }
+
+        // 处理自动锁定时间变化
+        function handlePinLockTimeChange(event) {
+            if (!window.pinVerificationService) return;
+
+            const minutes = parseInt(event.target.value);
+            window.pinVerificationService.setLockTimeMinutes(minutes);
+            showToast(`自动锁定时间已设置为${minutes}分钟`, 'success');
+        }
+
+        // 显示设置PIN模态框
+        function showSetPinModal() {
+            const modal = new bootstrap.Modal(document.getElementById('setPinModal'));
+            modal.show();
+            
+            // 清空输入框
+            document.getElementById('newPin').value = '';
+            document.getElementById('confirmNewPin').value = '';
+            
+            // 聚焦到第一个输入框
+            document.getElementById('newPin').focus();
+        }
+
+        // 显示修改PIN模态框
+        function showChangePinModal() {
+            const modal = new bootstrap.Modal(document.getElementById('changePinModal'));
+            modal.show();
+            
+            // 清空输入框
+            document.getElementById('currentPin').value = '';
+            document.getElementById('newPinChange').value = '';
+            document.getElementById('confirmNewPinChange').value = '';
+            
+            // 聚焦到第一个输入框
+            document.getElementById('currentPin').focus();
+        }
+
+        // 确认设置PIN
+        async function confirmSetPin() {
+            if (!window.pinVerificationService) {
+                showToast('PIN验证服务未加载', 'error');
+                return;
+            }
+
+            const newPin = document.getElementById('newPin').value;
+            const confirmNewPin = document.getElementById('confirmNewPin').value;
+
+            // 验证PIN格式
+            if (!window.pinVerificationService.validatePinFormat(newPin)) {
+                showToast('PIN必须是4到6位数字', 'error');
+                return;
+            }
+
+            if (newPin !== confirmNewPin) {
+                showToast('两次输入的PIN码不一致', 'error');
+                return;
+            }
+
+            try {
+                await window.pinVerificationService.setPin(newPin);
+                showToast('PIN设置成功', 'success');
+                updatePinUI();
+                
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('setPinModal'));
+                modal.hide();
+            } catch (error) {
+                console.error('设置PIN失败:', error);
+                if (error.message && error.message.includes('PIN_ALREADY_EXISTS')) {
+                    showToast('用户已设置PIN，请使用修改PIN功能', 'warning');
+                } else {
+                    showToast('设置PIN失败: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // 确认修改PIN
+        async function confirmChangePin() {
+            if (!window.pinVerificationService) {
+                showToast('PIN验证服务未加载', 'error');
+                return;
+            }
+
+            const currentPin = document.getElementById('currentPin').value;
+            const newPin = document.getElementById('newPinChange').value;
+            const confirmNewPin = document.getElementById('confirmNewPinChange').value;
+
+            // 验证输入
+            if (!currentPin) {
+                showToast('请输入当前PIN码', 'error');
+                return;
+            }
+
+            if (!window.pinVerificationService.validatePinFormat(newPin)) {
+                showToast('新PIN必须是4到6位数字', 'error');
+                return;
+            }
+
+            if (newPin !== confirmNewPin) {
+                showToast('两次输入的新PIN码不一致', 'error');
+                return;
+            }
+
+            if (currentPin === newPin) {
+                showToast('新PIN不能与当前PIN相同', 'error');
+                return;
+            }
+
+            try {
+                await window.pinVerificationService.changePin(currentPin, newPin);
+                showToast('PIN修改成功', 'success');
+                
+                // 关闭模态框
+                const modal = bootstrap.Modal.getInstance(document.getElementById('changePinModal'));
+                modal.hide();
+            } catch (error) {
+                console.error('修改PIN失败:', error);
+                showToast('修改PIN失败: ' + error.message, 'error');
+            }
+        }
+
+        // 全局函数声明
+        window.showSetPinModal = showSetPinModal;
+        window.showChangePinModal = showChangePinModal;
+        window.confirmSetPin = confirmSetPin;
+        window.confirmChangePin = confirmChangePin;
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', initProfile);
