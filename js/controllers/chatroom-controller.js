@@ -3094,6 +3094,17 @@ justifyContent: ${debugInfo.justifyContent}
             cursor: zoom-out;
         `;
         
+        // 移动端临时启用缩放
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+        let originalViewport = null;
+        if (isMobileDevice) {
+            const viewport = document.querySelector('meta[name="viewport"]');
+            if (viewport) {
+                originalViewport = viewport.getAttribute('content');
+                viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes');
+            }
+        }
+        
         // 创建图片容器
         const imageContainer = document.createElement('div');
         imageContainer.style.cssText = `
@@ -3299,28 +3310,54 @@ justifyContent: ${debugInfo.justifyContent}
         enlargedImg.addEventListener('wheel', handleWheel, { passive: false });
         enlargedImg.addEventListener('touchstart', handleTouchStart, { passive: false });
         enlargedImg.addEventListener('touchmove', handleTouchMove, { passive: false });
-        enlargedImg.addEventListener('touchend', handleTouchEnd);
+        enlargedImg.addEventListener('touchend', handleTouchEnd, { passive: false });
         enlargedImg.addEventListener('mousedown', handleMouseDown);
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
         enlargedImg.addEventListener('click', handleImageClick);
         
+        // 为模态框也添加触摸事件处理（防止默认行为）
+        modal.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        modal.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        // 统一的关闭模态框函数
+        function closeModal() {
+            if (document.body.contains(modal)) {
+                document.body.removeChild(modal);
+            }
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.removeEventListener('keydown', handleKeyPress);
+            
+            // 恢复原始viewport设置
+            if (isMobileDevice && originalViewport) {
+                const viewport = document.querySelector('meta[name="viewport"]');
+                if (viewport) {
+                    viewport.setAttribute('content', originalViewport);
+                }
+            }
+        }
+        
         // 点击模态框背景关闭
         modal.onclick = function(e) {
             if (e.target === modal) {
-                document.body.removeChild(modal);
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
+                closeModal();
             }
         };
         
         // ESC键关闭
         const handleKeyPress = function(e) {
             if (e.key === 'Escape') {
-                document.body.removeChild(modal);
-                document.removeEventListener('keydown', handleKeyPress);
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
+                closeModal();
             }
         };
         document.addEventListener('keydown', handleKeyPress);
@@ -3339,7 +3376,11 @@ justifyContent: ${debugInfo.justifyContent}
             pointer-events: none;
             z-index: 1;
         `;
-        hint.textContent = 'PC: 滚轮缩放 | 移动端: 双指缩放 | 双击重置';
+        
+        // 检测设备类型显示对应提示
+        hint.textContent = isMobileDevice ? 
+            '双指缩放 | 单指拖拽 | 双击重置' : 
+            'PC: 滚轮缩放 | 移动端: 双指缩放 | 双击重置';
         
         imageContainer.appendChild(enlargedImg);
         modal.appendChild(imageContainer);

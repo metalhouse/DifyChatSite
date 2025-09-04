@@ -4747,8 +4747,8 @@
 
             // 添加点击聊天区域自动聚焦输入框的功能（仅移动端）
             chatMessages.addEventListener('click', function(e) {
-                // 如果点击的不是链接、按钮等交互元素
-                if (!e.target.closest('a, button, .message-actions')) {
+                // 如果点击的不是链接、按钮、图片等交互元素
+                if (!e.target.closest('a, button, .message-actions, img, .message-image')) {
                     messageInput.focus();
                 }
             });
