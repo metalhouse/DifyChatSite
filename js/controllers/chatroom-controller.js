@@ -58,8 +58,10 @@ class ChatroomController {
 
         console.log('DOM元素初始化:', this.elements);
         
-        // 绑定事件
-        this.bindEvents();
+    // 绑定事件
+    this.bindEvents();
+    // 修复输入菜单定位：确保容器具备定位上下文，避免需先触发@才可见
+    this.ensureInputMenusPositioning();
         
         // 输入状态管理
         this.typingTimer = null;
@@ -1470,6 +1472,37 @@ class ChatroomController {
                 this.createRoom();
             }
         });
+
+        // 再次确保定位（某些早期加载顺序可能导致未设置）
+        this.ensureInputMenusPositioning();
+    }
+
+    /**
+     * 确保输入框区域的+菜单和表情菜单具备正确定位上下文与层级
+     * 解决：点击+或表情需要先点@才显示的问题（@逻辑曾临时把.chat-input设为relative）
+     */
+    ensureInputMenusPositioning() {
+        try {
+            const chatInput = document.querySelector('.chat-input');
+            if (chatInput) {
+                const style = window.getComputedStyle(chatInput);
+                if (!style || style.position === 'static') {
+                    chatInput.style.position = 'relative';
+                }
+            }
+
+            // 提升菜单层级，避免被周围元素遮挡
+            const addMenu = this.elements.addMenu || document.getElementById('addMenu');
+            const emojiMenu = this.elements.emojiMenu || document.getElementById('emojiMenu');
+            if (addMenu) {
+                addMenu.style.zIndex = addMenu.style.zIndex || '1100';
+            }
+            if (emojiMenu) {
+                emojiMenu.style.zIndex = emojiMenu.style.zIndex || '1100';
+            }
+        } catch (e) {
+            console.warn('ensureInputMenusPositioning failed:', e);
+        }
     }
 
     /**

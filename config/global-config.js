@@ -287,6 +287,120 @@ if (IS_DEVELOPMENT) {
     window.showConfig();
 }
 
+// 生产环境安全日志包装：
+// - 静默普通日志（log/info/debug）
+// - 对警告/错误进行敏感信息（PIN样式的4-6位数字）遮蔽
+// 说明：不会影响开发环境。
+(function setupSafeConsole() {
+    try {
+        const isProd = !ENV_CONFIG.isDevelopment() && !ENV_CONFIG.isDebug();
+        // 高级遮蔽器：跨参数检测“pin”线索，深度遮蔽对象/数组中与PIN相关的字段与4-6位数字
+        const redactor = (() => {
+            const isPinKey = (k) => typeof k === 'string' && /pin/i.test(k);
+            const redactString = (s, hasPinHint = false) => {
+                if (typeof s !== 'string') return s;
+                const lower = s.toLowerCase();
+                if (hasPinHint || lower.includes('pin')) {
+                    return s
+                        .replace(/(pin\s*[:=]?\s*)(\d{4,6})/gi, (_, pfx) => `${pfx}••••`)
+                        .replace(/(^|[^\d])(\d{4,6})(?=$|[^\d])/g, (m, lead) => `${lead}••••`);
+                }
+                return s;
+            };
+            const detectPinClue = (val, seen = new WeakSet()) => {
+                try {
+                    if (val == null) return false;
+                    if (typeof val === 'string') return /pin/i.test(val);
+                    if (typeof val === 'number') return false;
+                    if (typeof val !== 'object') return false;
+                    if (seen.has(val)) return false;
+                    seen.add(val);
+                    if (Array.isArray(val)) {
+                        return val.some(v => detectPinClue(v, seen));
+                    }
+                    return Object.keys(val).some(k => isPinKey(k) || detectPinClue(val[k], seen));
+                } catch { return false; }
+            };
+            const redactAny = (val, pinHint = false, seen = new WeakSet()) => {
+                try {
+                    if (val == null) return val;
+                    if (typeof val === 'string') return redactString(val, pinHint);
+                    if (typeof val === 'number') {
+                        const len = val.toString().length;
+                        return pinHint && len >= 4 && len <= 6 ? '••••' : val;
+                    }
+                    if (typeof val !== 'object') return val;
+                    if (seen.has(val)) return val; // avoid cycles
+                    seen.add(val);
+                    if (Array.isArray(val)) {
+                        return val.map(v => redactAny(v, pinHint, seen));
+                    }
+                    const out = {};
+                    for (const k of Object.keys(val)) {
+                        const v = val[k];
+                        if (isPinKey(k)) {
+                            if (typeof v === 'string' || typeof v === 'number') {
+                                out[k] = '••••';
+                            } else {
+                                out[k] = redactAny(v, true, seen);
+                            }
+                        } else {
+                            out[k] = redactAny(v, pinHint, seen);
+                        }
+                    }
+                    return out;
+                } catch { return val; }
+            };
+            return { detectPinClue, redactAny };
+        })();
+
+        const wrapWithRedaction = (method, silent = false) => {
+            const orig = console[method];
+            console[method] = function(...args) {
+                if (silent) return; // 完全静默
+                try {
+                    let hasPinHint = args.some(a => redactor.detectPinClue(a));
+                    // 生产环境下，若有独立的4-6位数字参数，也进行遮蔽（防止裸PIN泄露）
+                    if (!hasPinHint && isProd && (method === 'warn' || method === 'error')) {
+                        hasPinHint = args.some(a => {
+                            if (typeof a === 'number') {
+                                const len = a.toString().length; return len >= 4 && len <= 6;
+                            }
+                            if (typeof a === 'string') {
+                                return /^\d{4,6}$/.test(a.trim());
+                            }
+                            return false;
+                        });
+                    }
+                    const safeArgs = args.map(a => redactor.redactAny(a, hasPinHint));
+                    return orig.apply(console, safeArgs);
+                } catch (e) {
+                    return orig.apply(console, args);
+                }
+            };
+        };
+
+        if (isProd) {
+            // 静默普通日志
+            wrapWithRedaction('log', true);
+            wrapWithRedaction('info', true);
+            wrapWithRedaction('debug', true);
+            // 为 warn/error 添加遮蔽
+            wrapWithRedaction('warn');
+            wrapWithRedaction('error');
+        } else {
+            // 开发环境对所有方法做遮蔽保护（不改变可见性）
+            wrapWithRedaction('log');
+            wrapWithRedaction('info');
+            wrapWithRedaction('debug');
+            wrapWithRedaction('warn');
+            wrapWithRedaction('error');
+        }
+    } catch (_) {
+        // 忽略任何包装失败
+    }
+})();
+
 // 导出配置供其他模块使用
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = window.GLOBAL_CONFIG;

@@ -387,7 +387,7 @@ class PinVerificationService {
                         <div class="form-group">
                             <label class="form-label" for="dynamicVerifyPin">PIN码 *</label>
                             <input type="password" class="form-control pin-input" id="dynamicVerifyPin" 
-                                   placeholder="请输入PIN码" maxlength="6" 
+                                   placeholder="请输入PIN码" maxlength="6" autocomplete="off"
                                    pattern="[0-9]*" inputmode="numeric" required
                                    style="font-family: monospace; font-size: 1.1rem; letter-spacing: 0.2em; text-align: center;">
                             <div class="invalid-feedback" id="dynamicPinVerifyError"></div>
