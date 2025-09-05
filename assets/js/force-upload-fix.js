@@ -14,10 +14,12 @@
     // 创建强力上传按钮
     function createForceUploadButton() {
         // 移除现有按钮的所有限制
-        const originalButton = document.getElementById('imageUploadButton');
+        const originalButton = document.getElementById('imageUploadButton')
+            || document.getElementById('addButton')
+            || document.querySelector('[data-action="image"], .image-button, .add-btn');
         if (!originalButton) {
-            console.warn('未找到原始上传按钮');
-            return;
+            // 按钮可能由页面控制器稍后生成，这里静默跳过，稍后重试
+            return null;
         }
 
         console.log('💪 创建强力上传按钮...');
@@ -54,7 +56,7 @@
             }
         });
 
-        return forceButton;
+    return forceButton;
     }
 
     // 显示图片来源选择菜单 - 主流底部滑出样式
@@ -826,7 +828,17 @@
         }
 
         try {
-            createForceUploadButton();
+            const btn = createForceUploadButton();
+            if (!btn) {
+                // 若未找到按钮，稍后再试一次，最多重试3次
+                let retries = 0;
+                const retry = () => {
+                    const n = createForceUploadButton();
+                    retries++;
+                    if (!n && retries < 3) setTimeout(retry, 1000);
+                };
+                setTimeout(retry, 800);
+            }
             setupForceFileInputs();
             preventInterference();
 

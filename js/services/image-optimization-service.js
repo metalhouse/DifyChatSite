@@ -620,6 +620,11 @@ class ImageOptimizationService {
 // 创建全局实例
 window.imageOptimizer = new ImageOptimizationService();
 
+// 兼容：将类挂到 window 供其他脚本检测/实例化
+if (typeof window !== 'undefined') {
+    window.ImageOptimizationService = ImageOptimizationService;
+}
+
 // 添加全局调试功能
 window.debugImageOptimizer = {
     getStats: () => window.imageOptimizer.getLoadingStats(),

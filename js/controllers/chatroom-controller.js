@@ -71,6 +71,19 @@ class ChatroomController {
         this.agentSuggestionsList = null;
         this.selectedSuggestionIndex = -1;
         this.atPosition = -1;
+
+        // 全局Promise拒绝降噪：忽略浏览器扩展消息通道类报错
+        if (!window.__unhandledRejectionPatched) {
+            window.addEventListener('unhandledrejection', (event) => {
+                const msg = String(event.reason?.message || event.reason || '');
+                if (msg.includes('listener indicated an asynchronous response') ||
+                    msg.includes('message channel closed before a response was received')) {
+                    event.preventDefault();
+                    return;
+                }
+            });
+            window.__unhandledRejectionPatched = true;
+        }
     }
 
     /**
@@ -100,7 +113,10 @@ class ChatroomController {
                 this.lazyLoader.init();
                 console.log('✅ [前端] 懒加载器初始化成功');
             } else {
-                console.warn('⚠️ [前端] LazyLoader 未找到，图片将直接加载');
+                // 降噪：仅在调试模式输出此信息
+                if (window.ENV_CONFIG?.isDebug && window.ENV_CONFIG.isDebug()) {
+                    console.warn('⚠️ [前端] LazyLoader 未找到，图片将直接加载');
+                }
             }
             
             // 初始化图片优化服务
@@ -108,7 +124,9 @@ class ChatroomController {
                 this.imageOptimizer = new window.ImageOptimizationService();
                 console.log('✅ [前端] 图片优化服务初始化成功');
             } else {
-                console.warn('⚠️ [前端] ImageOptimizationService 未找到，将使用默认图片加载');
+                if (window.ENV_CONFIG?.isDebug && window.ENV_CONFIG.isDebug()) {
+                    console.warn('⚠️ [前端] ImageOptimizationService 未找到，将使用默认图片加载');
+                }
             }
             
             // 初始化WebSocket连接

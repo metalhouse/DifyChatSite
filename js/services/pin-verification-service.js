@@ -384,24 +384,26 @@ class PinVerificationService {
                             <i class="fas fa-shield-alt me-1"></i>
                             ${message}
                         </p>
-                        <div class="form-group">
-                            <label class="form-label" for="dynamicVerifyPin">PIN码 *</label>
-                            <input type="password" class="form-control pin-input" id="dynamicVerifyPin" 
-                                   placeholder="请输入PIN码" maxlength="6" autocomplete="off"
-                                   pattern="[0-9]*" inputmode="numeric" required
-                                   style="font-family: monospace; font-size: 1.1rem; letter-spacing: 0.2em; text-align: center;">
-                            <div class="invalid-feedback" id="dynamicPinVerifyError"></div>
-                        </div>
-                        <div class="pin-verify-attempts" id="dynamicPinVerifyAttempts" style="display: none; margin-top: 1rem; padding: 0.5rem; background-color: rgba(255, 193, 7, 0.1); border-radius: 0.25rem;">
-                            <small class="text-warning">
-                                <i class="fas fa-exclamation-triangle me-1"></i>
-                                <span id="dynamicAttemptsText">剩余尝试次数: 5</span>
-                            </small>
-                        </div>
+                        <form id="dynamicPinForm" novalidate>
+                            <div class="form-group">
+                                <label class="form-label" for="dynamicVerifyPin">PIN码 *</label>
+                                <input type="password" class="form-control pin-input" id="dynamicVerifyPin" 
+                                       placeholder="请输入PIN码" maxlength="6" autocomplete="off"
+                                       pattern="[0-9]*" inputmode="numeric" required
+                                       style="font-family: monospace; font-size: 1.1rem; letter-spacing: 0.2em; text-align: center;">
+                                <div class="invalid-feedback" id="dynamicPinVerifyError"></div>
+                            </div>
+                            <div class="pin-verify-attempts" id="dynamicPinVerifyAttempts" style="display: none; margin-top: 1rem; padding: 0.5rem; background-color: rgba(255, 193, 7, 0.1); border-radius: 0.25rem;">
+                                <small class="text-warning">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    <span id="dynamicAttemptsText">剩余尝试次数: 5</span>
+                                </small>
+                            </div>
+                        </form>
                     </div>
                     <div class="modal-footer">
                         ${showCancel ? '<button type="button" class="btn btn-secondary" onclick="window.pinVerificationService.cancelVerification()">取消</button>' : ''}
-                        <button type="button" class="btn btn-primary" onclick="window.pinVerificationService.confirmVerification()">
+                        <button type="submit" class="btn btn-primary" form="dynamicPinForm">
                             <i class="fas fa-unlock"></i>
                             验证
                         </button>
@@ -417,7 +419,16 @@ class PinVerificationService {
         
         // 由于禁用了默认背景，不需要设置backdrop的z-index
 
-        // 绑定回车键事件
+        // 绑定表单提交与回车键事件
+        const form = modal.querySelector('#dynamicPinForm');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.confirmVerification();
+            });
+        }
+        
+        // 兼容：回车键快速提交
         const input = modal.querySelector('#dynamicVerifyPin');
         if (input) {
             input.addEventListener('keypress', (e) => {
