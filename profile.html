@@ -951,6 +951,7 @@
                                 <span class="info-label">自动锁定时间</span>
                                 <div class="info-value">
                                     <select class="form-control pin-lock-time-select" id="pinLockTimeSelect">
+                                        <option value="0.5">30秒</option>
                                         <option value="1">1分钟</option>
                                         <option value="5" selected>5分钟</option>
                                         <option value="30">30分钟</option>
@@ -1588,16 +1589,16 @@
                 }
 
                 const pinService = window.pinVerificationService;
+                
+                // 从服务器获取最新PIN状态
+                await pinService.refreshPinStatus();
                 const settings = pinService.getSettings();
-
-                // 如果PIN已启用，检查后端PIN状态
-                if (settings.enabled) {
-                    await pinService.checkPinStatus();
-                }
-
+                
+                console.log('📌 初始化PIN设置:', settings);
                 updatePinUI();
             } catch (error) {
                 console.error('初始化PIN设置失败:', error);
+                showToast('加载PIN设置失败: ' + error.message, 'warning');
             }
         }
 
@@ -1643,7 +1644,8 @@
             }
 
             if (pinLockTimeSelect) {
-                pinLockTimeSelect.value = settings.lockTimeMinutes;
+                pinLockTimeSelect.value = settings.lockTimeMinutes || 5;
+                console.log(`📝 设置锁定时间选择器值为: ${settings.lockTimeMinutes || 5} 分钟`);
             }
         }
 
@@ -1653,33 +1655,80 @@
 
             const pinService = window.pinVerificationService;
             const isEnabled = event.target.checked;
+            const currentSettings = pinService.getSettings();
             
-            pinService.setEnabled(isEnabled);
-
-            if (isEnabled) {
-                // 启用PIN验证，检查是否已有PIN
-                try {
-                    await pinService.checkPinStatus();
-                    const settings = pinService.getSettings();
-                    
-                    if (!settings.hasPin) {
-                        showToast('请先设置PIN码以启用验证功能', 'info');
+            try {
+                // 刷新最新PIN状态
+                await pinService.refreshPinStatus();
+                const latestSettings = pinService.getSettings();
+                
+                if (isEnabled) {
+                    // 用户想要开启PIN验证
+                    if (!latestSettings.hasPin) {
+                        // 没有PIN码，提示用户先设置
+                        event.target.checked = false; // 重置开关
+                        showToast('请先设置PIN码才能启用验证功能', 'warning');
+                        showSetPinModal(); // 自动打开设置PIN的模态框
+                        return;
+                    } else {
+                        // 有PIN码，直接启用
+                        await pinService.togglePinEnabled(true);
+                        showToast('PIN验证已启用', 'success');
                     }
-                } catch (error) {
-                    showToast('检查PIN状态失败: ' + error.message, 'warning');
+                } else {
+                    // 用户想要关闭PIN验证，需要验证当前PIN
+                    if (latestSettings.hasPin && latestSettings.enabled) {
+                        // 需要验证PIN才能关闭
+                        event.target.checked = true; // 先保持开启状态
+                        
+                        try {
+                            const isValid = await pinService.showVerificationDialog('请输入PIN码以关闭验证功能');
+                            if (isValid) {
+                                await pinService.togglePinEnabled(false);
+                                event.target.checked = false; // 验证成功后关闭开关
+                                showToast('PIN验证已关闭', 'success');
+                            } else {
+                                // 验证失败，保持开启状态
+                                showToast('PIN验证失败，无法关闭', 'error');
+                            }
+                        } catch (error) {
+                            console.error('PIN验证过程出错:', error);
+                            showToast('PIN验证失败: ' + error.message, 'error');
+                        }
+                    } else {
+                        // 当前未启用，直接设置为关闭
+                        await pinService.togglePinEnabled(false);
+                        showToast('PIN验证已关闭', 'success');
+                    }
                 }
+                
+                // 更新UI
+                updatePinUI();
+                
+            } catch (error) {
+                console.error('PIN开关切换失败:', error);
+                showToast('操作失败: ' + error.message, 'error');
+                // 恢复开关状态
+                event.target.checked = currentSettings.enabled;
             }
-            
-            updatePinUI();
         }
 
         // 处理自动锁定时间变化
-        function handlePinLockTimeChange(event) {
+        async function handlePinLockTimeChange(event) {
             if (!window.pinVerificationService) return;
 
-            const minutes = parseInt(event.target.value);
+            const minutes = parseFloat(event.target.value);
             window.pinVerificationService.setLockTimeMinutes(minutes);
-            showToast(`自动锁定时间已设置为${minutes}分钟`, 'success');
+            
+            // 如果当前在chatroom页面且有聊天室控制器，重新启动定时器
+            if (window.chatroomController && typeof window.chatroomController.resetAutoLockTimer === 'function') {
+                await window.chatroomController.resetAutoLockTimer();
+                console.log(`🔄 已重置自动锁定定时器为${minutes}分钟`);
+            }
+            
+            // 显示友好的时间格式
+            const timeText = minutes < 1 ? `${minutes * 60}秒` : `${minutes}分钟`;
+            showToast(`自动锁定时间已设置为${timeText}`, 'success');
         }
 
         // 显示设置PIN模态框
@@ -1731,8 +1780,13 @@
             }
 
             try {
+                // 设置PIN码
                 await window.pinVerificationService.setPin(newPin);
-                showToast('PIN设置成功', 'success');
+                
+                // 设置成功后，自动启用PIN验证功能
+                await window.pinVerificationService.togglePinEnabled(true);
+                
+                showToast('PIN设置成功并已启用验证功能', 'success');
                 updatePinUI();
                 
                 // 关闭模态框
@@ -1740,11 +1794,7 @@
                 modal.hide();
             } catch (error) {
                 console.error('设置PIN失败:', error);
-                if (error.message && error.message.includes('PIN_ALREADY_EXISTS')) {
-                    showToast('用户已设置PIN，请使用修改PIN功能', 'warning');
-                } else {
-                    showToast('设置PIN失败: ' + error.message, 'error');
-                }
+                showToast('设置PIN失败: ' + error.message, 'error');
             }
         }
 

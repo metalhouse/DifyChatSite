@@ -10,7 +10,7 @@ class FriendsApiService {
             FRIENDS: {
                 SEARCH: '/api/friends/search',
                 LIST: '/api/friends',
-                DELETE: '/api/friends',
+                DELETE: '/api/friends',  // 删除好友的基础端点，实际使用时会添加/{userId}
                 SUGGESTIONS: '/api/friends/suggestions'
             },
             REQUESTS: {

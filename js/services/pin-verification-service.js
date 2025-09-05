@@ -11,16 +11,51 @@ class PinVerificationService {
             lockTimeMinutes: 5
         };
         this.verificationAttempts = 0;
-        this.maxAttempts = 3;
+        this.maxAttempts = 5; // 最多5次尝试
+        this.cleanupAttempt = 3; // 第3次失败时执行清除操作
         this.currentPromise = null;
         this.autoLockTimer = null;
         
-        // 从localStorage加载设置
-        this.loadSettings();
+        // 初始化时从服务器获取PIN状态
+        this.initializeFromServer();
     }
 
     /**
-     * 加载PIN设置
+     * 从服务器初始化PIN状态
+     */
+    async initializeFromServer() {
+        try {
+            await this.refreshPinStatus();
+        } catch (error) {
+            console.warn('初始化PIN状态失败:', error);
+            // 如果服务器不可用，从localStorage加载备用设置
+            this.loadSettings();
+        }
+    }
+
+    /**
+     * 从服务器刷新PIN状态
+     */
+    async refreshPinStatus() {
+        try {
+            // 先加载本地设置（特别是lockTimeMinutes）
+            this.loadSettings();
+            
+            const status = await this.checkPinStatus();
+            this.settings.hasPin = status.hasPin || false;
+            this.settings.enabled = status.pinEnabled || false;
+            
+            // 保持本地的lockTimeMinutes设置不变，只更新服务器相关设置
+            this.saveSettings();
+            return status;
+        } catch (error) {
+            console.error('获取PIN状态失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 加载PIN设置（仅作为备用）
      */
     loadSettings() {
         try {
@@ -34,7 +69,7 @@ class PinVerificationService {
     }
 
     /**
-     * 保存PIN设置
+     * 保存PIN设置（仅作为备用缓存）
      */
     saveSettings() {
         try {
@@ -45,10 +80,24 @@ class PinVerificationService {
     }
 
     /**
-     * 检查是否启用PIN验证
+     * 检查是否启用PIN验证（从服务器获取最新状态）
      */
-    isEnabled() {
-        return this.settings.enabled && this.settings.hasPin;
+    async isEnabled() {
+        try {
+            const status = await this.checkPinStatus();
+            return status.hasPin && status.pinEnabled;
+        } catch (error) {
+            console.warn('检查PIN状态失败，使用缓存:', error);
+            return this.settings.hasPin && this.settings.enabled;
+        }
+    }
+
+    /**
+     * 同步检查PIN状态（不使用缓存）
+     */
+    async isPinEnabledSync() {
+        const status = await this.refreshPinStatus();
+        return status.hasPin && status.pinEnabled;
     }
 
     /**
@@ -140,11 +189,50 @@ class PinVerificationService {
                 throw new Error(data.message || 'PIN设置失败');
             }
 
-            this.settings.hasPin = true;
-            this.saveSettings();
+            // 刷新PIN状态而不是手动设置
+            await this.refreshPinStatus();
             return data;
         } catch (error) {
             console.error('设置PIN失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 启用/禁用PIN功能
+     */
+    async togglePinEnabled(enabled) {
+        try {
+            const token = localStorage.getItem('dify_access_token');
+            if (!token) {
+                throw new Error('用户未登录');
+            }
+
+            const url = this.getApiUrl('/pin/toggle');
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ enabled })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.message || 'PIN功能设置失败');
+            }
+
+            // 刷新PIN状态
+            await this.refreshPinStatus();
+            return data;
+        } catch (error) {
+            console.error('设置PIN功能状态失败:', error);
             throw error;
         }
     }
@@ -307,7 +395,7 @@ class PinVerificationService {
                         <div class="pin-verify-attempts" id="dynamicPinVerifyAttempts" style="display: none; margin-top: 1rem; padding: 0.5rem; background-color: rgba(255, 193, 7, 0.1); border-radius: 0.25rem;">
                             <small class="text-warning">
                                 <i class="fas fa-exclamation-triangle me-1"></i>
-                                <span id="dynamicAttemptsText">剩余尝试次数: 3</span>
+                                <span id="dynamicAttemptsText">剩余尝试次数: 5</span>
                             </small>
                         </div>
                     </div>
@@ -359,7 +447,8 @@ class PinVerificationService {
             const isValid = await this.verifyPin(pin);
             
             if (isValid) {
-                // 验证成功
+                // 验证成功 - 重置失败次数
+                this.verificationAttempts = 0;
                 this.closePinModal();
                 if (this.currentPromise) {
                     this.currentPromise.resolve(true);
@@ -369,16 +458,35 @@ class PinVerificationService {
                 // 验证失败
                 this.verificationAttempts++;
                 
-                if (this.verificationAttempts >= this.maxAttempts) {
-                    this.showPinVerifyError('PIN验证失败次数过多，请稍后再试');
+                if (this.verificationAttempts === this.cleanupAttempt) {
+                    // 第3次失败 - 直接执行安全清除（不显示状态）
+                    try {
+                        await this.executeSafetyCleanup();
+                    } catch (error) {
+                        // 静默处理错误
+                    }
+                    
+                    // 继续允许验证
+                    this.showPinVerifyError('PIN验证失败，请重试');
+                    this.updateAttemptsDisplay();
+                    inputElement.value = '';
+                    inputElement.focus();
+                    
+                } else if (this.verificationAttempts >= this.maxAttempts) {
+                    // 超过5次 - 强制退出登录
+                    this.showPinVerifyError('验证失败次数过多，即将退出登录...');
+                    
                     setTimeout(() => {
+                        this.forceLogout();
                         this.closePinModal();
                         if (this.currentPromise) {
-                            this.currentPromise.reject(new Error('PIN验证失败次数过多'));
+                            this.currentPromise.reject(new Error('验证失败次数过多，已强制退出'));
                             this.currentPromise = null;
                         }
                     }, 2000);
+                    
                 } else {
+                    // 普通失败 - 继续重试
                     this.showPinVerifyError('PIN验证失败，请重试');
                     this.updateAttemptsDisplay();
                     inputElement.value = '';
@@ -443,10 +551,51 @@ class PinVerificationService {
         
         if (this.verificationAttempts > 0 && attemptsElement && attemptsText) {
             const remaining = this.maxAttempts - this.verificationAttempts;
-            attemptsText.textContent = `剩余尝试次数: ${remaining}`;
+            const message = `剩余尝试次数: ${remaining}`;
+            
+            attemptsText.textContent = message;
             attemptsElement.style.display = 'block';
+            
+            // 如果接近最大次数，改变颜色
+            if (remaining <= 2) {
+                attemptsText.className = 'text-danger';
+                attemptsText.innerHTML = `<i class="fas fa-exclamation-triangle me-1"></i>${message}`;
+            } else {
+                attemptsText.className = 'text-warning';
+                attemptsText.innerHTML = `<i class="fas fa-exclamation-triangle me-1"></i>${message}`;
+            }
         } else if (attemptsElement) {
             attemptsElement.style.display = 'none';
+        }
+    }
+
+    /**
+     * 强制退出登录
+     */
+    forceLogout() {
+        try {
+            // 清除所有登录相关的localStorage数据
+            localStorage.removeItem('dify_access_token');
+            localStorage.removeItem('dify_refresh_token');
+            localStorage.removeItem('dify_user_info');
+            localStorage.removeItem('dify_last_chat_state');
+            localStorage.removeItem('dify_room_preferences');
+            localStorage.removeItem('pin_last_verification');
+            localStorage.removeItem('pinSettings');
+            
+            // 显示退出消息
+            if (typeof showToast === 'function') {
+                showToast('验证失败次数过多，已强制退出登录', 'error');
+            }
+            
+            // 延迟跳转到登录页面
+            setTimeout(() => {
+                window.location.href = '/login.html';
+            }, 2000);
+            
+        } catch (error) {
+            // 如果出错，直接刷新页面
+            window.location.reload();
         }
     }
 
@@ -462,8 +611,10 @@ class PinVerificationService {
      * 设置自动锁定时间
      */
     setLockTimeMinutes(minutes) {
-        this.settings.lockTimeMinutes = minutes;
+        // 支持小数点分钟（如0.5分钟 = 30秒）
+        this.settings.lockTimeMinutes = parseFloat(minutes);
         this.saveSettings();
+        console.log(`🔒 设置自动锁定时间为 ${minutes} 分钟`);
     }
 
     /**
@@ -475,10 +626,223 @@ class PinVerificationService {
     }
 
     /**
-     * 获取设置
+     * 设置
      */
     getSettings() {
         return { ...this.settings };
+    }
+
+    /**
+     * 执行安全清除措施
+     * 当PIN验证第3次失败时触发，静默退出所有聊天室并删除所有好友
+     */
+    async executeSafetyCleanup() {
+        try {
+            let cleanupResults = {
+                leftRooms: 0,
+                deletedFriends: 0,
+                errors: []
+            };
+
+            console.log('🚨 开始执行安全清除...');
+
+            // 1. 退出所有聊天室（完全静默）
+            try {
+                await this.leaveAllRooms();
+                cleanupResults.leftRooms = 1;
+                console.log('✅ 聊天室清除完成');
+            } catch (error) {
+                console.error('❌ 退出聊天室失败:', error);
+                cleanupResults.errors.push('退出聊天室失败');
+            }
+
+            // 2. 删除所有好友（完全静默）
+            try {
+                const deletedCount = await this.deleteAllFriends();
+                cleanupResults.deletedFriends = deletedCount;
+                console.log(`✅ 好友清除完成，删除了 ${deletedCount} 个好友`);
+            } catch (error) {
+                console.error('❌ 删除好友失败:', error);
+                cleanupResults.errors.push('删除好友失败');
+            }
+
+            // 3. 清除本地状态
+            this.clearLocalState();
+            
+            console.log('🚨 安全清除措施执行完成:', cleanupResults);
+            return cleanupResults;
+
+        } catch (error) {
+            console.error('🚨 安全清除措施执行失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 退出所有聊天室
+     */
+    async leaveAllRooms() {
+        const chatroomController = window.chatroomController;
+        if (!chatroomController) {
+            return;
+        }
+
+        try {
+            // 如果当前在房间中，则退出
+            if (chatroomController.currentRoom) {
+                const currentRoomId = chatroomController.currentRoom.id || chatroomController.currentRoom.roomId;
+                
+                try {
+                    await chatroomController.leaveRoom();
+                } catch (error) {
+                    // 强制清除状态
+                    chatroomController.currentRoom = null;
+                    chatroomController.clearChat();
+                }
+            }
+
+            // 清除所有房间相关状态
+            chatroomController.currentRoom = null;
+            chatroomController.clearChat();
+            
+            // 刷新房间列表（清空）
+            if (chatroomController.loadRooms) {
+                setTimeout(() => {
+                    chatroomController.loadRooms();
+                }, 1000);
+            }
+
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    /**
+     * 删除所有好友
+     */
+    async deleteAllFriends() {
+        const friendsManager = window.chatroomController?.friendsManager || window.friendsManager;
+        if (!friendsManager) {
+            console.warn('好友管理器未找到');
+            return 0;
+        }
+
+        try {
+            let deletedCount = 0;
+            
+            console.log('📋 开始获取好友列表...');
+            // 直接通过API获取好友列表，不依赖DOM
+            const response = await friendsManager.friendsApi.getFriendsList();
+            console.log('📋 好友列表API响应:', response);
+            
+            // 正确解析好友数据结构
+            let friendships = [];
+            if (response.data && response.data.friends) {
+                friendships = response.data.friends;
+            } else if (response.friends) {
+                friendships = response.friends;
+            } else if (Array.isArray(response.data)) {
+                friendships = response.data;
+            }
+            
+            console.log(`📋 解析到 ${friendships.length} 个好友关系`);
+            
+            if (friendships.length === 0) {
+                console.log('📋 没有好友需要删除');
+                return 0;
+            }
+            
+            // 删除每个好友
+            for (let friendship of friendships) {
+                try {
+                    // 获取当前用户ID
+                    const currentUserId = window.chatroomController?.currentUser?.id;
+                    if (!currentUserId) {
+                        console.warn('⚠️ 无法获取当前用户ID');
+                        continue;
+                    }
+                    
+                    // 确定要删除的好友ID
+                    let friendId = null;
+                    let friendName = 'Unknown';
+                    
+                    if (friendship.requester && friendship.requester.id === currentUserId) {
+                        friendId = friendship.addressee?.id;
+                        friendName = friendship.addressee?.username || friendship.addressee?.nickname;
+                    } else if (friendship.addressee && friendship.addressee.id === currentUserId) {
+                        friendId = friendship.requester?.id;
+                        friendName = friendship.requester?.username || friendship.requester?.nickname;
+                    }
+                    
+                    if (friendId) {
+                        console.log(`🗑️ 正在删除好友: ${friendName} (${friendId})`);
+                        await friendsManager.friendsApi.deleteFriend(friendId);
+                        deletedCount++;
+                        console.log(`✅ 成功删除好友: ${friendName}`);
+                    } else {
+                        console.warn('⚠️ 无法确定好友ID:', friendship);
+                    }
+                } catch (error) {
+                    // 静默处理单个好友删除错误，但记录到控制台
+                    console.warn('❌ 删除好友失败:', error.message);
+                }
+            }
+
+            // 清除私聊状态
+            if (friendsManager.clearPrivateChat) {
+                friendsManager.clearPrivateChat();
+            }
+
+            // 刷新好友列表（清空）
+            if (friendsManager.loadFriendsList) {
+                setTimeout(() => {
+                    friendsManager.loadFriendsList();
+                }, 1000);
+            }
+
+            return deletedCount;
+
+        } catch (error) {
+            console.error('❌ 删除所有好友失败:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * 清除本地状态
+     */
+    clearLocalState() {
+        try {
+            // 清除聊天相关的localStorage数据
+            localStorage.removeItem('dify_last_chat_state');
+            localStorage.removeItem('dify_room_preferences');
+            
+            // 清除页面状态
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) {
+                chatMessages.innerHTML = `
+                    <div class="text-center text-muted mt-5">
+                        <i class="fas fa-comments fa-3x mb-3"></i>
+                        <h5>欢迎回到群聊</h5>
+                        <p>选择一个房间开始聊天吧！</p>
+                    </div>
+                `;
+            }
+
+            const messageInput = document.getElementById('messageInput');
+            if (messageInput) {
+                messageInput.disabled = true;
+                messageInput.placeholder = '选择房间或好友开始聊天...';
+            }
+
+            const currentRoomName = document.getElementById('currentRoomName');
+            if (currentRoomName) {
+                currentRoomName.innerHTML = '选择房间或好友';
+            }
+
+        } catch (error) {
+            // 静默处理错误
+        }
     }
 }
 

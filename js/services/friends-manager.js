@@ -234,12 +234,18 @@ class FriendsManager {
                     ${avatarText}
                     <div class="${onlineClass}"></div>
                 </div>
-                <div class="friend-info">
-                    <div class="friend-name">${displayName}${encryptionIcon}</div>
-                    <div class="friend-meta">
-                        <span class="friend-status">${statusText}</span>
-                        ${unreadBadge}
-                    </div>
+        <div class="friend-info">
+            <div class="friend-name">${displayName}${encryptionIcon}</div>
+            <div class="friend-status">${statusText}</div>
+            ${unreadBadge ? `<div class="friend-meta">${unreadBadge}</div>` : ''}
+        </div>
+                <div class="friend-actions">
+                    <button class="action-btn primary" onclick="event.stopPropagation(); chatroomController.friendsManager.startPrivateChat('${friend.id}', '${displayName}')" title="开始聊天">
+                        <i class="fas fa-comments"></i>
+                    </button>
+                    <button class="action-btn danger" onclick="event.stopPropagation(); chatroomController.friendsManager.deleteFriend('${friend.id}', '${displayName}')" title="删除好友">
+                        <i class="fas fa-trash"></i>
+                    </button>
                 </div>
             </div>
         `;
@@ -252,37 +258,51 @@ class FriendsManager {
         try {
             console.log('开始与好友私聊:', friendId, friendName);
             
-            // PIN验证检查 - 根据自动锁定时间判断是否需要验证
-            if (window.pinVerification && window.pinVerification.isEnabled()) {
-                const lastVerification = localStorage.getItem('pin_last_verification');
-                const verificationTimeout = window.pinVerification.getLockTimeout();
-                const now = Date.now();
+            // PIN验证检查 - 只有在超过锁定时间后才需要验证
+            if (window.pinVerificationService) {
+                try {
+                    const isPinEnabled = await window.pinVerificationService.isPinEnabledSync();
+                    if (isPinEnabled) {
+                        const lastVerification = localStorage.getItem('pin_last_verification');
+                        const verificationTimeout = window.pinVerificationService.getLockTimeout();
+                        const now = Date.now();
 
-                if (!lastVerification || (now - parseInt(lastVerification)) > verificationTimeout) {
-                    try {
-                        await window.pinVerification.showVerification('请输入PIN码以开始私聊');
-                        console.log('私聊PIN验证成功');
-                        
-                        // 记录验证时间
-                        localStorage.setItem('pin_last_verification', now.toString());
-                        if (this.chatroomController && this.chatroomController.resetAutoLockTimer) {
-                            this.chatroomController.resetAutoLockTimer();
+                        // 只有在确实超过锁定时间时才需要验证
+                        if (!lastVerification || (now - parseInt(lastVerification)) > verificationTimeout) {
+                            try {
+                                const isValid = await window.pinVerificationService.showVerificationDialog('会话已过期，请输入PIN码继续');
+                                if (!isValid) {
+                                    showToast('PIN验证失败，无法开始私聊', 'warning');
+                                    return;
+                                }
+                                
+                                console.log('✅ 私聊PIN验证成功');
+                                
+                                // 记录验证时间
+                                localStorage.setItem('pin_last_verification', now.toString());
+                                if (this.chatroomController && typeof this.chatroomController.resetAutoLockTimer === 'function') {
+                                    this.chatroomController.resetAutoLockTimer();
+                                }
+                            } catch (error) {
+                                console.log('❌ 私聊PIN验证失败或取消:', error.message);
+                                showToast('PIN验证失败，无法开始私聊', 'warning');
+                                return; // 验证失败，不继续执行
+                            }
+                        } else {
+                            console.log('📋 PIN验证在有效期内，跳过验证');
+                            // 重置自动锁定定时器（表示用户有活动）
+                            if (this.chatroomController && typeof this.chatroomController.resetAutoLockTimer === 'function') {
+                                this.chatroomController.resetAutoLockTimer();
+                            }
                         }
-                    } catch (error) {
-                        console.log('私聊PIN验证失败或取消:', error.message);
-                        showToast('PIN验证失败，无法开始私聊', 'warning');
-                        return; // 验证失败，不继续执行
                     }
-                } else {
-                    // 重置自动锁定定时器
-                    if (this.chatroomController && this.chatroomController.resetAutoLockTimer) {
-                        this.chatroomController.resetAutoLockTimer();
-                    }
+                } catch (error) {
+                    console.warn('检查PIN状态失败:', error);
                 }
             }
             
             // 设置当前私聊状态
-        this.currentPrivateChat = {
+            this.currentPrivateChat = {
             friendId: friendId,
             friendName: friendName,
             type: 'private'
@@ -1119,6 +1139,34 @@ class FriendsManager {
     }
 
     /**
+     * 删除好友
+     */
+    async deleteFriend(friendId, friendName) {
+        if (!confirm(`确定要删除好友"${friendName}"吗？\n\n删除后将无法再进行私聊，需要重新添加好友。`)) {
+            return;
+        }
+
+        try {
+            console.log('删除好友:', friendId, friendName);
+            await this.friendsApi.deleteFriend(friendId);
+            
+            showToast(`好友"${friendName}"已删除`, 'info');
+            
+            // 如果当前正在与此好友私聊，清除私聊状态
+            if (this.currentPrivateChat && this.currentPrivateChat.friendId === friendId) {
+                this.clearPrivateChat();
+            }
+            
+            // 重新加载好友列表
+            await this.loadFriendsList();
+            
+        } catch (error) {
+            console.error('删除好友失败:', error);
+            showToast('删除好友失败: ' + error.message, 'error');
+        }
+    }
+
+    /**
      * 获取状态文本
      */
     getStatusText(status) {
@@ -1151,28 +1199,6 @@ class FriendsManager {
             return `${minutes}分钟前`;
         } else {
             return '刚刚';
-        }
-    }
-
-    /**
-     * 清除私聊状态
-     */
-    clearPrivateChat() {
-        this.currentPrivateChat = null;
-        this.updateActiveStates();
-        
-        // 清除保存的聊天状态（如果当前是私聊状态）
-        try {
-            const savedState = localStorage.getItem('dify_last_chat_state');
-            if (savedState) {
-                const chatState = JSON.parse(savedState);
-                if (chatState.type === 'private') {
-                    localStorage.removeItem('dify_last_chat_state');
-                    console.log('🧹 已清除私聊状态');
-                }
-            }
-        } catch (error) {
-            console.warn('清除私聊状态时出错:', error);
         }
     }
 
@@ -1788,6 +1814,20 @@ class FriendsManager {
     clearPrivateChat() {
         this.currentPrivateChat = null;
         
+        // 清除保存的聊天状态（如果当前是私聊状态）
+        try {
+            const savedState = localStorage.getItem('dify_last_chat_state');
+            if (savedState) {
+                const chatState = JSON.parse(savedState);
+                if (chatState.type === 'private') {
+                    localStorage.removeItem('dify_last_chat_state');
+                    console.log('🧹 已清除私聊状态');
+                }
+            }
+        } catch (error) {
+            console.warn('清除私聊状态时出错:', error);
+        }
+        
         // 隐藏私聊操作按钮，显示群聊元素
         const privateChatActions = document.getElementById('privateChatActions');
         const onlineMembers = document.getElementById('onlineMembers');
@@ -1803,7 +1843,34 @@ class FriendsManager {
             this.exitSelectionMode();
         }
         
-        console.log('✅ 已清除私聊状态');
+        // 更新活跃状态
+        this.updateActiveStates();
+        
+        // 清空聊天区域，回到群聊模式
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const currentRoomName = document.getElementById('currentRoomName');
+        
+        if (chatMessages) {
+            chatMessages.innerHTML = `
+                <div class="text-center text-muted mt-5">
+                    <i class="fas fa-comments fa-3x mb-3"></i>
+                    <h5>欢迎回到群聊</h5>
+                    <p>选择一个房间开始聊天吧！</p>
+                </div>
+            `;
+        }
+        
+        if (messageInput) {
+            messageInput.disabled = true;
+            messageInput.placeholder = '选择房间或好友开始聊天...';
+        }
+        
+        if (currentRoomName) {
+            currentRoomName.innerHTML = '选择房间或好友';
+        }
+        
+        console.log('✅ 已清除私聊状态，切换回群聊模式');
     }
 
     /**

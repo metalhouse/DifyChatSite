@@ -44,6 +44,8 @@ class ChatroomController {
             mentionButton: document.getElementById('mentionButton'),
             emojiButton: document.getElementById('emojiButton'),
             imageUploadButton: document.getElementById('addButton'), // 更新为新的addButton
+            addMenu: document.getElementById('addMenu'),
+            emojiMenu: document.getElementById('emojiMenu'),
             connectionStatus: document.getElementById('connectionStatus'),
             statusText: document.getElementById('statusText'),
             currentRoomName: document.getElementById('currentRoomName'),
@@ -117,7 +119,7 @@ class ChatroomController {
             this.restoreLastChatState();
             
             // 初始化用户活动监听器（用于PIN验证自动锁定）
-            this.initializeActivityListeners();
+            await this.initializeActivityListeners();
             
             console.log('聊天室控制器初始化完成');
         } catch (error) {
@@ -343,27 +345,48 @@ class ChatroomController {
      * 初始化用户活动监听器
      * 用于PIN验证的自动锁定功能
      */
-    initializeActivityListeners() {
-        if (!window.pinVerification || !window.pinVerification.isEnabled()) {
+    async initializeActivityListeners() {
+        if (!window.pinVerificationService) {
             return;
         }
 
-        const activities = ['click', 'keypress', 'scroll', 'mousemove', 'touchstart'];
-        
-        // 防抖处理，避免频繁重置定时器
-        let resetTimer = null;
-        const resetAutoLockDebounced = () => {
-            if (resetTimer) clearTimeout(resetTimer);
-            resetTimer = setTimeout(() => {
-                this.resetAutoLockTimer();
-            }, 1000); // 1秒内的多次操作只重置一次
-        };
+        try {
+            const isPinEnabled = await window.pinVerificationService.isEnabled();
+            if (!isPinEnabled) {
+                return;
+            }
 
-        activities.forEach(activity => {
-            document.addEventListener(activity, resetAutoLockDebounced, { passive: true });
-        });
+            const activities = ['click', 'keypress', 'scroll', 'mousemove', 'touchstart', 'keydown'];
+            
+            // 防抖处理，避免频繁重置定时器
+            let resetTimer = null;
+            const resetAutoLockDebounced = () => {
+                if (resetTimer) clearTimeout(resetTimer);
+                resetTimer = setTimeout(async () => {
+                    // 检查界面是否已锁定
+                    const isLocked = localStorage.getItem('interface_locked');
+                    if (isLocked) {
+                        console.log('🔒 界面已锁定，不重置计时器');
+                        return;
+                    }
+                    
+                    // 重新验证PIN是否仍然启用
+                    const stillEnabled = await window.pinVerificationService.isEnabled();
+                    if (stillEnabled) {
+                        console.log('🔄 用户活动检测，重置自动锁定计时器');
+                        this.resetAutoLockTimer();
+                    }
+                }, 500); // 减少到500ms，更快响应用户活动
+            };
 
-        console.log('✅ PIN验证用户活动监听器已初始化');
+            activities.forEach(activity => {
+                document.addEventListener(activity, resetAutoLockDebounced, { passive: true });
+            });
+
+            console.log('✅ PIN验证用户活动监听器已初始化，监听事件:', activities);
+        } catch (error) {
+            console.warn('初始化活动监听器失败:', error);
+        }
     }
 
     /**
@@ -372,26 +395,55 @@ class ChatroomController {
      */
     async checkPinVerification(forceVerify = true) {
         try {
-            // 检查是否启用了PIN验证
-            if (!window.pinVerification || !window.pinVerification.isEnabled()) {
+            // 检查PIN验证服务是否可用
+            if (!window.pinVerificationService) {
+                console.log('PIN验证服务未加载');
+                return;
+            }
+
+            // 从服务器获取最新PIN状态
+            const isPinEnabled = await window.pinVerificationService.isPinEnabledSync();
+            
+            if (!isPinEnabled) {
                 console.log('PIN验证未启用，跳过验证');
                 return;
             }
+
+            console.log('🔒 PIN验证已启用，开始验证流程...');
 
             // 检查是否需要解锁（超时锁定）
             const lockStatus = this.checkAutoLockStatus();
             if (lockStatus.needsUnlock) {
                 await this.performPinVerification('界面已自动锁定，请输入PIN码解锁');
+                
+                // 记录解锁验证时间，这样就不需要再次验证
+                const now = Date.now();
+                localStorage.setItem('pin_last_verification', now.toString());
+                
                 this.resetAutoLockTimer();
-                return;
+                return; // 解锁验证完成后直接返回，不再进行其他验证
             }
 
             let needVerification = forceVerify; // 进入页面时强制验证
 
+            // 但是如果最近刚验证过（5分钟内），就不强制验证了
+            if (forceVerify) {
+                const lastVerification = localStorage.getItem('pin_last_verification');
+                if (lastVerification) {
+                    const timeSinceLastVerification = Date.now() - parseInt(lastVerification);
+                    const gracePeriod = 5 * 60 * 1000; // 5分钟宽限期
+                    
+                    if (timeSinceLastVerification < gracePeriod) {
+                        console.log('📋 最近刚验证过PIN，跳过强制验证');
+                        needVerification = false;
+                    }
+                }
+            }
+
             if (!forceVerify) {
                 // 页面内部操作时，根据时间判断
                 const lastVerification = localStorage.getItem('pin_last_verification');
-                const verificationTimeout = window.pinVerification.getLockTimeout();
+                const verificationTimeout = window.pinVerificationService.getLockTimeout();
                 const now = Date.now();
                 needVerification = !lastVerification || (now - parseInt(lastVerification)) > verificationTimeout;
             }
@@ -422,51 +474,78 @@ class ChatroomController {
      * 执行PIN验证
      */
     async performPinVerification(message) {
-        if (!window.pinVerification) {
-            throw new Error('PIN验证功能不可用');
+        if (!window.pinVerificationService) {
+            throw new Error('PIN验证服务不可用');
         }
 
-        return new Promise((resolve, reject) => {
-            window.pinVerification.showVerification(message, () => {
+        try {
+            const isValid = await window.pinVerificationService.showVerificationDialog(message, true);
+            if (!isValid) {
+                throw new Error('PIN验证失败');
+            }
+            console.log('✅ PIN验证成功');
+            return true;
+        } catch (error) {
+            console.error('❌ PIN验证过程出错:', error);
+            if (error.message === 'PIN verification cancelled') {
                 // 用户取消验证，重定向到主页
                 window.location.href = './index.html';
-            })
-            .then(() => {
-                console.log('PIN验证成功');
-                resolve();
-            })
-            .catch((error) => {
-                console.error('PIN验证失败:', error);
-                reject(error);
-            });
-        });
+            }
+            throw error;
+        }
     }
 
     /**
      * 启动自动锁定定时器
      */
-    startAutoLockTimer() {
-        if (!window.pinVerification || !window.pinVerification.isEnabled()) {
+    async startAutoLockTimer() {
+        if (!window.pinVerificationService) {
             return;
         }
 
-        this.clearAutoLockTimer();
+        try {
+            const isPinEnabled = await window.pinVerificationService.isEnabled();
+            if (!isPinEnabled) {
+                return;
+            }
 
-        const lockTimeout = window.pinVerification.getLockTimeout();
-        
-        this.autoLockTimer = setTimeout(() => {
-            this.lockInterface();
-        }, lockTimeout);
+            this.clearAutoLockTimer();
 
-        console.log(`自动锁定定时器启动，${lockTimeout / 60000}分钟后锁定`);
+            const lockTimeout = window.pinVerificationService.getLockTimeout();
+            
+            this.autoLockTimer = setTimeout(() => {
+                this.lockInterface();
+            }, lockTimeout);
+
+            const timeText = lockTimeout < 60000 ? `${lockTimeout / 1000}秒` : `${lockTimeout / 60000}分钟`;
+            console.log(`🔒 自动锁定定时器启动，${timeText}后锁定`);
+        } catch (error) {
+            console.warn('启动自动锁定定时器失败:', error);
+        }
     }
 
     /**
      * 重置自动锁定定时器
      */
-    resetAutoLockTimer() {
-        if (window.pinVerification && window.pinVerification.isEnabled()) {
-            this.startAutoLockTimer();
+    async resetAutoLockTimer() {
+        if (window.pinVerificationService) {
+            try {
+                const isPinEnabled = await window.pinVerificationService.isEnabled();
+                if (isPinEnabled) {
+                    // 先清除旧的定时器
+                    this.clearAutoLockTimer();
+                    
+                    // 启动新的定时器
+                    await this.startAutoLockTimer();
+                    
+                    // 只在调试模式下显示重置日志，避免过多输出
+                    if (window.ENV_CONFIG && window.ENV_CONFIG.isDebug && window.ENV_CONFIG.isDebug()) {
+                        console.log('🔄 自动锁定计时器已重置');
+                    }
+                }
+            } catch (error) {
+                console.warn('重置自动锁定定时器失败:', error);
+            }
         }
     }
 
@@ -1280,90 +1359,117 @@ class ChatroomController {
      * 绑定DOM事件
      */
     bindEvents() {
-        // 发送消息按钮
-        this.elements.sendButton.addEventListener('click', () => {
-            this.sendMessage();
-        });
+        const { messageInput, sendButton, mentionButton, emojiButton, imageUploadButton, addMenu, emojiMenu } = this.elements;
 
-        // 消息输入框
-        this.elements.messageInput.addEventListener('keydown', (e) => {
-            // 如果智能体建议列表显示，不处理Enter键发送消息
-            if (this.agentSuggestionsList && this.agentSuggestionsList.style.display !== 'none') {
-                return;
-            }
-            
+        // 发送消息按钮
+        sendButton.addEventListener('click', () => this.sendMessage());
+
+        // 消息输入框 Enter 发送
+        messageInput.addEventListener('keydown', (e) => {
+            if (this.agentSuggestionsList && this.agentSuggestionsList.style.display !== 'none') return;
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 this.sendMessage();
             }
         });
 
-        // 输入状态检测和@智能体功能
-        this.elements.messageInput.addEventListener('input', (e) => {
+        // 输入状态、@提及、高度调整
+        messageInput.addEventListener('input', (e) => {
             this.handleTypingStatus();
             this.handleAtMention(e);
+            this.adjustTextareaHeight();
         });
 
-        // 添加键盘导航支持
-        this.elements.messageInput.addEventListener('keydown', (e) => {
+        // @提及列表键盘导航
+        messageInput.addEventListener('keydown', (e) => {
             if (this.agentSuggestionsList && this.agentSuggestionsList.style.display !== 'none') {
                 this.handleAgentSuggestionKeydown(e);
             }
         });
 
-        // 点击其他地方隐藏智能体建议列表
+        // @智能体按钮
+        mentionButton.addEventListener('click', () => this.insertAtSymbol());
+
+        // 添加(+)按钮
+        if (imageUploadButton && addMenu) {
+            imageUploadButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                addMenu.style.display = addMenu.style.display === 'none' ? 'block' : 'none';
+                if (emojiMenu) emojiMenu.style.display = 'none';
+            });
+        }
+
+        // 添加(+)菜单项点击
+        if (addMenu) {
+            addMenu.addEventListener('click', (e) => {
+                const menuItem = e.target.closest('.add-menu-item');
+                if (!menuItem) return;
+                const action = menuItem.dataset.action;
+                const hasActiveChat = this.currentRoom || this.friendsManager?.currentPrivateChat;
+
+                if (!hasActiveChat) {
+                    this.showWarning('请先选择一个聊天室或好友');
+                    addMenu.style.display = 'none';
+                    return;
+                }
+
+                if (action === 'image') document.getElementById('imageFileInput').click();
+                else if (action === 'camera') document.getElementById('cameraFileInput').click();
+                
+                addMenu.style.display = 'none';
+            });
+        }
+
+        // 表情按钮
+        if (emojiButton && emojiMenu) {
+            emojiButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                emojiMenu.style.display = emojiMenu.style.display === 'none' ? 'block' : 'none';
+                if (addMenu) addMenu.style.display = 'none';
+            });
+
+            emojiMenu.addEventListener('click', (e) => {
+                const emojiItem = e.target.closest('.emoji-item');
+                if (!emojiItem) return;
+                const emoji = emojiItem.dataset.emoji;
+                if (emoji) {
+                    this.insertEmojiAtCursor(messageInput, emoji);
+                    this.adjustTextareaHeight();
+                }
+                emojiMenu.style.display = 'none';
+            });
+        }
+
+        // 点击页面其他地方关闭菜单和建议列表
         document.addEventListener('click', (e) => {
-            if (this.agentSuggestionsList && !this.agentSuggestionsList.contains(e.target) && e.target !== this.elements.messageInput) {
+            if (this.agentSuggestionsList && !this.agentSuggestionsList.contains(e.target) && e.target !== messageInput) {
                 this.hideAgentSuggestions();
+            }
+            if (addMenu && imageUploadButton && !imageUploadButton.contains(e.target) && !addMenu.contains(e.target)) {
+                addMenu.style.display = 'none';
+            }
+            if (emojiMenu && emojiButton && !emojiButton.contains(e.target) && !emojiMenu.contains(e.target)) {
+                emojiMenu.style.display = 'none';
             }
         });
 
-        // @智能体按钮 - 现在只是简单地插入@符号到输入框
-        this.elements.mentionButton.addEventListener('click', () => {
-            this.insertAtSymbol();
-        });
-
-        // 创建房间按钮 - 在模态框中的实际创建按钮
+        // 创建房间相关事件
         const modalCreateBtn = document.getElementById('modalCreateRoomBtn');
-        if (modalCreateBtn) {
-            modalCreateBtn.addEventListener('click', () => {
-                console.log('🔧 [前端] 模态框中的创建房间按钮被点击');
-                this.createRoom();
-            });
-            console.log('✅ [前端] 创建房间按钮事件绑定成功');
-        } else {
-            console.error('❌ [前端] 创建房间按钮元素未找到');
-        }
+        if (modalCreateBtn) modalCreateBtn.addEventListener('click', () => this.createRoom());
 
-        // 防止创建房间表单的默认提交行为
         const createRoomForm = document.getElementById('createRoomForm');
-        if (createRoomForm) {
-            createRoomForm.addEventListener('submit', (e) => {
-                e.preventDefault(); // 阻止表单默认提交
-                console.log('🔧 [前端] 创建房间表单提交被拦截');
-                this.createRoom(); // 手动调用创建函数
-            });
-            console.log('✅ [前端] 创建房间表单事件绑定成功');
-        }
-
-        // 创建房间输入框回车键支持
-        const roomNameInput = document.getElementById('roomName');
-        if (roomNameInput) {
-            roomNameInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault(); // 防止表单提交
-                    this.createRoom();
-                }
-            });
-        }
-
-        // 消息输入框自动调整高度
-        this.elements.messageInput.addEventListener('input', () => {
-            this.adjustTextareaHeight();
+        if (createRoomForm) createRoomForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.createRoom();
         });
-        
-        // 移动端添加调试按钮（临时禁用）
-        // this.addMobileDebugButton();
+
+        const roomNameInput = document.getElementById('roomName');
+        if (roomNameInput) roomNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.createRoom();
+            }
+        });
     }
 
     /**
@@ -3914,9 +4020,25 @@ justifyContent: ${debugInfo.justifyContent}
      */
     adjustTextareaHeight() {
         const textarea = this.elements.messageInput;
+        if (!textarea) return;
         textarea.style.height = 'auto';
-        const newHeight = Math.min(textarea.scrollHeight, 120);
+        const newHeight = Math.min(textarea.scrollHeight, 120); // Max height 120px
         textarea.style.height = newHeight + 'px';
+    }
+
+    /**
+     * 插入表情到光标位置
+     */
+    insertEmojiAtCursor(textarea, emoji) {
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        textarea.value = text.substring(0, start) + emoji + text.substring(end);
+        const newCursorPos = start + emoji.length;
+        textarea.selectionStart = newCursorPos;
+        textarea.selectionEnd = newCursorPos;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.focus();
     }
 
     /**

@@ -337,6 +337,61 @@
             color: rgba(255, 255, 255, 0.8) !important;
         }
 
+        /* 好友操作按钮样式 */
+        .friend-actions {
+            display: flex;
+            gap: 0.25rem;
+            margin-left: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .friend-item:hover .friend-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            width: 28px;
+            height: 28px;
+            border: none;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.75rem;
+        }
+
+        .action-btn.primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .action-btn.primary:hover {
+            background: #0056b3;
+            transform: scale(1.1);
+        }
+
+        .action-btn.danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .action-btn.danger:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+
+        .friend-item.active .action-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .friend-item.active .action-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
         .online-indicator {
             width: 8px;
             height: 8px;
@@ -2579,17 +2634,19 @@
                     <div class="friend-search">
                         <div class="input-group input-group-sm">
                             <input type="text" class="form-control" id="friendSearchInput" placeholder="搜索好友...">
-                            <button class="btn btn-outline-secondary" type="button" id="friendSearchBtn">
+                            <button class="btn btn-outline-secondary" type="button" id="searchFriendsBtn">
                                 <i class="fas fa-search"></i>
                             </button>
                         </div>
+                        <!-- 搜索结果容器 -->
+                        <div id="searchResults" style="display: none;"></div>
                     </div>
 
                     <!-- 好友请求提示 -->
                     <div class="friend-requests-badge" id="friendRequestsBadge" style="display:none;">
                         <div class="alert alert-info alert-sm">
                             <i class="fas fa-user-clock me-2"></i>
-                            <span id="requestsCount">0</span> 个好友请求
+                            <span id="requestsBadge">0</span> 个好友请求
                             <button class="btn btn-link btn-sm p-0 ms-2" onclick="showFriendRequestsModal()">查看</button>
                         </div>
                     </div>
@@ -2600,6 +2657,8 @@
                             <div class="spinner"></div>
                             <span>加载好友列表...</span>
                         </div>
+                        <!-- FriendsController 使用的容器 -->
+                        <div id="friendsList"></div>
                     </div>
                 </div>
             </div>
@@ -3277,6 +3336,9 @@
     <!-- 好友管理器 -->
     <script src="js/services/friends-manager.js"></script>
     
+    <!-- 好友功能控制器 -->
+    <script src="js/controllers/friends-controller.js"></script>
+    
     <!-- 聊天室页面控制器 -->
     <script src="js/controllers/chatroom-controller.js"></script>
 
@@ -3323,14 +3385,6 @@
             // 移动端输入框优化处理
             if (window.innerWidth <= 768) {
                 setupMobileInputOptimization();
-            }
-            
-            // 初始化集成输入框（优先级高，立即执行）
-            try {
-                initIntegratedInput();
-                console.log('✅ 集成输入框初始化完成');
-            } catch (error) {
-                console.error('❌ 集成输入框初始化失败:', error);
             }
             
             // 检查用户登录状态
@@ -3385,7 +3439,7 @@
             }
 
             // 好友列表搜索
-            const friendSearchBtn = document.getElementById('friendSearchBtn');
+            const friendSearchBtn = document.getElementById('searchFriendsBtn');
             const friendSearchInput = document.getElementById('friendSearchInput');
             
             if (friendSearchBtn && friendSearchInput) {
@@ -3581,22 +3635,58 @@
             const roomsTab = document.getElementById('rooms-tab');
             const createRoomBtn = document.getElementById('createRoomBtn');
             const addFriendBtn = document.getElementById('addFriendBtn');
+            const deleteModeBtn = document.getElementById('deleteModeBtn');
+            const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
             
             if (friendsTab && roomsTab && createRoomBtn && addFriendBtn) {
-                friendsTab.addEventListener('shown.bs.tab', function () {
+                friendsTab.addEventListener('shown.bs.tab', async function () {
+                    // 好友标签页：隐藏房间相关按钮，显示好友相关按钮
                     createRoomBtn.style.display = 'none';
                     addFriendBtn.style.display = 'block';
+                    
+                    // 隐藏删除房间相关按钮
+                    if (deleteModeBtn) deleteModeBtn.style.display = 'none';
+                    if (cancelDeleteBtn) cancelDeleteBtn.style.display = 'none';
+                    if (confirmDeleteBtn) confirmDeleteBtn.style.display = 'none';
+                    
+                    // 退出删除房间模式（如果正在删除模式中）
+                    const body = document.body;
+                    if (body.classList.contains('room-delete-mode')) {
+                        body.classList.remove('room-delete-mode');
+                        console.log('📤 切换到好友标签页，退出删除模式');
+                    }
+                    
+                    // 确保好友控制器已初始化
+                    if (!window.friendsController) {
+                        console.log('🤝 初始化好友控制器');
+                        window.friendsController = new FriendsController();
+                        await window.friendsController.initialize();
+                    }
                     
                     // 加载好友列表
                     if (window.chatroomController && window.chatroomController.friendsManager) {
                         window.chatroomController.friendsManager.loadFriendsList();
                         window.chatroomController.friendsManager.loadFriendRequests();
                     }
+                    
+                    // 同时使用独立的好友控制器加载数据
+                    if (window.friendsController) {
+                        await window.friendsController.refresh();
+                    }
                 });
 
                 roomsTab.addEventListener('shown.bs.tab', function () {
+                    // 房间标签页：显示房间相关按钮，隐藏好友相关按钮
                     createRoomBtn.style.display = 'block';
                     addFriendBtn.style.display = 'none';
+                    
+                    // 显示删除房间按钮
+                    if (deleteModeBtn) deleteModeBtn.style.display = 'block';
+                    
+                    // 确保删除模式按钮状态正确
+                    if (cancelDeleteBtn) cancelDeleteBtn.style.display = 'none';
+                    if (confirmDeleteBtn) confirmDeleteBtn.style.display = 'none';
                 });
             }
         }
@@ -5319,131 +5409,6 @@
                 timeout = setTimeout(later, wait);
             };
         }
-
-        // 集成输入框功能
-        function initIntegratedInput() {
-            const textarea = document.getElementById('messageInput');
-            const addButton = document.getElementById('addButton');
-            const addMenu = document.getElementById('addMenu');
-            const emojiButton = document.getElementById('emojiButton');
-            const emojiMenu = document.getElementById('emojiMenu');
-            
-            if (!textarea || !addButton || !addMenu) return;
-
-            // 自动调整textarea高度
-            function adjustTextareaHeight() {
-                textarea.style.height = 'auto';
-                const scrollHeight = textarea.scrollHeight;
-                const maxHeight = 120; // 最大高度
-                textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
-            }
-
-            // 监听输入变化
-            textarea.addEventListener('input', adjustTextareaHeight);
-            
-            // 初始化高度
-            adjustTextareaHeight();
-
-            // 处理加号按钮点击
-            addButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                addMenu.style.display = addMenu.style.display === 'none' ? 'block' : 'none';
-                // 关闭表情菜单
-                if (emojiMenu) emojiMenu.style.display = 'none';
-            });
-
-            // 处理菜单项点击
-            addMenu.addEventListener('click', (e) => {
-                const menuItem = e.target.closest('.add-menu-item');
-                if (!menuItem) return;
-
-                const action = menuItem.dataset.action;
-                if (action === 'image') {
-                    // 检查是否有选中的聊天室或好友
-                    const hasActiveRoom = window.chatroomController?.currentRoom;
-                    const hasActiveFriend = window.friendsManager?.currentPrivateChat;
-                    
-                    if (!hasActiveRoom && !hasActiveFriend) {
-                        showToast('请先选择一个聊天室或好友', 'warning');
-                        addMenu.style.display = 'none';
-                        return;
-                    }
-                    
-                    document.getElementById('imageFileInput').click();
-                } else if (action === 'camera') {
-                    // 检查是否有选中的聊天室或好友
-                    const hasActiveRoom = window.chatroomController?.currentRoom;
-                    const hasActiveFriend = window.friendsManager?.currentPrivateChat;
-                    
-                    if (!hasActiveRoom && !hasActiveFriend) {
-                        showToast('请先选择一个聊天室或好友', 'warning');
-                        addMenu.style.display = 'none';
-                        return;
-                    }
-                    
-                    document.getElementById('cameraFileInput').click();
-                }
-                
-                addMenu.style.display = 'none';
-            });
-
-            // 处理表情按钮点击
-            if (emojiButton && emojiMenu) {
-                emojiButton.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    emojiMenu.style.display = emojiMenu.style.display === 'none' ? 'block' : 'none';
-                    // 关闭添加菜单
-                    addMenu.style.display = 'none';
-                });
-
-                // 处理表情选择
-                emojiMenu.addEventListener('click', (e) => {
-                    const emojiItem = e.target.closest('.emoji-item');
-                    if (!emojiItem) return;
-
-                    const emoji = emojiItem.dataset.emoji;
-                    if (emoji) {
-                        insertEmojiAtCursor(textarea, emoji);
-                        adjustTextareaHeight();
-                    }
-                    
-                    emojiMenu.style.display = 'none';
-                });
-            }
-
-            // 插入表情到光标位置
-            function insertEmojiAtCursor(textarea, emoji) {
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const currentValue = textarea.value;
-                
-                const newValue = currentValue.substring(0, start) + emoji + currentValue.substring(end);
-                textarea.value = newValue;
-                
-                // 设置光标位置到表情后面
-                const newCursorPos = start + emoji.length;
-                textarea.selectionStart = newCursorPos;
-                textarea.selectionEnd = newCursorPos;
-                
-                // 触发input事件，让其他监听器知道内容已改变
-                textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                
-                // 聚焦到textarea
-                textarea.focus();
-            }
-
-            // 点击其他地方关闭菜单
-            document.addEventListener('click', (e) => {
-                if (!addButton.contains(e.target) && !addMenu.contains(e.target)) {
-                    addMenu.style.display = 'none';
-                }
-                if (emojiButton && emojiMenu && 
-                    !emojiButton.contains(e.target) && !emojiMenu.contains(e.target)) {
-                    emojiMenu.style.display = 'none';
-                }
-            });
-        }
-
     </script>
     
     <!-- 图片显示修复脚本 v2.0 - 基于file-api.js标准 -->
