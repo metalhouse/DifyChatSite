@@ -20,8 +20,8 @@ class ChatroomController {
         // 初始化好友管理器
         this.friendsManager = null;
         
-        // 初始化懒加载器
-        this.lazyLoader = null;
+    // 已移除遗留的 LazyLoader，使用 ImageOptimizationService 统一处理
+    this.imageOptimizer = null;
         
         // 初始化图片优化服务
         this.imageOptimizer = null;
@@ -107,17 +107,7 @@ class ChatroomController {
             // 设置全局引用，以便HTML中的按钮可以调用
             window.friendsManager = this.friendsManager;
             
-            // 初始化懒加载器
-            if (window.LazyLoader) {
-                this.lazyLoader = new window.LazyLoader();
-                this.lazyLoader.init();
-                console.log('✅ [前端] 懒加载器初始化成功');
-            } else {
-                // 降噪：仅在调试模式输出此信息
-                if (window.ENV_CONFIG?.isDebug && window.ENV_CONFIG.isDebug()) {
-                    console.warn('⚠️ [前端] LazyLoader 未找到，图片将直接加载');
-                }
-            }
+            // 移除 LazyLoader 分支
             
             // 初始化图片优化服务
             if (window.ImageOptimizationService) {
@@ -1381,20 +1371,22 @@ class ChatroomController {
     bindEvents() {
         const { messageInput, sendButton, mentionButton, emojiButton, imageUploadButton, addMenu, emojiMenu } = this.elements;
 
-        // 发送消息按钮
-        sendButton.addEventListener('click', () => this.sendMessage());
+    // 发送消息按钮
+    sendButton.addEventListener('click', () => { this.resetAutoLockTimer?.(); this.sendMessage(); });
 
         // 消息输入框 Enter 发送
         messageInput.addEventListener('keydown', (e) => {
             if (this.agentSuggestionsList && this.agentSuggestionsList.style.display !== 'none') return;
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
+                this.resetAutoLockTimer?.();
                 this.sendMessage();
             }
         });
 
         // 输入状态、@提及、高度调整
         messageInput.addEventListener('input', (e) => {
+            this.resetAutoLockTimer?.();
             this.handleTypingStatus();
             this.handleAtMention(e);
             this.adjustTextareaHeight();
@@ -1402,17 +1394,19 @@ class ChatroomController {
 
         // @提及列表键盘导航
         messageInput.addEventListener('keydown', (e) => {
+            this.resetAutoLockTimer?.();
             if (this.agentSuggestionsList && this.agentSuggestionsList.style.display !== 'none') {
                 this.handleAgentSuggestionKeydown(e);
             }
         });
 
         // @智能体按钮
-        mentionButton.addEventListener('click', () => this.insertAtSymbol());
+    mentionButton.addEventListener('click', () => { this.resetAutoLockTimer?.(); this.insertAtSymbol(); });
 
         // 添加(+)按钮
         if (imageUploadButton && addMenu) {
             imageUploadButton.addEventListener('click', (e) => {
+                this.resetAutoLockTimer?.();
                 e.stopPropagation();
                 addMenu.style.display = addMenu.style.display === 'none' ? 'block' : 'none';
                 if (emojiMenu) emojiMenu.style.display = 'none';
@@ -1422,6 +1416,7 @@ class ChatroomController {
         // 添加(+)菜单项点击
         if (addMenu) {
             addMenu.addEventListener('click', (e) => {
+                this.resetAutoLockTimer?.();
                 const menuItem = e.target.closest('.add-menu-item');
                 if (!menuItem) return;
                 const action = menuItem.dataset.action;
@@ -1443,12 +1438,14 @@ class ChatroomController {
         // 表情按钮
         if (emojiButton && emojiMenu) {
             emojiButton.addEventListener('click', (e) => {
+                this.resetAutoLockTimer?.();
                 e.stopPropagation();
                 emojiMenu.style.display = emojiMenu.style.display === 'none' ? 'block' : 'none';
                 if (addMenu) addMenu.style.display = 'none';
             });
 
             emojiMenu.addEventListener('click', (e) => {
+                this.resetAutoLockTimer?.();
                 const emojiItem = e.target.closest('.emoji-item');
                 if (!emojiItem) return;
                 const emoji = emojiItem.dataset.emoji;
@@ -1765,6 +1762,9 @@ width: ${computedStyle.width}`;
                     this.resetAutoLockTimer();
                 }
             }
+
+            // 用户操作：重置自动锁定计时器
+            this.resetAutoLockTimer?.();
 
             // 清除私聊状态
         if (this.friendsManager) {
@@ -2313,6 +2313,9 @@ width: ${computedStyle.width}`;
             return;
         }
 
+    // 用户操作：重置自动锁定计时器
+    this.resetAutoLockTimer?.();
+
         // 检查是否在私聊模式
         if (this.friendsManager && this.friendsManager.isPrivateChatMode()) {
             this.friendsManager.sendPrivateMessage(content);
@@ -2811,25 +2814,13 @@ width: ${computedStyle.width}`;
                         attachmentsContainer.appendChild(errorDiv);
                     }
                 } else {
-                    // 降级方案：如果没有优化服务，使用旧的懒加载方法
-                    console.log('⚠️ [降级] ImageOptimizationService未初始化，使用旧的懒加载方法');
+                    // 降级方案：直接设置图片src显示
                     const img = document.createElement('img');
-                    img.className = 'message-image img-fluid lazy-image';
+                    img.className = 'message-image img-fluid';
                     img.alt = fileName;
                     img.title = fileName;
                     img.style.cssText = 'border-radius: 8px; cursor: pointer; max-width: 100%; height: auto; display: block; min-height: 100px; background: #f0f0f0;';
-                    
-                    if (this.lazyLoader) {
-                        img.dataset.src = imageUrl;
-                        img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect width="100%25" height="100%25" fill="%23f0f0f0"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-family="sans-serif" font-size="16"%3E加载中...%3C/text%3E%3C/svg%3E';
-                        setTimeout(() => {
-                            if (this.lazyLoader && img.parentNode) {
-                                this.lazyLoader.observe(img);
-                            }
-                        }, 100);
-                    } else {
-                        img.src = imageUrl;
-                    }
+                    img.src = imageUrl;
                     
                     img.onerror = () => {
                         if (img.parentNode) {
