@@ -16,8 +16,8 @@ const getEnvironment = () => {
     return 'development';
   }
   
-  // 反代部署特殊域名判断
-  if (hostname === 'nas.pznas.com') {
+  // 反代部署特殊域名判断 - 支持多个生产域名
+  if (hostname === 'nas.pznas.com' || hostname === 'www.pznas.com' || hostname.includes('.pznas.com')) {
     return 'production';
   }
   
@@ -32,11 +32,11 @@ const developmentConfig = {
   // 根据当前访问地址动态配置后端URL
   API_BASE_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? 'http://localhost:4005' 
-    : `http://${window.location.hostname}:4005`,
+    : `${window.location.protocol}//${window.location.host}`, // 非localhost使用当前host（通过Nginx代理）
   API_PREFIX: '/api',
   WS_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:4005'
-    : `http://${window.location.hostname}:4005`,
+    : `${window.location.protocol.replace('http', 'ws')}//${window.location.host}`, // WebSocket通过Nginx代理
   
   // 功能开关
   ENABLE_WEBSOCKET: true,

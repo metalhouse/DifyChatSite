@@ -116,11 +116,18 @@ class PinVerificationService {
             return window.ENV_CONFIG.getApiUrl(path);
         }
         
-        // 降级方案：根据当前域名构建API URL
+        // 降级方案：根据当前页面协议和域名构建API URL
         const hostname = window.location.hostname;
-        const baseUrl = (hostname === 'localhost' || hostname === '127.0.0.1') 
-            ? 'http://localhost:4005/api' 
-            : `http://${hostname}:4005/api`;
+        const protocol = window.location.protocol;
+        
+        let baseUrl;
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            // 本地开发环境直接访问后端
+            baseUrl = 'http://localhost:4005/api';
+        } else {
+            // 生产环境通过Nginx代理访问，使用相同的host和protocol
+            baseUrl = `${protocol}//${window.location.host}/api`;
+        }
         
         return path ? `${baseUrl}${path.startsWith('/') ? path : '/' + path}` : baseUrl;
     }

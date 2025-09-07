@@ -12,14 +12,12 @@
     <meta name="theme-color" content="#28a745">
     
     <!-- 字体预加载 - 移动端优化 -->
-    <link rel="preload" href="./vendor/font-awesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="./vendor/font-awesome/webfonts/fa-brands-400.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="./vendor/font-awesome/webfonts/fa-regular-400.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="./vendor/font-awesome/webfonts/fa-solid-900.woff2?v=6.4.0" as="font" type="font/woff2" crossorigin>
     
     <!-- Bootstrap CSS -->
-    <link href="./vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="./vendor/bootstrap/bootstrap.min.css?v=5.3.0" rel="stylesheet">
     <!-- Font Awesome -->
-    <link href="./vendor/font-awesome/all.min.css" rel="stylesheet">
+    <link href="./vendor/font-awesome/all.min.css?v=6.4.0" rel="stylesheet">
     <!-- 移动端Font Awesome修复 -->
     <link href="./vendor/font-awesome/mobile-font-fix.css" rel="stylesheet">
     <!-- 移动端图片显示修复 -->
@@ -692,18 +690,18 @@
         }
 
         .member-avatar {
-            width: 28px;
-            height: 28px;
+            width: 20px !important;
+            height: 20px !important;
             border-radius: 50%;
             background: linear-gradient(135deg, #007bff, #0056b3);
             display: inline-flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 0.75rem;
+            font-size: 0.6rem !important;
             font-weight: 600;
-            margin: 0 3px;
-            border: 2px solid rgba(255, 255, 255, 0.2);
+            margin: 0 2px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
             cursor: pointer;
             transition: all 0.2s ease;
             user-select: none;
@@ -2219,9 +2217,9 @@
             }
             
             .member-avatar {
-                width: 22px !important;
-                height: 22px !important;
-                font-size: 0.65rem !important;
+                width: 20px !important;
+                height: 20px !important;
+                font-size: 0.6rem !important;
                 margin-right: 0.15rem !important;
                 flex-shrink: 0;
             }
@@ -2392,7 +2390,7 @@
 
         .add-btn {
             background: #f8f9fa;
-            color: #6c757d;
+            color: white;
             margin-right: 4px;
         }
 
@@ -3364,7 +3362,7 @@
     </div>
 
     <!-- Bootstrap JS -->
-    <script src="./vendor/bootstrap/bootstrap.bundle.min.js"></script>
+    <script src="./vendor/bootstrap/bootstrap.bundle.min.js?v=5.3.0"></script>
     
     <!-- 全局配置 -->
     <script type="module" src="config/env.js?v=2.0.0"></script>
@@ -3394,9 +3392,6 @@
     
     <!-- 好友API服务 -->
     <script src="js/api/friends-api.js"></script>
-    
-    <!-- 临时调试脚本 -->
-    <script src="debug-friends-api.js"></script>
     
     <!-- 好友管理器 -->
     <script src="js/services/friends-manager.js"></script>
@@ -3436,9 +3431,6 @@
         document.addEventListener('DOMContentLoaded', function() {
             // 页面DOM加载完成
             // console.log('页面DOM加载完成');
-            
-            // 验证Token状态
-            debugTokenStatus();
             
             // 初始时隐藏所有房间管理按钮
             const deleteRoomBtn = document.getElementById('deleteRoomBtn');
@@ -3573,25 +3565,6 @@
             // console.log('🔧 API客户端状态:', typeof window.apiClient);
             // console.log('🔧 Token状态:', !!TokenManager.getAccessToken());
             loadUserProfile();
-        }
-
-        // Token状态调试函数
-        function debugTokenStatus() {
-            console.log('🔑 Token状态检查:');
-            console.log('- dify_access_token:', !!localStorage.getItem('dify_access_token'));
-            console.log('- access_token:', !!localStorage.getItem('access_token'));
-            
-            if (window.TokenManager) {
-                console.log('- TokenManager.getAccessToken():', !!TokenManager.getAccessToken());
-            }
-            
-            const token = localStorage.getItem('dify_access_token');
-            if (token) {
-                console.log('- Token长度:', token.length);
-                console.log('- Token前缀:', token.substring(0, 10) + '...');
-            } else {
-                console.log('❌ 未找到dify_access_token');
-            }
         };
 
         // 用户搜索处理函数

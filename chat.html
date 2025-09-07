@@ -13,8 +13,6 @@
     
     <!-- 字体预加载 - 移动端优化 -->
     <link rel="preload" href="./vendor/font-awesome/webfonts/fa-solid-900.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="./vendor/font-awesome/webfonts/fa-brands-400.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="./vendor/font-awesome/webfonts/fa-regular-400.woff2" as="font" type="font/woff2" crossorigin>
     
     <!-- Bootstrap CSS -->
     <link href="./vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
@@ -1607,7 +1605,6 @@
                 const response = await apiClient.get('/api/users/profile');
                 if (response.success && response.data) {
                     const user = response.data;
-                    console.log('📋 用户资料加载成功:', user);
                     
                     // 更新导航栏用户名显示
                     const currentUsernameNav = document.getElementById('currentUsername');

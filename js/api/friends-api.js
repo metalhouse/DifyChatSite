@@ -5,7 +5,7 @@
 
 class FriendsApiService {
     constructor() {
-        this.baseURL = window.ENV_CONFIG?.API_BASE_URL || 'http://localhost:4005';
+        // 不在构造函数中设置baseURL，改为动态获取
         this.endpoints = {
             FRIENDS: {
                 SEARCH: '/api/friends/search',
@@ -36,17 +36,40 @@ class FriendsApiService {
     }
 
     /**
+     * 动态获取API基础URL
+     * @returns {string} API基础URL
+     */
+    getBaseURL() {
+        // 优先使用ENV_CONFIG
+        if (window.ENV_CONFIG?.API_BASE_URL) {
+            return window.ENV_CONFIG.API_BASE_URL;
+        }
+        
+        // 降级方案：根据当前页面环境构建URL
+        const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
+        
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            // 本地开发环境
+            return 'http://localhost:4005';
+        } else {
+            // 生产环境通过Nginx代理
+            return `${protocol}//${window.location.host}`;
+        }
+    }
+
+    /**
      * 获取认证头
      * @returns {Object} 请求头
      */
     getHeaders() {
-        // 按照TokenManager的标准，优先使用dify_access_token
-        let token = localStorage.getItem('dify_access_token');
+        // 按照API文档，优先使用access_token
+        let token = localStorage.getItem('access_token');
         
-        // 如果没有dify_access_token，尝试其他可能的键名
+        // 如果没有access_token，尝试其他可能的键名
         if (!token || token === 'null' || token === 'undefined') {
             const fallbackKeys = [
-                'access_token',
+                'dify_access_token',
                 'jwt_token', 
                 'auth_token',
                 'user_token'
@@ -107,7 +130,7 @@ class FriendsApiService {
             config.body = JSON.stringify(data);
         }
 
-        const fullURL = `${this.baseURL}${url}`;
+        const fullURL = `${this.getBaseURL()}${url}`;
         console.log(`🌐 [FriendsApi] ${method} ${fullURL}`, data ? { data } : '');
 
         try {
@@ -223,7 +246,7 @@ class FriendsApiService {
                 targetUsername,
                 message,
                 error: error.message,
-                baseURL: this.baseURL,
+                baseURL: this.getBaseURL(),
                 endpoint: this.endpoints.REQUESTS.SEND
             });
             throw error;
@@ -285,7 +308,7 @@ class FriendsApiService {
             const data = { action };
             
             console.log(`🔄 处理好友请求 - 请求ID: ${requestId}, 操作: ${action}`);
-            console.log(`🌐 请求URL: ${this.baseURL}${url}`);
+            console.log(`🌐 请求URL: ${this.getBaseURL()}${url}`);
             
             const response = await this.request('POST', url, data);
             console.log(`✅ ${action === 'accept' ? '接受' : '拒绝'}好友请求:`, response);
