@@ -2814,6 +2814,65 @@ width: ${computedStyle.width}`;
                     
                     if (fileId) {
                         const imageContainer = this.imageOptimizer.progressiveLoadImage(fileId, fileName);
+                        
+                        // 重写点击事件，使用ChatroomController的showImageModal
+                        const that = this; // 保持上下文引用
+                        setTimeout(() => {
+                            // 等待图片优化服务创建完容器后，重新绑定点击事件
+                            if (imageContainer && imageContainer.onclick) {
+                                console.log('🔧 [修复] 重写图片优化服务的点击事件，使用ChatroomController的showImageModal');
+                                
+                                imageContainer.onclick = function(e) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
+                                    const img = imageContainer.querySelector('img');
+                                    let actualImageUrl = imageUrl;
+
+                                    // 优先使用全尺寸原图 URL（带 token 的 dataset.srcFull）
+                                    if (img && img.dataset && img.dataset.srcFull) {
+                                        actualImageUrl = img.dataset.srcFull;
+                                    } else if (img && img.dataset && img.dataset.srcMedium) {
+                                        // 退化到中等
+                                        actualImageUrl = img.dataset.srcMedium;
+                                    } else if (img && img.src) {
+                                        // 最后退化到当前显示的 src
+                                        actualImageUrl = img.src;
+                                    }
+
+                                    // 如果缺少token而本地仍有token，则补充（避免鉴权失败）
+                                    if (typeof TokenManager !== 'undefined') {
+                                        try {
+                                            const tk = TokenManager.getAccessToken?.();
+                                            if (tk && !/([?&])token=/.test(actualImageUrl)) {
+                                                actualImageUrl += (actualImageUrl.includes('?') ? '&' : '?') + 'token=' + tk;
+                                            }
+                                        } catch (_) {}
+                                    }
+
+                                    // 如果原图尚未加载，提前加入 userRequested 队列加速加载
+                                    try {
+                                        if (window.imageOptimizer && img?.dataset?.imageId) {
+                                            const state = window.imageOptimizer.imageStates.get(img.dataset.imageId);
+                                            if (state && !state.fullLoaded) {
+                                                window.imageOptimizer.addToQueue('userRequested', {
+                                                    img,
+                                                    imageId: img.dataset.imageId,
+                                                    priority: Date.now()
+                                                });
+                                            }
+                                        }
+                                    } catch (err) {
+                                        console.warn('⚠️ [图片] 加速原图加载队列失败:', err);
+                                    }
+
+                                    console.log('🖼️ [点击-原图] 打开原图(统一使用ChatroomController模态框): ', actualImageUrl);
+                                    // 统一使用当前控制器的模态框，避免与ImageOptimizationService的遮罩样式冲突导致看不到图片
+                                    that.showImageModal(actualImageUrl, fileName);
+                                };
+                            }
+                        }, 100);
+                        
                         attachmentsContainer.appendChild(imageContainer);
                     } else {
                         console.error('❌ [优化] 附件中缺少文件ID，无法优化:', attachment);
@@ -3554,9 +3613,11 @@ justifyContent: ${debugInfo.justifyContent}
         // 检查是否已有放大模态框
         let existingModal = document.getElementById('imageModal');
         if (existingModal) {
+            // 若已存在则先移除旧的，再继续创建新的（而不是直接返回，避免第一次打开后无法重新打开更大尺寸）
             document.body.removeChild(existingModal);
-            return;
         }
+        
+        console.log('📸 [模态框] 显示图片模态框:', { imageUrl, altText });
         
         // 创建模态框
         const modal = document.createElement('div');
@@ -3573,6 +3634,7 @@ justifyContent: ${debugInfo.justifyContent}
             justify-content: center;
             align-items: center;
             cursor: zoom-out;
+            backdrop-filter: blur(2px);
         `;
         
         // 移动端临时启用缩放
@@ -3586,43 +3648,226 @@ justifyContent: ${debugInfo.justifyContent}
             }
         }
         
-        // 创建图片容器
+        // 创建图片容器 - 根据屏幕大小智能调整
         const imageContainer = document.createElement('div');
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        
+        // 大屏幕使用更大的初始尺寸
+        let maxWidth, maxHeight;
+        if (screenWidth >= 1920) {
+            // 4K或超宽屏
+            maxWidth = '85%';
+            maxHeight = '85%';
+        } else if (screenWidth >= 1366) {
+            // 标准桌面屏幕
+            maxWidth = '80%';
+            maxHeight = '80%';
+        } else if (screenWidth >= 768) {
+            // 平板
+            maxWidth = '90%';
+            maxHeight = '85%';
+        } else {
+            // 移动端
+            maxWidth = '95%';
+            maxHeight = '90%';
+        }
+        
         imageContainer.style.cssText = `
             position: relative;
-            overflow: hidden;
-            max-width: 90%;
-            max-height: 90%;
+            overflow: visible;
+            max-width: ${maxWidth};
+            max-height: ${maxHeight};
+            width: auto;
+            height: auto;
             display: flex;
             justify-content: center;
             align-items: center;
+            background: transparent;
         `;
         
-        // 创建放大的图片
+        // 创建加载指示器
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 1.2rem;
+            z-index: 1;
+        `;
+        loadingIndicator.innerHTML = `
+            <i class="fas fa-spinner fa-spin"></i>
+            <span style="margin-left: 8px;">加载中...</span>
+        `;
+        imageContainer.appendChild(loadingIndicator);
+        
+        // 创建放大的图片 - 智能尺寸适配（改进：大屏使用更大显示区域，取消1200px硬限制）
         const enlargedImg = document.createElement('img');
-        enlargedImg.src = imageUrl;
         enlargedImg.alt = altText;
+        
+        // 根据屏幕大小设置初始尺寸（移除像素上限，改为纯 vw/vh 以适配 2K/4K）
+        let imgMaxWidth, imgMaxHeight;
+        if (screenWidth >= 2560) { // 2K/4K
+            imgMaxWidth = '90vw';
+            imgMaxHeight = '90vh';
+        } else if (screenWidth >= 1920) { // FHD+ 大屏
+            imgMaxWidth = '88vw';
+            imgMaxHeight = '88vh';
+        } else if (screenWidth >= 1366) { // 普通桌面
+            imgMaxWidth = '85vw';
+            imgMaxHeight = '85vh';
+        } else if (screenWidth >= 768) { // 平板
+            imgMaxWidth = '90vw';
+            imgMaxHeight = '80vh';
+        } else { // 移动
+            imgMaxWidth = '95vw';
+            imgMaxHeight = '85vh';
+        }
+        
         enlargedImg.style.cssText = `
-            max-width: 100%;
-            max-height: 100%;
+            max-width: ${imgMaxWidth};
+            max-height: ${imgMaxHeight};
+            width: auto;
+            height: auto;
             object-fit: contain;
             border-radius: 8px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            cursor: grab;
-            transition: transform 0.2s ease;
+            cursor: zoom-in; /* 初始提示可缩放 */
+            transition: transform 0.2s ease, opacity 0.3s ease;
             transform-origin: center center;
+            opacity: 0;
+            visibility: hidden;
         `;
         
+        // 图片加载成功处理
+        enlargedImg.onload = function() {
+            console.log('✅ [模态框] 图片加载成功');
+            // 隐藏加载指示器
+            if (loadingIndicator.parentNode) {
+                loadingIndicator.parentNode.removeChild(loadingIndicator);
+            }
+            // 记录原始尺寸
+            naturalWidth = enlargedImg.naturalWidth;
+            naturalHeight = enlargedImg.naturalHeight;
+
+            // 视口允许的最大像素尺寸（与容器 90% 规则保持一致）
+            const vpW = window.innerWidth * 0.9;
+            const vpH = window.innerHeight * 0.9;
+            // 计算缩放(只缩小，不放大会导致模糊)
+            const shrinkScale = Math.min(vpW / naturalWidth, vpH / naturalHeight, 1);
+
+            // 通过实际宽度限制避免浏览器把小图拉伸造成模糊
+            const targetW = Math.round(naturalWidth * shrinkScale);
+            const targetH = Math.round(naturalHeight * shrinkScale);
+            enlargedImg.style.maxWidth = 'none';
+            enlargedImg.style.maxHeight = 'none';
+            enlargedImg.style.width = targetW + 'px';
+            enlargedImg.style.height = 'auto';
+            enlargedImg.style.imageRendering = 'auto'; // 需要像素风可改为 'crisp-edges'
+
+            // 初始化平移/缩放状态
+            scale = 1; // 1 代表当前显示尺寸，不进行额外放大
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+
+            // 显示图片
+            enlargedImg.style.opacity = '1';
+            enlargedImg.style.visibility = 'visible';
+            if (zoomIndicator) zoomIndicator.textContent = '100%';
+        };
+        
+        // 图片加载失败处理
+        enlargedImg.onerror = function() {
+            console.error('❌ [模态框] 图片加载失败:', imageUrl);
+            // 隐藏加载指示器
+            if (loadingIndicator.parentNode) {
+                loadingIndicator.parentNode.removeChild(loadingIndicator);
+            }
+            // 显示错误信息
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = `
+                color: white;
+                text-align: center;
+                padding: 20px;
+                background: rgba(255, 255, 255, 0.1);
+                border-radius: 8px;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            `;
+            errorDiv.innerHTML = `
+                <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px; color: #ffc107;"></i><br>
+                <span style="font-size: 1.1rem;">图片加载失败</span><br>
+                <small style="opacity: 0.7; margin-top: 8px; display: block;">点击背景关闭</small>
+            `;
+            imageContainer.appendChild(errorDiv);
+        };
+        
+        // 设置图片加载超时（15秒）
+        const loadTimeout = setTimeout(() => {
+            if (enlargedImg.complete === false || enlargedImg.naturalWidth === 0) {
+                console.warn('⚠️ [模态框] 图片加载超时');
+                enlargedImg.onerror();
+            }
+        }, 15000);
+        
+        // 当图片加载完成时清除超时定时器
+        enlargedImg.addEventListener('load', () => clearTimeout(loadTimeout));
+        enlargedImg.addEventListener('error', () => clearTimeout(loadTimeout));
+        
+        // 设置图片源（延迟设置以确保事件绑定完成）
+        setTimeout(() => {
+            console.log('📸 [模态框] 开始加载图片:', imageUrl);
+            enlargedImg.src = imageUrl;
+        }, 10);
+        
         // 缩放控制变量
-        let scale = 1;
+    let scale = 1;
         let isDragging = false;
         let startX, startY, translateX = 0, translateY = 0;
         const minScale = 1;
-        const maxScale = 5;
+    const maxScale = 10; // 放大上限提高，适配大屏查看细节
+    let naturalWidth = 0, naturalHeight = 0;
+    // 预先声明，避免在 updateTransform 初次执行时未定义
+    let zoomIndicator = null;
+    let baseDisplayWidth = 0;
+    let baseDisplayHeight = 0;
         
         // 更新图片变换
+        function clampTranslation() {
+            if (scale <= 1 || !naturalWidth || !naturalHeight) {
+                translateX = 0;
+                translateY = 0;
+                return;
+            }
+            const rect = enlargedImg.getBoundingClientRect();
+            // 允许溢出边界的比例（留一点黑边）
+            const overflowAllowance = 0.1;
+            const visibleW = rect.width / scale;
+            const visibleH = rect.height / scale;
+            const maxOffsetX = (rect.width - rect.width / scale) / 2 + rect.width * overflowAllowance / 2;
+            const maxOffsetY = (rect.height - rect.height / scale) / 2 + rect.height * overflowAllowance / 2;
+            translateX = Math.min(Math.max(translateX, -maxOffsetX), maxOffsetX);
+            translateY = Math.min(Math.max(translateY, -maxOffsetY), maxOffsetY);
+        }
+
         function updateTransform() {
-            enlargedImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+            clampTranslation();
+            // 使用3D加速
+            enlargedImg.style.transform = `translate3d(${translateX}px, ${translateY}px,0) scale(${scale})`;
+            enlargedImg.style.willChange = 'transform';
+            if (zoomIndicator) zoomIndicator.textContent = `${Math.round(scale * 100)}%`;
+            // Fallback：如果 transform 后宽度没有明显变化，改用直接设置宽度
+            if (baseDisplayWidth && scale !== 1) {
+                const rect = enlargedImg.getBoundingClientRect();
+                const expectedWidth = baseDisplayWidth * scale * 0.9; // 允许 10% 误差
+                if (rect.width < expectedWidth) {
+                    enlargedImg.style.transform = 'translate3d(0,0,0)';
+                    enlargedImg.style.width = Math.min(naturalWidth * scale, window.innerWidth * 0.95) + 'px';
+                    enlargedImg.style.height = 'auto';
+                }
+            }
         }
         
         // 重置图片位置和缩放
@@ -3630,36 +3875,34 @@ justifyContent: ${debugInfo.justifyContent}
             scale = 1;
             translateX = 0;
             translateY = 0;
+            // 记录初始显示尺寸供缩放回退判断
+            const rect = enlargedImg.getBoundingClientRect();
+            baseDisplayWidth = rect.width;
+            baseDisplayHeight = rect.height;
             updateTransform();
         }
         
-        // PC端：鼠标滚轮缩放
+        // PC端：鼠标滚轮缩放 - 优化版本
         function handleWheel(e) {
+            // 允许按住Ctrl时使用浏览器默认缩放（可辅助无障碍），其它情况自行处理
+            if (e.ctrlKey) return;
             e.preventDefault();
-            
+            e.stopPropagation();
             const rect = enlargedImg.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
-            
-            // 计算缩放中心点
-            const centerX = mouseX / rect.width;
-            const centerY = mouseY / rect.height;
-            
             const oldScale = scale;
-            const delta = e.deltaY > 0 ? -0.1 : 0.1;
-            scale = Math.min(Math.max(scale + delta, minScale), maxScale);
-            
+            // 使用指数缩放获得更平滑体验
+            const zoomFactor = 1.15; // 单步缩放比例
+            scale = e.deltaY > 0 ? scale / zoomFactor : scale * zoomFactor;
+            scale = Math.min(Math.max(scale, minScale), maxScale);
             if (scale !== oldScale) {
-                // 调整平移以保持鼠标位置为缩放中心
                 const scaleRatio = scale / oldScale;
-                const containerRect = imageContainer.getBoundingClientRect();
-                const offsetX = (mouseX - containerRect.width / 2) * (scaleRatio - 1);
-                const offsetY = (mouseY - containerRect.height / 2) * (scaleRatio - 1);
-                
-                translateX = (translateX - offsetX);
-                translateY = (translateY - offsetY);
-                
+                // 以鼠标位置为中心缩放
+                translateX = (translateX + (mouseX - rect.width / 2)) * scaleRatio - (mouseX - rect.width / 2);
+                translateY = (translateY + (mouseY - rect.height / 2)) * scaleRatio - (mouseY - rect.height / 2);
                 updateTransform();
+                enlargedImg.style.cursor = scale > 1 ? 'grab' : 'zoom-in';
             }
         }
         
@@ -3787,17 +4030,23 @@ justifyContent: ${debugInfo.justifyContent}
             lastClickTime = currentTime;
         }
         
-        // 绑定事件
-        enlargedImg.addEventListener('wheel', handleWheel, { passive: false });
+        // 绑定事件 - 优化版本
+        // 为图片绑定所有交互事件
+    enlargedImg.addEventListener('wheel', handleWheel, { passive: false });
         enlargedImg.addEventListener('touchstart', handleTouchStart, { passive: false });
         enlargedImg.addEventListener('touchmove', handleTouchMove, { passive: false });
         enlargedImg.addEventListener('touchend', handleTouchEnd, { passive: false });
         enlargedImg.addEventListener('mousedown', handleMouseDown);
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
         enlargedImg.addEventListener('click', handleImageClick);
         
-        // 为模态框也添加触摸事件处理（防止默认行为）
+        // 为整个模态框也添加滚轮事件，确保在图片外围也能缩放
+    modal.addEventListener('wheel', function(e) { handleWheel(e); }, { passive: false });
+        
+        // 全局鼠标事件（用于拖拽）
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        
+        // 为模态框添加触摸事件处理（防止默认行为）
         modal.addEventListener('touchstart', function(e) {
             if (e.touches.length === 2) {
                 e.preventDefault();
@@ -3861,11 +4110,36 @@ justifyContent: ${debugInfo.justifyContent}
         // 检测设备类型显示对应提示
         hint.textContent = isMobileDevice ? 
             '双指缩放 | 单指拖拽 | 双击重置' : 
-            'PC: 滚轮缩放 | 移动端: 双指缩放 | 双击重置';
+            '滚轮缩放 | 拖拽移动 | 双击重置 | 按住Ctrl使用浏览器缩放';
+
+        // 缩放百分比指示器
+        zoomIndicator = document.createElement('div');
+        zoomIndicator.style.cssText = `
+            position: absolute;
+            left: 20px;
+            bottom: 20px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: system-ui, sans-serif;
+            pointer-events: none;
+        `;
+        zoomIndicator.textContent = '100%';
+
+        // 图片原始尺寸加载后根据自然尺寸决定是否初始放大（如果图片比视口小很多，可保持 100%）
+        enlargedImg.addEventListener('load', () => {
+            naturalWidth = enlargedImg.naturalWidth;
+            naturalHeight = enlargedImg.naturalHeight;
+            // 如果图片本身小于容器，不自动放大（保持清晰度）
+            updateTransform();
+        });
         
         imageContainer.appendChild(enlargedImg);
         modal.appendChild(imageContainer);
-        modal.appendChild(hint);
+    modal.appendChild(hint);
+    modal.appendChild(zoomIndicator);
         document.body.appendChild(modal);
     }
 

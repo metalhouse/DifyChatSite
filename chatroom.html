@@ -1439,6 +1439,85 @@
             max-width: 320px !important;
         }
 
+        /* 图片模态框修复样式 - 响应式优化版本 */
+        #imageModal {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            background: rgba(0, 0, 0, 0.8) !important;
+            z-index: 9999 !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+
+        /* 响应式图片尺寸 */
+        #imageModal img {
+            border-radius: 8px !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+            cursor: grab !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            background: transparent !important;
+            filter: none !important;
+            transform: none !important;
+            transition: transform 0.2s ease, opacity 0.3s ease !important;
+            object-fit: contain !important;
+        }
+
+        /* 大屏幕 (>=1920px) */
+        @media (min-width: 1920px) {
+            #imageModal img {
+                max-width: min(80vw, 1200px) !important;
+                max-height: min(80vh, 900px) !important;
+            }
+        }
+
+        /* 标准桌面屏幕 (1366px-1919px) */
+        @media (min-width: 1366px) and (max-width: 1919px) {
+            #imageModal img {
+                max-width: min(75vw, 1000px) !important;
+                max-height: min(75vh, 750px) !important;
+            }
+        }
+
+        /* 小桌面和平板 (768px-1365px) */
+        @media (min-width: 768px) and (max-width: 1365px) {
+            #imageModal img {
+                max-width: 85vw !important;
+                max-height: 70vh !important;
+            }
+        }
+
+        /* 移动端 (<768px) */
+        @media (max-width: 767px) {
+            #imageModal img {
+                max-width: 95vw !important;
+                max-height: 85vh !important;
+            }
+        }
+
+        #imageModal img:hover {
+            filter: none !important;
+        }
+
+        /* 确保模态框不被其他样式干扰 */
+        #imageModal * {
+            box-sizing: border-box !important;
+        }
+
+        #imageModal .image-container {
+            background: transparent !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+
         /* 拖拽上传样式 */
         .chat-input.drag-over {
             background: rgba(253, 126, 20, 0.1);
@@ -5626,6 +5705,41 @@
         };
 
         console.log('💡 提示: 如果图片气泡没有自动调整，请在控制台运行 window.debugImageBubbles() 进行调试');
+
+        // 图片模态框调试功能
+        window.debugImageModal = function() {
+            console.log('🔧 [调试] 测试图片模态框功能');
+            console.log('📊 [调试] 屏幕信息:', {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                devicePixelRatio: window.devicePixelRatio
+            });
+            
+            // 测试URL（使用一个示例图片）
+            const testImageUrl = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><rect width="800" height="600" fill="%23f0f0f0"/><text x="400" y="250" font-family="Arial" font-size="32" text-anchor="middle" fill="%23333">测试图片 800x600</text><text x="400" y="300" font-family="Arial" font-size="20" text-anchor="middle" fill="%23666">屏幕尺寸: ' + window.innerWidth + 'x' + window.innerHeight + '</text><text x="400" y="350" font-family="Arial" font-size="16" text-anchor="middle" fill="%23999">使用鼠标滚轮缩放</text></svg>';
+            
+            if (window.chatroomController && window.chatroomController.showImageModal) {
+                console.log('✅ [调试] 调用ChatroomController的showImageModal方法');
+                window.chatroomController.showImageModal(testImageUrl, '测试图片');
+                
+                // 等待一下再打印提示
+                setTimeout(() => {
+                    console.log('💡 [调试] 测试提示:');
+                    console.log('  - 使用鼠标滚轮进行缩放');
+                    console.log('  - 缩放后可拖拽图片');
+                    console.log('  - 双击图片重置缩放');
+                    console.log('  - 点击背景或按ESC关闭');
+                }, 500);
+            } else {
+                console.error('❌ [调试] ChatroomController或showImageModal方法不存在');
+                console.log('可用的全局对象:', {
+                    chatroomController: !!window.chatroomController,
+                    showImageModal: !!(window.chatroomController && window.chatroomController.showImageModal)
+                });
+            }
+        };
+
+        console.log('💡 提示: 运行 window.debugImageModal() 测试图片模态框功能（已优化大屏幕显示和滚轮缩放）');
 
         // 防抖函数
         function debounce(func, wait) {
