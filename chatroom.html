@@ -2469,9 +2469,14 @@
 
         .add-btn {
             background: #f8f9fa;
-            color: white;
+            color: #ffffff !important;
             margin-right: 4px;
+            width: 36px !important;
+            height: 36px !important;
+            font-size: 16px;
         }
+        /* 确保内部图标始终纯白 */
+        .add-btn i, .add-btn .fa, .add-btn svg { color: #ffffff !important; fill: #ffffff !important; }
 
         .add-btn:hover:not(:disabled) {
             background: #e9ecef;
@@ -2482,6 +2487,9 @@
             background: #e3f2fd;
             color: #1976d2;
             margin-right: 4px;
+            width: 36px !important;
+            height: 36px !important;
+            font-size: 16px;
         }
 
         .mention-btn:hover:not(:disabled) {
@@ -2493,6 +2501,9 @@
             background: #fff3e0;
             color: #f57c00;
             margin-right: 4px;
+            width: 36px !important;
+            height: 36px !important;
+            font-size: 16px;
         }
 
         .emoji-btn:hover:not(:disabled) {
@@ -2643,6 +2654,33 @@
         .emoji-menu::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
         }
+        /* ===== 修复模态框底部按钮不可见 ===== */
+        .modal-footer .btn {
+            position: relative;
+            z-index: 2;
+            opacity: 1 !important;
+            color: #fff !important;
+            font-weight: 500;
+        }
+        .modal-footer .btn.btn-secondary { background: #6c757d !important; border-color: #6c757d !important; }
+        .modal-footer .btn.btn-secondary:hover { background:#5a6268 !important; }
+        .modal-footer .btn.btn-success { background: #28a745 !important; border-color:#28a745 !important; }
+        .modal-footer .btn.btn-success:hover { background:#218838 !important; }
+        .modal-footer .btn.btn-danger { background:#dc3545 !important; border-color:#dc3545 !important; }
+        .modal-footer .btn.btn-danger:hover { background:#c82333 !important; }
+        .modal-content .modal-footer { position: relative; }
+        .modal-content .modal-footer::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(145deg, rgba(255,255,255,0.95), rgba(240,240,240,0.9));
+            z-index: 1;
+            pointer-events: none;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+        .modal-footer > * { position: relative; z-index: 3; }
+        .modal-footer button[disabled] { opacity: .65 !important; }
+        .modal-footer .btn:focus { outline: none; box-shadow: 0 0 0 0.25rem rgba(40,167,69,0.3); }
     </style>
 </head>
 <body>
