@@ -107,6 +107,13 @@ class ChatroomController {
             // 设置全局引用，以便HTML中的按钮可以调用
             window.friendsManager = this.friendsManager;
             
+            // 初始化好友控制器（如果存在）
+            if (window.FriendsController) {
+                this.friendsController = new FriendsController();
+                await this.friendsController.initialize();
+                window.friendsController = this.friendsController;
+            }
+            
             // 移除 LazyLoader 分支
             
             // 初始化图片优化服务
@@ -376,7 +383,10 @@ class ChatroomController {
                     // 检查界面是否已锁定
                     const isLocked = localStorage.getItem('interface_locked');
                     if (isLocked) {
-                        console.log('🔒 界面已锁定，不重置计时器');
+                        // 减少日志污染，只在调试模式下输出
+                        if (window.ENV_CONFIG && window.ENV_CONFIG.isDebug && window.ENV_CONFIG.isDebug()) {
+                            console.log('🔒 界面已锁定，不重置计时器');
+                        }
                         return;
                     }
                     

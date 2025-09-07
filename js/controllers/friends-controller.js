@@ -22,6 +22,10 @@ class FriendsController {
             receivedRequestsList: document.getElementById('receivedRequestsList'),
             sentRequestsList: document.getElementById('sentRequestsList'),
             requestsBadge: document.getElementById('requestsBadge'),
+            friendRequestsBadge: document.getElementById('friendRequestsBadge'),
+            requestSenderName: document.getElementById('requestSenderName'),
+            acceptRequestBtn: document.getElementById('acceptRequestBtn'),
+            declineRequestBtn: document.getElementById('declineRequestBtn'),
             
             // 搜索
             friendSearchInput: document.getElementById('friendSearchInput'),
@@ -34,10 +38,10 @@ class FriendsController {
         };
 
         // 调试：检查所有DOM元素是否存在
-        console.log('🔍 DOM元素检查:', {
-            sentRequestsList: !!this.elements.sentRequestsList,
-            receivedRequestsList: !!this.elements.receivedRequestsList
-        });
+        // console.log('🔍 DOM元素检查:', {
+        //     sentRequestsList: !!this.elements.sentRequestsList,
+        //     receivedRequestsList: !!this.elements.receivedRequestsList
+        // });
 
         // 如果关键元素不存在，等待DOM加载
         if (!this.elements.sentRequestsList) {
@@ -105,13 +109,106 @@ class FriendsController {
      * 初始化好友功能
      */
     async initialize() {
-        console.log('🤝 初始化好友功能控制器');
+        // console.log('🤝 初始化好友功能控制器');
         
-        // 加载好友列表
-        await this.loadFriends();
+        // 检查用户登录状态和Token可用性（现在是异步的）
+        if (!await this.checkUserAuthentication()) {
+            console.warn('⚠️ 用户未登录或Token不可用，延迟初始化');
+            return;
+        }
         
-        // 加载好友请求
-        await this.loadRequests();
+        try {
+            // 加载好友列表
+            await this.loadFriends();
+            
+            // 加载好友请求
+            await this.loadRequests();
+            
+            // console.log('✅ 好友功能初始化完成');
+        } catch (error) {
+            console.error('❌ 好友功能初始化失败:', error);
+            
+            // 如果是认证错误，提示用户重新登录
+            if (error.message.includes('认证失败') || error.message.includes('401')) {
+                this.showToast('登录状态过期，请重新登录', 'warning');
+            } else {
+                this.showToast('好友功能加载失败，请刷新页面重试', 'error');
+            }
+        }
+    }
+    
+    /**
+     * 检查用户认证状态 - 改进版，参考chatroom功能
+     */
+    async checkUserAuthentication() {
+        try {
+            // 1. 使用与好友API相同的Token获取逻辑
+            let accessToken = localStorage.getItem('access_token');
+            
+            // 如果没有access_token，尝试其他可能的键名（与FriendsApi保持一致）
+            if (!accessToken || accessToken === 'null' || accessToken === 'undefined') {
+                const fallbackKeys = [
+                    'dify_access_token',  // 这是系统实际使用的Token键名
+                    'jwt_token', 
+                    'auth_token',
+                    'user_token'
+                ];
+                
+                for (const key of fallbackKeys) {
+                    const fallbackToken = localStorage.getItem(key);
+                    if (fallbackToken && fallbackToken !== 'null' && fallbackToken !== 'undefined') {
+                        accessToken = fallbackToken;
+                        console.log(`✅ 找到Token，使用键名: ${key}`);
+                        break;
+                    }
+                }
+            } else {
+                console.log('✅ 找到access_token');
+            }
+            
+            if (!accessToken || accessToken === 'null' || accessToken === 'undefined') {
+                console.warn('❌ 未找到有效的Token');
+                console.warn('📋 localStorage中的Token相关键:', 
+                    Object.keys(localStorage).filter(key => 
+                        key.toLowerCase().includes('token') || 
+                        key.toLowerCase().includes('access')
+                    ).map(key => ({ 
+                        key, 
+                        hasValue: !!localStorage.getItem(key) && localStorage.getItem(key) !== 'null'
+                    }))
+                );
+                return false;
+            }
+
+            // 2. 验证Token有效性并获取当前用户信息
+            // 参考chatroom.html的loadUserProfile函数
+            if (typeof window.apiClient !== 'undefined') {
+                try {
+                    console.log('📡 验证用户Token并获取用户信息...');
+                    const response = await window.apiClient.get('/users/profile');
+                    if (response.success && response.data) {
+                        // 设置当前用户信息，供好友API使用
+                        window.currentUser = response.data;
+                        console.log('✅ 用户认证成功:', window.currentUser);
+                        return true;
+                    } else {
+                        console.warn('⚠️ Token验证失败:', response);
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('❌ Token验证请求失败:', error);
+                    return false;
+                }
+            }
+
+            // 3. 备选方案：如果apiClient不可用，只检查Token存在性
+            console.log('⚠️ apiClient不可用，只验证Token存在性');
+            return true;
+            
+        } catch (error) {
+            console.error('❌ 用户认证检查失败:', error);
+            return false;
+        }
     }
 
     // ========================================
@@ -463,25 +560,55 @@ class FriendsController {
             // 检查响应数据结构
             console.log('📊 收到的请求API原始响应:', response);
             
-            // 适配不同的响应结构 - 好友请求数据在 friends 字段中
-            if (response.data && Array.isArray(response.data.friends)) {
-                this.receivedRequests = response.data.friends;
-            } else if (response.data && Array.isArray(response.data.requests)) {
-                this.receivedRequests = response.data.requests;
-            } else if (response.data && Array.isArray(response.data)) {
-                this.receivedRequests = response.data;
+            let receivedRequests = [];
+            
+            // 根据API文档，数据结构应该是 { success: true, data: [...] }
+            if (response && response.success && Array.isArray(response.data)) {
+                receivedRequests = response.data;
+                console.log('✅ 使用标准API响应格式 data 数组:', receivedRequests);
+            } else if (response && response.data && Array.isArray(response.data.friends)) {
+                // 兼容旧格式
+                receivedRequests = response.data.friends;
+                console.log('✅ 使用兼容格式 data.friends 字段:', receivedRequests);
+            } else if (response && response.data && Array.isArray(response.data.requests)) {
+                // 兼容格式
+                receivedRequests = response.data.requests;
+                console.log('✅ 使用兼容格式 data.requests 字段:', receivedRequests);
+            } else if (response && Array.isArray(response.friends)) {
+                receivedRequests = response.friends;
+                console.log('✅ 使用friends字段:', receivedRequests);
+            } else if (response && Array.isArray(response.requests)) {
+                receivedRequests = response.requests;
+                console.log('✅ 使用requests字段:', receivedRequests);
             } else if (Array.isArray(response)) {
-                this.receivedRequests = response;
+                receivedRequests = response;
+                console.log('✅ 响应本身是数组:', receivedRequests);
             } else {
                 console.warn('⚠️ 收到的请求数据结构异常:', response);
-                this.receivedRequests = [];
+                receivedRequests = [];
             }
             
-            console.log('✅ 解析后的收到请求列表:', this.receivedRequests);
+            this.receivedRequests = receivedRequests;
+            
+            console.log('✅ 最终解析的收到请求列表:', this.receivedRequests);
+            console.log('📊 收到请求数量:', this.receivedRequests.length);
+            
+            // 更新计数显示
+            this.updateRequestCounts();
+            
             this.renderReceivedRequests();
             
         } catch (error) {
             console.error('❌ 加载收到的请求失败:', error);
+            
+            // 如果是认证错误，提示用户
+            if (error.message.includes('认证失败') || error.message.includes('401')) {
+                this.showToast('登录已过期，请重新登录', 'warning');
+                // 这里可以添加跳转到登录页的逻辑
+            } else {
+                this.showToast(`加载好友请求失败: ${error.message}`, 'error');
+            }
+            
             this.showReceivedRequestsError();
         }
     }
@@ -523,25 +650,54 @@ class FriendsController {
             // 检查响应数据结构
             console.log('📊 发送的请求API原始响应:', response);
             
-            // 适配不同的响应结构 - 好友请求数据在 friends 字段中
-            if (response.data && Array.isArray(response.data.friends)) {
-                this.sentRequests = response.data.friends;
-            } else if (response.data && Array.isArray(response.data.requests)) {
-                this.sentRequests = response.data.requests;
-            } else if (response.data && Array.isArray(response.data)) {
-                this.sentRequests = response.data;
+            let sentRequests = [];
+            
+            // 根据API文档，数据结构应该是 { success: true, data: [...] }
+            if (response && response.success && Array.isArray(response.data)) {
+                sentRequests = response.data;
+                console.log('✅ 使用标准API响应格式 data 数组:', sentRequests);
+            } else if (response && response.data && Array.isArray(response.data.friends)) {
+                // 兼容旧格式
+                sentRequests = response.data.friends;
+                console.log('✅ 使用兼容格式 data.friends 字段:', sentRequests);
+            } else if (response && response.data && Array.isArray(response.data.requests)) {
+                sentRequests = response.data.requests;
+                console.log('✅ 使用兼容格式 data.requests 字段:', sentRequests);
+            } else if (response && Array.isArray(response.friends)) {
+                sentRequests = response.friends;
+                console.log('✅ 使用friends字段:', sentRequests);
+            } else if (response && Array.isArray(response.requests)) {
+                sentRequests = response.requests;
+                console.log('✅ 使用requests字段:', sentRequests);
             } else if (Array.isArray(response)) {
-                this.sentRequests = response;
+                sentRequests = response;
+                console.log('✅ 响应本身是数组:', sentRequests);
             } else {
                 console.warn('⚠️ 发送的请求数据结构异常:', response);
-                this.sentRequests = [];
+                sentRequests = [];
             }
             
-            console.log('✅ 解析后的发送请求列表:', this.sentRequests);
+            this.sentRequests = sentRequests;
+            
+            console.log('✅ 最终解析的发送请求列表:', this.sentRequests);
+            console.log('📊 发送请求数量:', this.sentRequests.length);
+            
+            // 更新计数显示
+            this.updateRequestCounts();
+            
             this.renderSentRequests();
             
         } catch (error) {
             console.error('❌ 加载发送的请求失败:', error);
+            
+            // 如果是认证错误，提示用户
+            if (error.message.includes('认证失败') || error.message.includes('401')) {
+                this.showToast('登录已过期，请重新登录', 'warning');
+                // 这里可以添加跳转到登录页的逻辑
+            } else {
+                this.showToast(`加载好友请求失败: ${error.message}`, 'error');
+            }
+            
             this.showSentRequestsError();
         }
     }
@@ -608,9 +764,17 @@ class FriendsController {
      * 渲染收到的请求
      */
     renderReceivedRequests() {
-        if (!this.elements.receivedRequestsList) return;
+        console.log('🎨 [渲染] 开始渲染收到的请求');
+        console.log('🎨 [渲染] receivedRequestsList元素存在:', !!this.elements.receivedRequestsList);
+        console.log('🎨 [渲染] 请求数量:', this.receivedRequests.length);
+        console.log('🎨 [渲染] 请求数据:', this.receivedRequests);
+        if (!this.elements.receivedRequestsList) {
+            console.error('❌ [渲染] receivedRequestsList元素未找到');
+            return;
+        }
 
         if (this.receivedRequests.length === 0) {
+            console.log('📭 [渲染] 没有收到的请求，显示空状态');
             this.elements.receivedRequestsList.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-inbox"></i>
@@ -621,8 +785,31 @@ class FriendsController {
             return;
         }
 
-        const html = this.receivedRequests.map(request => this.createReceivedRequestItem(request)).join('');
+        console.log('🎨 [渲染] 准备渲染请求项...');
+        const html = this.receivedRequests.map((request, index) => {
+            console.log(`🎨 [渲染] 处理请求 ${index + 1}:`, request);
+            return this.createReceivedRequestItem(request);
+        }).join('');
+        
+        console.log('🎨 [渲染] 生成的HTML长度:', html.length);
+        console.log('🎨 [渲染] 设置DOM innerHTML...');
         this.elements.receivedRequestsList.innerHTML = html;
+        
+        // 调试：验证DOM更新
+        setTimeout(() => {
+            console.log('🔍 [渲染验证] DOM检查:');
+            console.log('🔍 [渲染验证] receivedRequestsList子元素数量:', this.elements.receivedRequestsList.children.length);
+            console.log('🔍 [渲染验证] receivedRequestsList innerHTML长度:', this.elements.receivedRequestsList.innerHTML.length);
+            console.log('🔍 [渲染验证] receivedRequestsList可见性:', getComputedStyle(this.elements.receivedRequestsList).display !== 'none');
+            console.log('🔍 [渲染验证] 父容器显示状态:', getComputedStyle(this.elements.receivedRequestsList.parentElement).display !== 'none');
+            
+            // 检查是否有CSS隐藏了内容
+            const parent = this.elements.receivedRequestsList.parentElement;
+            console.log('🔍 [渲染验证] 父容器类名:', parent.className);
+            console.log('🔍 [渲染验证] 祖父容器类名:', parent.parentElement.className);
+        }, 100);
+        
+        console.log('✅ [渲染] 收到的请求渲染完成');
     }
 
     /**
@@ -731,15 +918,129 @@ class FriendsController {
      * 更新请求徽章数量
      */
     updateRequestsBadge() {
-        if (this.elements.requestsBadge) {
-            const count = this.receivedRequests.length;
+        const count = this.receivedRequests.length;
+        console.log('🏷️ [徽章] 更新请求徽章, 请求数量:', count);
+        
+        if (this.elements.friendRequestsBadge) {
             if (count > 0) {
-                this.elements.requestsBadge.textContent = count > 99 ? '99+' : count;
-                this.elements.requestsBadge.style.display = 'block';
+                // 显示最新的好友请求
+                const latestRequest = this.receivedRequests[0]; // 取最新的请求
+                const senderName = latestRequest.requester?.username || latestRequest.requester?.nickname || '未知用户';
+                
+                // 更新发送者名称
+                if (this.elements.requestSenderName) {
+                    this.elements.requestSenderName.textContent = senderName;
+                }
+                
+                // 绑定按钮事件
+                this.bindRequestButtons(latestRequest.id);
+                
+                // 显示徽章
+                this.elements.friendRequestsBadge.style.display = 'block';
+                console.log('🏷️ [徽章] 显示好友请求徽章:', senderName);
             } else {
-                this.elements.requestsBadge.style.display = 'none';
+                this.elements.friendRequestsBadge.style.display = 'none';
+                console.log('🏷️ [徽章] 隐藏好友请求徽章');
+            }
+        } else {
+            console.error('🏷️ [徽章] friendRequestsBadge 元素不存在!');
+        }
+    }
+    
+    /**
+     * 绑定请求按钮事件
+     */
+    bindRequestButtons(requestId) {
+        if (this.elements.acceptRequestBtn) {
+            this.elements.acceptRequestBtn.onclick = () => this.handleRequest(requestId, 'accept');
+        }
+        
+        if (this.elements.declineRequestBtn) {
+            this.elements.declineRequestBtn.onclick = () => this.handleRequest(requestId, 'decline');
+        }
+    }
+    
+    /**
+     * 处理好友请求
+     */
+    async handleRequest(requestId, action) {
+        try {
+            console.log('处理好友请求:', requestId, action);
+            
+            const response = await window.FriendsApi.handleFriendRequest(requestId, action);
+            
+            if (response && response.success) {
+                const actionText = action === 'accept' ? '接受' : '拒绝';
+                console.log(`✅ ${actionText}好友请求成功`);
+                
+                // 显示成功消息
+                if (typeof showToast === 'function') {
+                    showToast(`已${actionText}好友请求`, 'success');
+                }
+                
+                // 重新加载数据
+                console.log('🔄 开始刷新数据...');
+                await Promise.all([
+                    this.loadFriendRequestsData(), // 刷新请求列表
+                    this.loadFriends()             // 刷新好友列表
+                ]);
+                
+                console.log('✅ 数据刷新完成，好友数量:', this.friends.length);
+                
+            } else {
+                throw new Error(response?.message || '请求处理失败');
+            }
+        } catch (error) {
+            console.error('❌ 处理好友请求失败:', error);
+            if (typeof showToast === 'function') {
+                showToast('处理请求失败: ' + error.message, 'error');
             }
         }
+    }
+    
+    /**
+     * 重新加载好友请求数据
+     */
+    async loadFriendRequestsData() {
+        try {
+            console.log('🔄 重新加载好友请求数据...');
+            await Promise.all([
+                this.loadReceivedRequests(),
+                this.loadSentRequests()
+            ]);
+            console.log('✅ 好友请求数据加载完成');
+        } catch (error) {
+            console.error('❌ 加载好友请求数据失败:', error);
+        }
+    }
+
+    /**
+     * 更新请求计数显示
+     */
+    updateRequestCounts() {
+        // 更新收到的请求数量
+        const receivedCountBadge = document.getElementById('receivedCount');
+        if (receivedCountBadge) {
+            const receivedCount = this.receivedRequests ? this.receivedRequests.length : 0;
+            receivedCountBadge.textContent = receivedCount;
+            receivedCountBadge.style.display = receivedCount > 0 ? 'inline' : 'none';
+        }
+
+        // 更新发送的请求数量
+        const sentCountBadge = document.getElementById('sentCount');
+        if (sentCountBadge) {
+            const sentCount = this.sentRequests ? this.sentRequests.length : 0;
+            sentCountBadge.textContent = sentCount;
+            sentCountBadge.style.display = sentCount > 0 ? 'inline' : 'none';
+        }
+
+        // 更新总的请求徽章
+        this.updateRequestsBadge();
+
+        console.log('📊 更新请求计数:', {
+            received: this.receivedRequests ? this.receivedRequests.length : 0,
+            sent: this.sentRequests ? this.sentRequests.length : 0
+        });
     }
 
     // ========================================
@@ -872,17 +1173,58 @@ class FriendsController {
     async refresh() {
         console.log('🔄 刷新好友数据');
         
+        // 检查认证状态
+        if (!await this.checkUserAuthentication()) {
+            console.warn('⚠️ 刷新时发现Token不可用');
+            this.showToast('请重新登录以获取最新数据', 'warning');
+            return;
+        }
+        
         // 清空搜索
         if (this.elements.friendSearchInput) {
             this.elements.friendSearchInput.value = '';
         }
         this.clearSearchResults();
         
-        // 重新加载数据
-        await Promise.all([
-            this.loadFriends(),
-            this.loadRequests()
-        ]);
+        try {
+            // 重新加载数据
+            await Promise.all([
+                this.loadFriends(),
+                this.loadRequests()
+            ]);
+            
+            console.log('✅ 好友数据刷新完成');
+        } catch (error) {
+            console.error('❌ 刷新好友数据失败:', error);
+            this.showToast('刷新失败，请稍后重试', 'error');
+        }
+    }
+    
+    /**
+     * 延迟初始化（用于Token延迟加载的情况）
+     */
+    async delayedInitialize(maxRetries = 5, retryInterval = 1000) {
+        console.log('🕐 开始延迟初始化好友功能');
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            console.log(`🔄 初始化尝试 ${attempt}/${maxRetries}`);
+            
+            if (await this.checkUserAuthentication()) {
+                console.log('✅ Token可用，开始初始化');
+                await this.initialize();
+                return true;
+            }
+            
+            if (attempt < maxRetries) {
+                console.log(`⏳ 等待 ${retryInterval}ms 后重试`);
+                await new Promise(resolve => setTimeout(resolve, retryInterval));
+                retryInterval *= 1.5; // 指数退避
+            }
+        }
+        
+        console.error('❌ 延迟初始化失败，超过最大重试次数');
+        this.showToast('好友功能初始化失败，请刷新页面', 'error');
+        return false;
     }
 }
 

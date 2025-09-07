@@ -40,28 +40,53 @@ class FriendsApiService {
      * @returns {Object} 请求头
      */
     getHeaders() {
-        // 尝试不同的Token存储方式
-        const tokenManager = TokenManager?.getAccessToken();
-        const accessToken = localStorage.getItem('access_token');
-        const difyAccessToken = localStorage.getItem('dify_access_token');
+        // 按照TokenManager的标准，优先使用dify_access_token
+        let token = localStorage.getItem('dify_access_token');
         
-        console.log('🔍 Token调试信息:', {
-            tokenManager,
-            accessToken,
-            difyAccessToken,
-            allKeys: Object.keys(localStorage).filter(key => key.includes('token'))
-        });
-        
-        const token = tokenManager || accessToken || difyAccessToken;
-                     
-        if (!token) {
-            console.warn('⚠️ 未找到访问令牌，请重新登录');
-            console.warn('📋 localStorage所有键:', Object.keys(localStorage));
+        // 如果没有dify_access_token，尝试其他可能的键名
+        if (!token || token === 'null' || token === 'undefined') {
+            const fallbackKeys = [
+                'access_token',
+                'jwt_token', 
+                'auth_token',
+                'user_token'
+            ];
+            
+            for (const key of fallbackKeys) {
+                const fallbackToken = localStorage.getItem(key);
+                if (fallbackToken && fallbackToken !== 'null' && fallbackToken !== 'undefined') {
+                    token = fallbackToken;
+                    console.log(`🔄 使用备用Token键: ${key}`);
+                    break;
+                }
+            }
         }
+
+        if (!token || token === 'null' || token === 'undefined') {
+            console.error('❌ 未找到有效的访问令牌');
+            console.warn('📋 localStorage中的Token相关键:', 
+                Object.keys(localStorage).filter(key => 
+                    key.toLowerCase().includes('token') || 
+                    key.toLowerCase().includes('access')
+                ).map(key => ({ 
+                    key, 
+                    value: localStorage.getItem(key)?.substring(0, 20) + '...',
+                    hasValue: !!localStorage.getItem(key) && localStorage.getItem(key) !== 'null'
+                }))
+            );
+            throw new Error('用户未登录或Token已过期，请重新登录');
+        }
+        
+        // 按照API文档的标准格式：Bearer {token}
+        // 确保token没有重复的Bearer前缀
+        const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+        const authHeader = `Bearer ${cleanToken}`;
+        
+        console.log('🔑 使用认证头:', authHeader.substring(0, 30) + '...');
         
         return {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': authHeader
         };
     }
 

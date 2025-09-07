@@ -533,3 +533,319 @@
 .tooltip .tooltip-arrow::before {
   border-top-color: var(--bg-inverse);
 }
+
+/* ===========================
+   好友请求组件样式
+   =========================== */
+
+.request-item {
+  display: flex !important;
+  align-items: center !important;
+  padding: 16px !important;
+  margin-bottom: 12px !important;
+  background: #f8f9fa !important;
+  border: 1px solid #dee2e6 !important;
+  border-radius: 12px !important;
+  transition: all 0.3s ease !important;
+}
+
+.request-item:hover {
+  background: #e9ecef !important;
+  border-color: #28a745 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+}
+
+.request-avatar {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(135deg, #28a745, #198754) !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-weight: bold !important;
+  font-size: 1.2rem !important;
+  margin-right: 16px !important;
+  flex-shrink: 0 !important;
+}
+
+.request-info {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.request-name {
+  font-weight: 600 !important;
+  color: #333 !important;
+  font-size: 16px !important;
+  margin-bottom: 4px !important;
+}
+
+.request-status {
+  color: #6c757d !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+}
+
+.request-actions {
+  display: flex !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+.action-btn {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  font-size: 14px !important;
+}
+
+.action-btn.success {
+  background: #28a745 !important;
+  color: white !important;
+}
+
+.action-btn.success:hover {
+  background: #218838 !important;
+  transform: scale(1.1) !important;
+}
+
+.action-btn.danger {
+  background: #dc3545 !important;
+  color: white !important;
+}
+
+.action-btn.danger:hover {
+  background: #c82333 !important;
+  transform: scale(1.1) !important;
+}
+
+/* 空状态样式 */
+.empty-state {
+  text-align: center !important;
+  padding: 32px 16px !important;
+  color: #6c757d !important;
+}
+
+.empty-state i {
+  font-size: 3rem !important;
+  margin-bottom: 16px !important;
+  opacity: 0.5 !important;
+}
+
+.empty-state h6 {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  margin-bottom: 8px !important;
+  color: #333 !important;
+}
+
+.empty-state p {
+  font-size: 14px !important;
+  margin: 0 !important;
+}
+
+/* 确保好友请求容器可见 */
+#receivedRequestsList,
+#sentRequestsList {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 50px !important;
+}
+
+/* 确保模态框内容可见 - Bootstrap风格优化 */
+#addFriendModal .modal-content {
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: none;
+}
+
+#addFriendModal .modal-header {
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  color: white;
+  border-radius: 12px 12px 0 0;
+  border: none;
+  padding: 1.25rem 1.5rem;
+}
+
+#addFriendModal .modal-title {
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+#addFriendModal .btn-close {
+  filter: brightness(0) invert(1);
+  opacity: 0.8;
+}
+
+#addFriendModal .btn-close:hover {
+  opacity: 1;
+}
+
+#addFriendModal .modal-body {
+  padding: 2rem 1.5rem;
+  background: #f8f9fa;
+}
+
+#addFriendModal .form-label {
+  color: #495057;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+#addFriendModal .form-control {
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  transition: all 0.2s ease-in-out;
+  background: #ffffff;
+  color: #495057;
+}
+
+#addFriendModal .form-control:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  background: #ffffff;
+}
+
+#addFriendModal .btn {
+  border-radius: 8px;
+  padding: 0.75rem 1.25rem;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+  border: none;
+}
+
+#addFriendModal .btn-outline-primary {
+  color: #007bff;
+  border: 2px solid #007bff;
+  background: transparent;
+}
+
+#addFriendModal .btn-outline-primary:hover {
+  background: #007bff;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+#addFriendModal .btn-primary {
+  background: linear-gradient(135deg, #007bff, #0056b3);
+  color: white;
+  border: none;
+}
+
+#addFriendModal .btn-primary:hover {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+#addFriendModal .btn-success {
+  background: linear-gradient(135deg, #28a745, #1e7e34);
+  color: white;
+}
+
+#addFriendModal .btn-success:hover {
+  background: linear-gradient(135deg, #1e7e34, #155724);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+/* 搜索结果容器 */
+#addFriendModal #userSearchResults {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e9ecef;
+  margin-top: 1rem;
+}
+
+#addFriendModal #userSearchResults h6 {
+  color: #495057;
+  font-weight: 600;
+  margin: 0;
+  padding: 1rem 1.5rem 0.5rem;
+  font-size: 1rem;
+}
+
+/* 搜索结果项 */
+#addFriendModal .search-result-item {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f1f3f4;
+  transition: background-color 0.2s ease;
+}
+
+#addFriendModal .search-result-item:last-child {
+  border-bottom: none;
+  border-radius: 0 0 10px 10px;
+}
+
+#addFriendModal .search-result-item:hover {
+  background: #f8f9fa;
+}
+
+/* 用户头像优化 */
+.user-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 18px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* 加载状态 */
+#addFriendModal .loading-state {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+}
+
+#addFriendModal .spinner-border-sm {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* 空状态 */
+#addFriendModal .empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+}
+
+#addFriendModal .empty-state i {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+/* 用户头像样式 */
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+}

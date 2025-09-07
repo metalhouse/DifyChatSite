@@ -24,6 +24,8 @@
     <link href="./vendor/font-awesome/mobile-font-fix.css" rel="stylesheet">
     <!-- 移动端图片显示修复 -->
     <link href="./assets/css/mobile-image-fix.css" rel="stylesheet">
+    <!-- UI组件样式 -->
+    <link href="./assets/css/components.css" rel="stylesheet">
     <!-- Socket.IO Client -->
     <script src="./vendor/socket.io/socket.io.min.js"></script>
     
@@ -216,6 +218,7 @@
             padding: 0.75rem;
             border-bottom: 1px solid rgba(0, 0, 0, 0.1);
             flex-shrink: 0;
+            margin-bottom: 0; /* 移除底部外边距 */
         }
 
         .friend-search .form-control {
@@ -233,20 +236,70 @@
             border-radius: 0 20px 20px 0;
         }
 
+        /* 搜索结果容器 */
+        #searchResults {
+            margin: 0 !important;
+            padding: 0 !important;
+            min-height: 0 !important;
+        }
+
         /* 好友请求提示 */
         .friend-requests-badge {
             padding: 0.5rem;
             flex-shrink: 0;
+            margin-top: 0; /* 移除顶部外边距 */
         }
 
         .friend-requests-badge .alert {
-            padding: 0.5rem;
+            padding: 0.75rem;
             margin: 0;
             border-radius: 8px;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             border: none;
             background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-            color: #1565c0;
+            position: relative;
+        }
+
+        .friend-request-actions {
+            position: absolute;
+            bottom: 4px;
+            right: 6px;
+        }
+
+        .friend-request-actions .btn {
+            font-size: 0.65rem;
+            padding: 0.15rem 0.25rem;
+            border-radius: 3px;
+            min-width: 20px;
+            height: 20px;
+            margin-left: 2px;
+        }
+
+        .friend-request-actions .btn i {
+            font-size: 0.6rem;
+        }
+
+        .friend-request-actions .btn-success {
+            background: #28a745;
+            border-color: #28a745;
+        }
+
+        .friend-request-actions .btn-success:hover {
+            background: #218838;
+            border-color: #1e7e34;
+            transform: scale(1.1);
+        }
+
+        .friend-request-actions .btn-outline-secondary {
+            color: #6c757d;
+            border-color: #6c757d;
+        }
+
+        .friend-request-actions .btn-outline-secondary:hover {
+            background: #6c757d;
+            border-color: #6c757d;
+            color: white;
+            transform: scale(1.1);
         }
 
         .room-list, .friend-list {
@@ -2644,10 +2697,19 @@
 
                     <!-- 好友请求提示 -->
                     <div class="friend-requests-badge" id="friendRequestsBadge" style="display:none;">
-                        <div class="alert alert-info alert-sm">
-                            <i class="fas fa-user-clock me-2"></i>
-                            <span id="requestsBadge">0</span> 个好友请求
-                            <button class="btn btn-link btn-sm p-0 ms-2" onclick="showFriendRequestsModal()">查看</button>
+                        <div class="alert alert-info alert-sm position-relative">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-user-clock me-2"></i>
+                                <span id="requestSenderName">用户名</span> 请求加你为好友
+                            </div>
+                            <div class="friend-request-actions">
+                                <button class="btn btn-success btn-sm me-1" id="acceptRequestBtn" title="同意">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" id="declineRequestBtn" title="拒绝">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -3333,11 +3395,17 @@
     <!-- 好友API服务 -->
     <script src="js/api/friends-api.js"></script>
     
+    <!-- 临时调试脚本 -->
+    <script src="debug-friends-api.js"></script>
+    
     <!-- 好友管理器 -->
     <script src="js/services/friends-manager.js"></script>
     
     <!-- 好友功能控制器 -->
     <script src="js/controllers/friends-controller.js"></script>
+    
+    <!-- 好友功能自动修复脚本 -->
+    <script src="js/utils/friends-auto-fix.js"></script>
     
     <!-- 聊天室页面控制器 -->
     <script src="js/controllers/chatroom-controller.js"></script>
@@ -3366,7 +3434,11 @@
         
         // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('页面DOM加载完成');
+            // 页面DOM加载完成
+            // console.log('页面DOM加载完成');
+            
+            // 验证Token状态
+            debugTokenStatus();
             
             // 初始时隐藏所有房间管理按钮
             const deleteRoomBtn = document.getElementById('deleteRoomBtn');
@@ -3496,10 +3568,30 @@
 
         // 调试函数：手动触发用户资料加载
         window.debugLoadUserProfile = function() {
-            console.log('🔧 手动触发用户资料加载...');
-            console.log('🔧 API客户端状态:', typeof window.apiClient);
-            console.log('🔧 Token状态:', !!TokenManager.getAccessToken());
+            // 手动触发用户资料加载
+            // console.log('🔧 手动触发用户资料加载...');
+            // console.log('🔧 API客户端状态:', typeof window.apiClient);
+            // console.log('🔧 Token状态:', !!TokenManager.getAccessToken());
             loadUserProfile();
+        }
+
+        // Token状态调试函数
+        function debugTokenStatus() {
+            console.log('🔑 Token状态检查:');
+            console.log('- dify_access_token:', !!localStorage.getItem('dify_access_token'));
+            console.log('- access_token:', !!localStorage.getItem('access_token'));
+            
+            if (window.TokenManager) {
+                console.log('- TokenManager.getAccessToken():', !!TokenManager.getAccessToken());
+            }
+            
+            const token = localStorage.getItem('dify_access_token');
+            if (token) {
+                console.log('- Token长度:', token.length);
+                console.log('- Token前缀:', token.substring(0, 10) + '...');
+            } else {
+                console.log('❌ 未找到dify_access_token');
+            }
         };
 
         // 用户搜索处理函数
@@ -3615,11 +3707,176 @@
             // 清空搜索结果
             document.getElementById('userSearchResults').style.display = 'none';
             document.getElementById('userSearchInput').value = '';
+            
+            // 绑定搜索功能
+            bindUserSearchEvents();
+        }
+        
+        // 绑定用户搜索事件
+        function bindUserSearchEvents() {
+            const searchInput = document.getElementById('userSearchInput');
+            const searchBtn = document.getElementById('userSearchBtn');
+            
+            // 搜索按钮点击事件
+            if (searchBtn) {
+                searchBtn.onclick = function() {
+                    const username = searchInput.value.trim();
+                    if (username) {
+                        searchUsers(username);
+                    }
+                };
+            }
+            
+            // 回车搜索
+            if (searchInput) {
+                searchInput.onkeypress = function(e) {
+                    if (e.key === 'Enter') {
+                        const username = searchInput.value.trim();
+                        if (username) {
+                            searchUsers(username);
+                        }
+                    }
+                };
+            }
+        }
+        
+        // 搜索用户
+        async function searchUsers(username) {
+            const resultsContainer = document.getElementById('userSearchResults');
+            const resultsList = document.getElementById('searchResultsList');
+            
+            try {
+                // 显示加载状态
+                resultsList.innerHTML = `
+                    <div class="loading-state">
+                        <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
+                        <p class="mb-0">搜索中...</p>
+                    </div>
+                `;
+                resultsContainer.style.display = 'block';
+                
+                // 调用搜索API
+                if (window.FriendsApi) {
+                    const response = await window.FriendsApi.searchUsers(username);
+                    
+                    if (response.success && response.data && response.data.users) {
+                        displaySearchResults(response.data.users);
+                    } else {
+                        resultsList.innerHTML = `
+                            <div class="empty-state">
+                                <i class="fas fa-search"></i>
+                                <p class="mb-0">没有找到相关用户</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    console.error('FriendsApi 不可用');
+                    resultsList.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-exclamation-triangle text-warning"></i>
+                            <p class="mb-0 text-warning">搜索功能暂不可用</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('搜索用户失败:', error);
+                resultsList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-times-circle text-danger"></i>
+                        <p class="mb-0 text-danger">搜索失败: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // 显示搜索结果
+        function displaySearchResults(users) {
+            const resultsList = document.getElementById('searchResultsList');
+            
+            if (users.length === 0) {
+                resultsList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-users"></i>
+                        <p class="mb-0">没有找到相关用户</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const html = users.map(user => {
+                const friendshipStatus = user.friendshipStatus || 'none';
+                let actionButton = '';
+                let statusBadge = '';
+                
+                switch(friendshipStatus) {
+                    case 'none':
+                        actionButton = `<button class="btn btn-primary btn-sm" onclick="sendFriendRequest('${user.username}')">
+                            <i class="fas fa-user-plus me-1"></i>添加好友
+                        </button>`;
+                        break;
+                    case 'pending':
+                        statusBadge = '<span class="badge bg-warning">请求已发送</span>';
+                        break;
+                    case 'accepted':
+                        statusBadge = '<span class="badge bg-success">已是好友</span>';
+                        break;
+                    default:
+                        actionButton = `<button class="btn btn-primary btn-sm" onclick="sendFriendRequest('${user.username}')">
+                            <i class="fas fa-user-plus me-1"></i>添加好友
+                        </button>`;
+                }
+                
+                return `
+                    <div class="search-result-item">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <div class="user-avatar me-3">
+                                    ${(user.nickname || user.username).charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <div class="fw-semibold text-dark mb-1">${user.nickname || user.username}</div>
+                                    ${user.email ? `<div class="text-muted small">${user.email}</div>` : ''}
+                                </div>
+                            </div>
+                            <div>
+                                ${actionButton}
+                                ${statusBadge}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            resultsList.innerHTML = html;
+        }
+        
+        // 发送好友请求
+        async function sendFriendRequest(username) {
+            
+            try {
+                if (window.FriendsApi) {
+                    const response = await window.FriendsApi.sendFriendRequest(username);
+                    
+                    if (response.success) {
+                        // 重新搜索以更新状态
+                        const searchInput = document.getElementById('userSearchInput');
+                        if (searchInput.value.trim()) {
+                            searchUsers(searchInput.value.trim());
+                        }
+                    } else {
+                        alert('发送失败: ' + (response.message || '未知错误'));
+                    }
+                } else {
+                    alert('功能暂不可用');
+                }
+            } catch (error) {
+                console.error('发送好友请求失败:', error);
+                alert('发送失败: ' + error.message);
+            }
         }
 
         // 显示好友请求模态框
         function showFriendRequestsModal() {
-            console.log('显示好友请求模态框');
             const modal = new bootstrap.Modal(document.getElementById('friendRequestsModal'));
             modal.show();
             
@@ -3659,19 +3916,19 @@
                     
                     // 确保好友控制器已初始化
                     if (!window.friendsController) {
-                        console.log('🤝 初始化好友控制器');
+                        console.log('🤝 创建好友控制器');
                         window.friendsController = new FriendsController();
-                        await window.friendsController.initialize();
-                    }
-                    
-                    // 加载好友列表
-                    if (window.chatroomController && window.chatroomController.friendsManager) {
-                        window.chatroomController.friendsManager.loadFriendsList();
-                        window.chatroomController.friendsManager.loadFriendRequests();
-                    }
-                    
-                    // 同时使用独立的好友控制器加载数据
-                    if (window.friendsController) {
+                        
+                        // 尝试立即初始化，如果失败则使用延迟初始化
+                        try {
+                            await window.friendsController.initialize();
+                        } catch (error) {
+                            console.warn('⚠️ 立即初始化失败，尝试延迟初始化:', error.message);
+                            await window.friendsController.delayedInitialize();
+                        }
+                    } else {
+                        // 如果控制器已存在，刷新数据
+                        console.log('🔄 刷新现有好友控制器');
                         await window.friendsController.refresh();
                     }
                 });
