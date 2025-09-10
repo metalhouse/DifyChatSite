@@ -20,21 +20,6 @@ class ChatroomController {
         // 初始化好友管理器
         this.friendsManager = null;
         
-    // 已移除遗留的 LazyLoader，使用 ImageOptimizationService 统一处理
-    this.imageOptimizer = null;
-        
-        // 初始化图片优化服务
-        this.imageOptimizer = null;
-        
-        // 智能体和流式响应相关
-        this.agents = []; // 可用智能体列表
-        this.currentStreamingMessageId = null; // 当前流式消息ID
-        this.processingMessages = new Set(); // 防重复处理
-        this.eventsSetup = false; // WebSocket事件设置标记
-        this.agentSuggestionsList = null; // 智能体建议列表DOM
-        this.selectedSuggestionIndex = -1; // 选中的建议索引
-        this.atPosition = -1; // @符号位置
-        
         // DOM 元素
         this.elements = {
             roomList: document.getElementById('roomList'),
@@ -42,10 +27,7 @@ class ChatroomController {
             messageInput: document.getElementById('messageInput'),
             sendButton: document.getElementById('sendButton'),
             mentionButton: document.getElementById('mentionButton'),
-            emojiButton: document.getElementById('emojiButton'),
-            imageUploadButton: document.getElementById('addButton'), // 更新为新的addButton
-            addMenu: document.getElementById('addMenu'),
-            emojiMenu: document.getElementById('emojiMenu'),
+            imageUploadButton: document.getElementById('imageUploadButton'),
             connectionStatus: document.getElementById('connectionStatus'),
             statusText: document.getElementById('statusText'),
             currentRoomName: document.getElementById('currentRoomName'),
@@ -58,32 +40,12 @@ class ChatroomController {
 
         console.log('DOM元素初始化:', this.elements);
         
-    // 绑定事件
-    this.bindEvents();
-    // 修复输入菜单定位：确保容器具备定位上下文，避免需先触发@才可见
-    this.ensureInputMenusPositioning();
+        // 绑定事件
+        this.bindEvents();
         
         // 输入状态管理
         this.typingTimer = null;
         this.isTyping = false;
-        
-        // @智能体建议列表相关
-        this.agentSuggestionsList = null;
-        this.selectedSuggestionIndex = -1;
-        this.atPosition = -1;
-
-        // 全局Promise拒绝降噪：忽略浏览器扩展消息通道类报错
-        if (!window.__unhandledRejectionPatched) {
-            window.addEventListener('unhandledrejection', (event) => {
-                const msg = String(event.reason?.message || event.reason || '');
-                if (msg.includes('listener indicated an asynchronous response') ||
-                    msg.includes('message channel closed before a response was received')) {
-                    event.preventDefault();
-                    return;
-                }
-            });
-            window.__unhandledRejectionPatched = true;
-        }
     }
 
     /**
@@ -93,9 +55,6 @@ class ChatroomController {
         try {
             // 获取当前用户信息
             await this.loadUserInfo();
-            
-            // PIN验证检查
-            await this.checkPinVerification(true); // 进入页面时强制验证
             
             // 初始化房间管理服务
             this.roomManagementService = new RoomManagementService();
@@ -107,233 +66,16 @@ class ChatroomController {
             // 设置全局引用，以便HTML中的按钮可以调用
             window.friendsManager = this.friendsManager;
             
-            // 初始化好友控制器（如果存在）
-            if (window.FriendsController) {
-                this.friendsController = new FriendsController();
-                await this.friendsController.initialize();
-                window.friendsController = this.friendsController;
-            }
-            
-            // 移除 LazyLoader 分支
-            
-            // 初始化图片优化服务
-            if (window.ImageOptimizationService) {
-                this.imageOptimizer = new window.ImageOptimizationService();
-                console.log('✅ [前端] 图片优化服务初始化成功');
-            } else {
-                if (window.ENV_CONFIG?.isDebug && window.ENV_CONFIG.isDebug()) {
-                    console.warn('⚠️ [前端] ImageOptimizationService 未找到，将使用默认图片加载');
-                }
-            }
-            
             // 初始化WebSocket连接
             this.initializeWebSocket();
             
             // 加载智能体列表
             await this.loadAgents();
             
-            // 恢复上次的聊天状态
-            this.restoreLastChatState();
-            
-            // 初始化用户活动监听器（用于PIN验证自动锁定）
-            await this.initializeActivityListeners();
-            
             console.log('聊天室控制器初始化完成');
         } catch (error) {
             console.error('初始化聊天室失败:', error);
             this.showError('初始化聊天室失败，请刷新页面重试');
-        }
-    }
-
-    /**
-     * 保存当前聊天状态到localStorage
-     */
-    saveCurrentChatState() {
-        try {
-            const chatState = {
-                timestamp: Date.now(),
-                userId: this.currentUser?.id,
-                type: null, // 'room' 或 'private'
-                data: null
-            };
-
-            if (this.currentRoom) {
-                // 当前在聊天室
-                chatState.type = 'room';
-                chatState.data = {
-                    roomId: this.currentRoom.id || this.currentRoom.roomId,
-                    roomName: this.currentRoom.name || this.currentRoom.roomName
-                };
-            } else if (this.friendsManager?.currentPrivateChat) {
-                // 当前在私聊
-                chatState.type = 'private';
-                chatState.data = {
-                    friendId: this.friendsManager.currentPrivateChat.friendId,
-                    friendName: this.friendsManager.currentPrivateChat.friendName
-                };
-            }
-
-            if (chatState.type && chatState.data) {
-                localStorage.setItem('dify_last_chat_state', JSON.stringify(chatState));
-                console.log('💾 聊天状态已保存:', chatState);
-            }
-        } catch (error) {
-            console.warn('⚠️ 保存聊天状态失败:', error);
-        }
-    }
-
-    /**
-     * 恢复上次的聊天状态
-     */
-    async restoreLastChatState() {
-        try {
-            // 检查用户是否启用了自动恢复功能
-            const autoRestore = localStorage.getItem('dify_auto_restore_chat');
-            if (autoRestore === 'false') {
-                console.log('🚫 用户已禁用自动恢复聊天功能');
-                return;
-            }
-
-            const savedState = localStorage.getItem('dify_last_chat_state');
-            if (!savedState) {
-                console.log('📭 没有保存的聊天状态');
-                return;
-            }
-
-            const chatState = JSON.parse(savedState);
-            
-            // 验证状态有效性（检查用户是否匹配，时间是否过期等）
-            if (!chatState.userId || chatState.userId !== this.currentUser?.id) {
-                console.log('👤 用户不匹配，清除保存的状态');
-                localStorage.removeItem('dify_last_chat_state');
-                return;
-            }
-
-            // 检查是否超过7天（可配置）
-            const maxAge = 7 * 24 * 60 * 60 * 1000; // 7天
-            if (Date.now() - chatState.timestamp > maxAge) {
-                console.log('⏰ 保存的状态已过期，清除');
-                localStorage.removeItem('dify_last_chat_state');
-                return;
-            }
-
-            console.log('🔄 准备恢复聊天状态:', chatState);
-
-            // 等待一段时间确保WebSocket连接和数据加载完成
-            // 使用更智能的等待机制
-            this.waitForDataReady().then(() => {
-                this.doRestoreChatState(chatState);
-            });
-
-        } catch (error) {
-            console.warn('⚠️ 恢复聊天状态失败:', error);
-            // 清除损坏的状态
-            localStorage.removeItem('dify_last_chat_state');
-        }
-    }
-
-    /**
-     * 等待数据准备就绪
-     */
-    async waitForDataReady() {
-        return new Promise((resolve) => {
-            let attempts = 0;
-            const maxAttempts = 20; // 最多等待10秒
-            
-            const checkReady = () => {
-                attempts++;
-                
-                // 检查WebSocket连接状态
-                const isWebSocketReady = this.websocket && this.websocket.connected;
-                
-                // 检查房间列表是否已加载
-                const hasRooms = this.rooms && this.rooms.length > 0;
-                
-                // 检查好友列表是否已加载
-                const hasFriends = this.friendsManager && 
-                                  this.friendsManager.friends && 
-                                  this.friendsManager.friends.length >= 0; // 可能没有好友，所以>=0
-                
-                console.log(`🔍 数据就绪检查 (${attempts}/${maxAttempts}):`, {
-                    websocket: isWebSocketReady,
-                    rooms: hasRooms,
-                    roomsCount: this.rooms?.length || 0,
-                    friends: hasFriends,
-                    friendsCount: this.friendsManager?.friends?.length || 0
-                });
-                
-                if ((isWebSocketReady && hasRooms) || attempts >= maxAttempts) {
-                    console.log('✅ 数据就绪，开始恢复聊天状态');
-                    resolve();
-                } else {
-                    // 每500ms检查一次
-                    setTimeout(checkReady, 500);
-                }
-            };
-            
-            // 初始延迟1秒后开始检查
-            setTimeout(checkReady, 1000);
-        });
-    }
-
-    /**
-     * 执行聊天状态恢复
-     */
-    async doRestoreChatState(chatState) {
-        try {
-            if (chatState.type === 'private' && chatState.data) {
-                // 恢复私聊
-                console.log('🔄 尝试恢复私聊:', chatState.data.friendName);
-                
-                // 确保好友管理器已初始化并且好友列表已加载
-                if (!this.friendsManager || !this.friendsManager.friends) {
-                    console.log('❌ 好友管理器未就绪，无法恢复私聊');
-                    showToast('好友数据未加载完成，无法恢复聊天', 'warning');
-                    return;
-                }
-                
-                // 验证好友是否仍在好友列表中
-                const friend = this.friendsManager.friends.find(f => f.id === chatState.data.friendId);
-                if (friend) {
-                    // 等待额外500ms确保好友管理器完全初始化
-                    setTimeout(() => {
-                        this.friendsManager.startPrivateChat(chatState.data.friendId, chatState.data.friendName);
-                        showToast(`已恢复与 ${chatState.data.friendName} 的私聊`, 'success');
-                        console.log('✅ 私聊恢复成功');
-                    }, 500);
-                } else {
-                    console.log('❌ 好友不存在，无法恢复私聊');
-                    showToast('上次的聊天好友已不存在', 'info');
-                    // 清除无效的状态
-                    localStorage.removeItem('dify_last_chat_state');
-                }
-                
-            } else if (chatState.type === 'room' && chatState.data) {
-                // 恢复聊天室
-                console.log('🔄 尝试恢复聊天室:', chatState.data.roomName);
-                
-                // 验证房间是否仍存在
-                const room = this.rooms.find(r => 
-                    (r.id === chatState.data.roomId || r.roomId === chatState.data.roomId)
-                );
-                if (room) {
-                    this.joinRoom(chatState.data.roomId);
-                    showToast(`已恢复聊天室: ${chatState.data.roomName}`, 'success');
-                    console.log('✅ 聊天室恢复成功');
-                } else {
-                    console.log('❌ 聊天室不存在，无法恢复');
-                    showToast('上次的聊天室已不存在', 'info');
-                    // 清除无效的状态
-                    localStorage.removeItem('dify_last_chat_state');
-                }
-            } else {
-                console.log('❓ 未知的聊天状态类型:', chatState.type);
-                // 清除无效的状态
-                localStorage.removeItem('dify_last_chat_state');
-            }
-        } catch (error) {
-            console.error('❌ 执行聊天状态恢复失败:', error);
-            showToast('恢复上次聊天失败', 'warning');
         }
     }
 
@@ -356,376 +98,6 @@ class ChatroomController {
             console.error('加载用户信息失败:', error);
             throw error;
         }
-    }
-
-    /**
-     * 初始化用户活动监听器
-     * 用于PIN验证的自动锁定功能
-     */
-    async initializeActivityListeners() {
-        if (!window.pinVerificationService) {
-            return;
-        }
-
-        try {
-            const isPinEnabled = await window.pinVerificationService.isEnabled();
-            if (!isPinEnabled) {
-                return;
-            }
-
-            const activities = ['click', 'keypress', 'scroll', 'mousemove', 'touchstart', 'keydown'];
-            
-            // 防抖处理，避免频繁重置定时器
-            let resetTimer = null;
-            const resetAutoLockDebounced = () => {
-                if (resetTimer) clearTimeout(resetTimer);
-                resetTimer = setTimeout(async () => {
-                    // 检查界面是否已锁定
-                    const isLocked = localStorage.getItem('interface_locked');
-                    if (isLocked) {
-                        // 减少日志污染，只在调试模式下输出
-                        if (window.ENV_CONFIG && window.ENV_CONFIG.isDebug && window.ENV_CONFIG.isDebug()) {
-                            console.log('🔒 界面已锁定，不重置计时器');
-                        }
-                        return;
-                    }
-                    
-                    // 重新验证PIN是否仍然启用
-                    const stillEnabled = await window.pinVerificationService.isEnabled();
-                    if (stillEnabled) {
-                        console.log('🔄 用户活动检测，重置自动锁定计时器');
-                        this.resetAutoLockTimer();
-                    }
-                }, 500); // 减少到500ms，更快响应用户活动
-            };
-
-            activities.forEach(activity => {
-                document.addEventListener(activity, resetAutoLockDebounced, { passive: true });
-            });
-
-            console.log('✅ PIN验证用户活动监听器已初始化，监听事件:', activities);
-        } catch (error) {
-            console.warn('初始化活动监听器失败:', error);
-        }
-    }
-
-    /**
-     * 检查PIN验证
-     * @param {boolean} forceVerify - 是否强制验证（进入页面时为true）
-     */
-    async checkPinVerification(forceVerify = true) {
-        try {
-            // 检查PIN验证服务是否可用
-            if (!window.pinVerificationService) {
-                console.log('PIN验证服务未加载');
-                return;
-            }
-
-            // 从服务器获取最新PIN状态
-            const isPinEnabled = await window.pinVerificationService.isPinEnabledSync();
-            
-            if (!isPinEnabled) {
-                console.log('PIN验证未启用，跳过验证');
-                return;
-            }
-
-            console.log('🔒 PIN验证已启用，开始验证流程...');
-
-            // 检查是否需要解锁（超时锁定）
-            const lockStatus = this.checkAutoLockStatus();
-            if (lockStatus.needsUnlock) {
-                await this.performPinVerification('界面已自动锁定，请输入PIN码解锁');
-                
-                // 记录解锁验证时间，这样就不需要再次验证
-                const now = Date.now();
-                localStorage.setItem('pin_last_verification', now.toString());
-                
-                this.resetAutoLockTimer();
-                return; // 解锁验证完成后直接返回，不再进行其他验证
-            }
-
-            let needVerification = forceVerify; // 进入页面时强制验证
-
-            // 但是如果最近刚验证过（5分钟内），就不强制验证了
-            if (forceVerify) {
-                const lastVerification = localStorage.getItem('pin_last_verification');
-                if (lastVerification) {
-                    const timeSinceLastVerification = Date.now() - parseInt(lastVerification);
-                    const gracePeriod = 5 * 60 * 1000; // 5分钟宽限期
-                    
-                    if (timeSinceLastVerification < gracePeriod) {
-                        console.log('📋 最近刚验证过PIN，跳过强制验证');
-                        needVerification = false;
-                    }
-                }
-            }
-
-            if (!forceVerify) {
-                // 页面内部操作时，根据时间判断
-                const lastVerification = localStorage.getItem('pin_last_verification');
-                const verificationTimeout = window.pinVerificationService.getLockTimeout();
-                const now = Date.now();
-                needVerification = !lastVerification || (now - parseInt(lastVerification)) > verificationTimeout;
-            }
-
-            if (needVerification) {
-                const message = forceVerify ? '请输入PIN码以访问聊天功能' : '会话已过期，请重新输入PIN码';
-                await this.performPinVerification(message);
-                
-                // 记录本次验证时间，用于自动锁定计时
-                const now = Date.now();
-                localStorage.setItem('pin_last_verification', now.toString());
-            }
-
-            // 启动自动锁定定时器
-            this.startAutoLockTimer();
-
-        } catch (error) {
-            console.error('PIN验证失败:', error);
-            // PIN验证失败，重定向到主页
-            showToast('PIN验证失败，无法访问聊天功能', 'error');
-            setTimeout(() => {
-                window.location.href = './index.html';
-            }, 2000);
-        }
-    }
-
-    /**
-     * 执行PIN验证
-     */
-    async performPinVerification(message) {
-        if (!window.pinVerificationService) {
-            throw new Error('PIN验证服务不可用');
-        }
-
-        try {
-            const isValid = await window.pinVerificationService.showVerificationDialog(message, true);
-            if (!isValid) {
-                throw new Error('PIN验证失败');
-            }
-            console.log('✅ PIN验证成功');
-            return true;
-        } catch (error) {
-            console.error('❌ PIN验证过程出错:', error);
-            if (error.message === 'PIN verification cancelled') {
-                // 用户取消验证，重定向到主页
-                window.location.href = './index.html';
-            }
-            throw error;
-        }
-    }
-
-    /**
-     * 启动自动锁定定时器
-     */
-    async startAutoLockTimer() {
-        if (!window.pinVerificationService) {
-            return;
-        }
-
-        try {
-            const isPinEnabled = await window.pinVerificationService.isEnabled();
-            if (!isPinEnabled) {
-                return;
-            }
-
-            this.clearAutoLockTimer();
-
-            const lockTimeout = window.pinVerificationService.getLockTimeout();
-            
-            this.autoLockTimer = setTimeout(() => {
-                this.lockInterface();
-            }, lockTimeout);
-
-            const timeText = lockTimeout < 60000 ? `${lockTimeout / 1000}秒` : `${lockTimeout / 60000}分钟`;
-            console.log(`🔒 自动锁定定时器启动，${timeText}后锁定`);
-        } catch (error) {
-            console.warn('启动自动锁定定时器失败:', error);
-        }
-    }
-
-    /**
-     * 重置自动锁定定时器
-     */
-    async resetAutoLockTimer() {
-        if (window.pinVerificationService) {
-            try {
-                const isPinEnabled = await window.pinVerificationService.isEnabled();
-                if (isPinEnabled) {
-                    // 先清除旧的定时器
-                    this.clearAutoLockTimer();
-                    
-                    // 启动新的定时器
-                    await this.startAutoLockTimer();
-                    
-                    // 只在调试模式下显示重置日志，避免过多输出
-                    if (window.ENV_CONFIG && window.ENV_CONFIG.isDebug && window.ENV_CONFIG.isDebug()) {
-                        console.log('🔄 自动锁定计时器已重置');
-                    }
-                }
-            } catch (error) {
-                console.warn('重置自动锁定定时器失败:', error);
-            }
-        }
-    }
-
-    /**
-     * 清除自动锁定定时器
-     */
-    clearAutoLockTimer() {
-        if (this.autoLockTimer) {
-            clearTimeout(this.autoLockTimer);
-            this.autoLockTimer = null;
-        }
-    }
-
-    /**
-     * 锁定界面
-     */
-    lockInterface() {
-        console.log('界面自动锁定');
-        localStorage.setItem('interface_locked', Date.now().toString());
-        this.clearAutoLockTimer();
-        
-        // 显示锁定遮罩
-        this.showLockOverlay();
-    }
-
-    /**
-     * 显示锁定遮罩
-     */
-    showLockOverlay() {
-        // 创建锁定遮罩
-        const overlay = document.createElement('div');
-        overlay.id = 'pin-lock-overlay';
-        overlay.innerHTML = `
-            <div class="pin-lock-content">
-                <i class="fas fa-lock fa-3x mb-3"></i>
-                <h4>界面已锁定</h4>
-                <p class="text-muted mb-4">为了保护您的隐私，界面已自动锁定</p>
-                <button class="btn btn-primary" onclick="chatroomController.unlockInterface()">
-                    <i class="fas fa-unlock me-2"></i>
-                    解锁
-                </button>
-            </div>
-        `;
-        
-        // 添加样式
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.9);
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            color: white;
-            text-align: center;
-        `;
-        
-        // 添加CSS样式到head中
-        const style = document.createElement('style');
-        style.textContent = `
-            .pin-lock-content {
-                background: rgba(255, 255, 255, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                border-radius: 1rem;
-                padding: 2rem;
-                backdrop-filter: blur(20px);
-            }
-            .pin-lock-content .btn {
-                background: linear-gradient(135deg, #28a745, #20c997);
-                border: none;
-                padding: 0.75rem 1.5rem;
-                border-radius: 0.5rem;
-                color: white;
-                font-weight: 500;
-                transition: all 0.3s ease;
-            }
-            .pin-lock-content .btn:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-            }
-        `;
-        document.head.appendChild(style);
-        
-        document.body.appendChild(overlay);
-    }
-
-    /**
-     * 解锁界面
-     */
-    async unlockInterface() {
-        try {
-            // 修改锁定遮罩显示解锁状态，但保持背景模糊
-            const overlay = document.getElementById('pin-lock-overlay');
-            if (overlay) {
-                // 隐藏解锁按钮和提示文字，但保持背景遮罩
-                const content = overlay.querySelector('.pin-lock-content');
-                if (content) {
-                    content.style.display = 'none';
-                }
-                // 保持遮罩背景以保护隐私
-                overlay.style.background = 'rgba(0, 0, 0, 0.7)';
-            }
-
-            await this.performPinVerification('请输入PIN码解锁界面');
-            
-            // 验证成功后移除锁定遮罩
-            if (overlay) {
-                overlay.remove();
-            }
-            
-            // 清除锁定状态
-            localStorage.removeItem('interface_locked');
-            localStorage.setItem('pin_last_verification', Date.now().toString());
-            
-            // 重新启动自动锁定定时器
-            this.startAutoLockTimer();
-            
-            showToast('界面解锁成功', 'success');
-            
-        } catch (error) {
-            console.error('解锁失败:', error);
-            showToast('解锁失败', 'error');
-            
-            // 恢复锁定遮罩的原始显示状态
-            const overlay = document.getElementById('pin-lock-overlay');
-            if (overlay) {
-                const content = overlay.querySelector('.pin-lock-content');
-                if (content) {
-                    content.style.display = 'block';
-                }
-                overlay.style.background = 'rgba(0, 0, 0, 0.9)';
-            }
-        }
-    }
-
-    /**
-     * 检查自动锁定状态
-     */
-    checkAutoLockStatus() {
-        const lockTimestamp = localStorage.getItem('interface_locked');
-        if (!lockTimestamp) {
-            return { needsUnlock: false };
-        }
-
-        // 检查锁定时间是否有效（避免长时间锁定）
-        const lockTime = parseInt(lockTimestamp);
-        const now = Date.now();
-        const maxLockDuration = 24 * 60 * 60 * 1000; // 24小时
-
-        if ((now - lockTime) > maxLockDuration) {
-            // 超过最大锁定时间，自动解除锁定状态
-            localStorage.removeItem('interface_locked');
-            return { needsUnlock: false };
-        }
-
-        return { needsUnlock: true, lockTime };
     }
 
     /**
@@ -774,14 +146,6 @@ class ChatroomController {
      * 设置WebSocket事件监听
      */
     setupWebSocketEvents() {
-        // 防止重复绑定 - 先移除所有已存在的监听器
-        if (this.eventsSetup) {
-            console.log('🔄 [前端] 清理旧的WebSocket事件监听器');
-            this.websocket.removeAllListeners();
-        }
-
-        console.log('🎯 [前端] 设置WebSocket事件监听器...');
-
         // 连接事件
         this.websocket.on('connect', () => {
             console.log('✅ [前端] WebSocket连接成功:', this.websocket.id);
@@ -874,35 +238,8 @@ class ChatroomController {
                 roomName: data.roomName || data.name,
                 memberCount: data.memberCount,
                 onlineUsers: data.onlineUsers?.length || 0,
-                recentMessages: data.recentMessages?.length || 0,
-                recentMessagesDetail: data.recentMessages
+                recentMessages: data.recentMessages?.length || 0
             });
-            
-            // 检查是否有智能体消息
-            if (data.recentMessages && data.recentMessages.length > 0) {
-                const agentMessages = data.recentMessages.filter(msg => 
-                    msg.senderType === 'agent' || msg.type === 'agent_response' || msg.agentId
-                );
-                console.log('🤖 [前端] WebSocket中的智能体消息数量:', agentMessages.length);
-                if (agentMessages.length > 0) {
-                    console.log('🤖 [前端] 智能体消息详情:', agentMessages);
-                    
-                    // 详细分析第一条智能体消息的数据结构
-                    console.log('🔍 [WebSocket智能体消息] 第一条消息详细结构:', {
-                        id: agentMessages[0].id,
-                        senderType: agentMessages[0].senderType,
-                        type: agentMessages[0].type,
-                        agentId: agentMessages[0].agentId,
-                        agentName: agentMessages[0].agentName,
-                        userId: agentMessages[0].userId,
-                        username: agentMessages[0].username,
-                        sender_username: agentMessages[0].sender_username,
-                        content: agentMessages[0].content?.substring(0, 50) + '...',
-                        createdAt: agentMessages[0].createdAt,
-                        allFields: Object.keys(agentMessages[0]).sort()
-                    });
-                }
-            }
             
             // 清除timeout
             if (this.joinRoomTimeout) {
@@ -913,9 +250,6 @@ class ChatroomController {
             this.currentRoom = data;
             await this.updateRoomInfo(data);
             this.showSuccess(`成功加入房间: ${data.roomName || data.name || data.roomId}`);
-            
-            // 保存聊天状态
-            this.saveCurrentChatState();
             
             // 主动请求房间状态和在线用户信息
             setTimeout(() => {
@@ -1119,174 +453,48 @@ class ChatroomController {
             this.updateTypingIndicator(data);
         });
 
-        // 智能体流式响应处理 - 按照后端文档方案B实现
-        this.streamingMessages = new Map(); // 管理流式消息
-
-        // 🚫 不再监听 agent-stream-start（后端不发送此事件）
-        
-        this.websocket.on('agent-typing-start', (data) => {
-            console.log('🤖 [前端] 智能体开始思考:', data);
+        // 智能体相关事件
+        this.websocket.on('agent-typing', (data) => {
+            console.log('智能体正在思考:', data);
             this.showAgentTyping(data);
         });
 
         this.websocket.on('agent-typing-stop', (data) => {
-            console.log('🤖 [前端] 智能体思考完成:', data);
+            console.log('智能体思考完成:', data);
             this.hideAgentTyping(data.agentId);
         });
 
-        // 1. 监听流式片段，实时更新 - 关键事件
-        this.websocket.on('agent-stream-chunk', (data) => {
-            console.log('� [前端] 收到智能体流式片段:', {
-                messageId: data.messageId,
-                chunk: data.chunk,
-                chunkLength: data.chunk?.length
-            });
-            
-            let streamingMsg = this.streamingMessages.get(data.messageId);
-            if (!streamingMsg) {
-                // 创建新的流式消息
-                streamingMsg = {
-                    id: data.messageId,
-                    agentId: data.agentId,
-                    agentName: data.agentName,
-                    content: '',
-                    isStreaming: true,
-                    timestamp: data.timestamp,
-                    replyToId: data.replyToId
-                };
-                this.streamingMessages.set(data.messageId, streamingMsg);
-                
-                // 显示开始流式响应的占位符
-                this.displayStreamingMessageStart(streamingMsg);
-                console.log('✨ [前端] 创建新的流式消息:', data.messageId);
-            }
-            
-            // 累积内容并更新UI
-            streamingMsg.content += data.chunk;
-            this.updateStreamingMessageContent(data.messageId, streamingMsg.content);
-        });
-
-        // 2. 监听完整响应，完成流式消息
-        this.websocket.on('agent-response', (data) => {
-            console.log('🎯 [前端] 智能体响应完成:', {
-                id: data.id,
-                messageId: data.messageId,
-                isStreamingResponse: data.isStreamingResponse,
-                agentName: data.agentName || data.username,
-                contentLength: data.content?.length
-            });
-            
-            if (data.isStreamingResponse) {
-                console.log('✅ [前端] 这是流式响应的最终消息');
-                
-                // 🔧 修复：尝试找到对应的流式消息
-                let foundStreamingId = null;
-                
-                // 先尝试用 data.messageId 查找
-                if (data.messageId && this.streamingMessages.has(data.messageId)) {
-                    foundStreamingId = data.messageId;
-                    console.log('🔍 [前端] 通过 messageId 找到流式消息:', foundStreamingId);
-                }
-                // 再尝试用 data.id 查找
-                else if (data.id && this.streamingMessages.has(data.id)) {
-                    foundStreamingId = data.id;
-                    console.log('🔍 [前端] 通过 id 找到流式消息:', foundStreamingId);
-                }
-                // 最后尝试查找同一智能体最近的流式消息
-                else {
-                    for (let [msgId, streamingMsg] of this.streamingMessages) {
-                        if (streamingMsg.agentId === data.agentId) {
-                            foundStreamingId = msgId;
-                            console.log('🔍 [前端] 通过 agentId 找到流式消息:', foundStreamingId);
-                            break;
-                        }
-                    }
-                }
-                
-                if (foundStreamingId) {
-                    // 从流式管理中移除
-                    this.streamingMessages.delete(foundStreamingId);
-                    
-                    // 完成流式消息显示，使用找到的流式消息ID
-                    this.finalizeStreamingMessage({
-                        ...data,
-                        streamingMessageId: foundStreamingId
-                    });
-                } else {
-                    console.warn('⚠️ [前端] 未找到对应的流式消息，检查是否已存在相同消息');
-                    
-                    // 检查是否已经存在相同ID的消息（避免重复）
-                    if (data.id && this.processedMessages.has(data.id)) {
-                        console.log('🔄 [前端] 消息已存在，跳过添加:', data.id);
-                        return;
-                    }
-                    
-                    // 没有找到流式消息，且消息不存在，才添加完整消息
-                    this.addMessage({
-                        id: data.id,
-                        content: data.content,
-                        username: data.agentName || data.username || 'AI智能体',
-                        agentId: data.agentId,
-                        agentName: data.agentName,
-                        createdAt: data.createdAt,
-                        type: 'agent_response',
-                        senderType: 'agent',
-                        replyToId: data.replyToId,
-                        replyToContent: data.replyToContent
-                    });
-                }
-            } else {
-                // 如果不是流式响应，检查是否已存在，然后添加消息
-                console.log('📝 [前端] 这是直接的完整响应');
-                
-                // 检查是否已经存在相同ID的消息（避免重复）
-                if (data.id && this.processedMessages.has(data.id)) {
-                    console.log('🔄 [前端] 消息已存在，跳过添加:', data.id);
-                    return;
-                }
-                
-                this.addMessage({
-                    id: data.id,
-                    content: data.content,
-                    username: data.agentName || data.username || 'AI智能体',
-                    agentId: data.agentId,
-                    agentName: data.agentName,
-                    createdAt: data.createdAt,
-                    type: 'agent_response',
-                    senderType: 'agent',
-                    replyToId: data.replyToId,
-                    replyToContent: data.replyToContent
-                });
-            }
-            
-            this.hideAgentTyping(data.agentId);
-        });
-
-        // 智能体错误处理
-        this.websocket.on('agent-error', (data) => {
-            console.error('❌ [前端] 智能体响应错误:', data);
-            this.hideAgentTyping(data.agentId);
-            this.showAgentError(data);
-        });
-
-        // 智能体权限错误
-        this.websocket.on('agent-no-permission', (data) => {
-            console.warn('⚠️ [前端] 智能体权限不足:', data);
-            this.showWarning(`您没有权限使用智能体 @${data.agentName}`);
-        });
-
-        // 兼容旧版本事件名
-        this.websocket.on('agent-typing', (data) => {
-            console.log('🤖 [前端] 智能体正在思考 (旧版):', data);
-            this.showAgentTyping(data);
-        });
-
+        // 支持API指南中的新智能体事件
         this.websocket.on('agent-thinking', (data) => {
-            console.log('🤖 [前端] 智能体思考中 (兼容):', data);
+            console.log('🤖 [前端] AI助手正在思考 (新格式):', data);
             this.showAgentTyping({
                 agentId: data.agentId,
-                agentName: data.agentName || 'AI助手'
+                agentName: 'AI助手'
             });
+        });
+
+        this.websocket.on('agent-response', (data) => {
+            console.log('🤖 [前端] AI助手回复 (新格式):', data);
+            this.hideAgentTyping(data.agentId);
+            
+            // 将AI助手响应作为消息显示
+            const agentMessage = {
+                id: data.messageId || 'agent_' + Date.now(),
+                content: data.content,
+                username: 'AI助手',
+                agentId: data.agentId,
+                createdAt: data.timestamp || new Date().toISOString(),
+                encrypted: data.encrypted || false,
+                type: 'agent_response'
+            };
+            
+            this.addMessage(agentMessage);
+        });
+
+        this.websocket.on('agent-error', (data) => {
+            console.error('🤖 [前端] AI助手错误 (新格式):', data);
+            this.hideAgentTyping();
+            this.showError('AI助手错误: ' + data.error);
         });
 
         // 增强房间管理事件 - 基于后端报告
@@ -1362,172 +570,76 @@ class ChatroomController {
             console.error('WebSocket错误:', error);
             this.showError('WebSocket错误: ' + error.message);
         });
-
-        // 🔍 调试：监听所有WebSocket事件
-        if (this.websocket.onAny) {
-            this.websocket.onAny((eventName, data) => {
-                console.log('🌐 [WebSocket] 收到事件:', eventName, data);
-            });
-        }
-
-        // 标记事件已设置，防止重复绑定
-        this.eventsSetup = true;
-        console.log('✅ [前端] WebSocket事件监听器设置完成');
     }
 
     /**
      * 绑定DOM事件
      */
     bindEvents() {
-        const { messageInput, sendButton, mentionButton, emojiButton, imageUploadButton, addMenu, emojiMenu } = this.elements;
+        // 发送消息按钮
+        this.elements.sendButton.addEventListener('click', () => {
+            this.sendMessage();
+        });
 
-    // 发送消息按钮
-    sendButton.addEventListener('click', () => { this.resetAutoLockTimer?.(); this.sendMessage(); });
-
-        // 消息输入框 Enter 发送
-        messageInput.addEventListener('keydown', (e) => {
-            if (this.agentSuggestionsList && this.agentSuggestionsList.style.display !== 'none') return;
+        // 消息输入框
+        this.elements.messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                this.resetAutoLockTimer?.();
                 this.sendMessage();
             }
         });
 
-        // 输入状态、@提及、高度调整
-        messageInput.addEventListener('input', (e) => {
-            this.resetAutoLockTimer?.();
+        // 输入状态检测
+        this.elements.messageInput.addEventListener('input', () => {
             this.handleTypingStatus();
-            this.handleAtMention(e);
-            this.adjustTextareaHeight();
-        });
-
-        // @提及列表键盘导航
-        messageInput.addEventListener('keydown', (e) => {
-            this.resetAutoLockTimer?.();
-            if (this.agentSuggestionsList && this.agentSuggestionsList.style.display !== 'none') {
-                this.handleAgentSuggestionKeydown(e);
-            }
         });
 
         // @智能体按钮
-    mentionButton.addEventListener('click', () => { this.resetAutoLockTimer?.(); this.insertAtSymbol(); });
-
-        // 添加(+)按钮
-        if (imageUploadButton && addMenu) {
-            imageUploadButton.addEventListener('click', (e) => {
-                this.resetAutoLockTimer?.();
-                e.stopPropagation();
-                addMenu.style.display = addMenu.style.display === 'none' ? 'block' : 'none';
-                if (emojiMenu) emojiMenu.style.display = 'none';
-            });
-        }
-
-        // 添加(+)菜单项点击
-        if (addMenu) {
-            addMenu.addEventListener('click', (e) => {
-                this.resetAutoLockTimer?.();
-                const menuItem = e.target.closest('.add-menu-item');
-                if (!menuItem) return;
-                const action = menuItem.dataset.action;
-                const hasActiveChat = this.currentRoom || this.friendsManager?.currentPrivateChat;
-
-                if (!hasActiveChat) {
-                    this.showWarning('请先选择一个聊天室或好友');
-                    addMenu.style.display = 'none';
-                    return;
-                }
-
-                if (action === 'image') document.getElementById('imageFileInput').click();
-                else if (action === 'camera') document.getElementById('cameraFileInput').click();
-                
-                addMenu.style.display = 'none';
-            });
-        }
-
-        // 表情按钮
-        if (emojiButton && emojiMenu) {
-            emojiButton.addEventListener('click', (e) => {
-                this.resetAutoLockTimer?.();
-                e.stopPropagation();
-                emojiMenu.style.display = emojiMenu.style.display === 'none' ? 'block' : 'none';
-                if (addMenu) addMenu.style.display = 'none';
-            });
-
-            emojiMenu.addEventListener('click', (e) => {
-                this.resetAutoLockTimer?.();
-                const emojiItem = e.target.closest('.emoji-item');
-                if (!emojiItem) return;
-                const emoji = emojiItem.dataset.emoji;
-                if (emoji) {
-                    this.insertEmojiAtCursor(messageInput, emoji);
-                    this.adjustTextareaHeight();
-                }
-                emojiMenu.style.display = 'none';
-            });
-        }
-
-        // 点击页面其他地方关闭菜单和建议列表
-        document.addEventListener('click', (e) => {
-            if (this.agentSuggestionsList && !this.agentSuggestionsList.contains(e.target) && e.target !== messageInput) {
-                this.hideAgentSuggestions();
-            }
-            if (addMenu && imageUploadButton && !imageUploadButton.contains(e.target) && !addMenu.contains(e.target)) {
-                addMenu.style.display = 'none';
-            }
-            if (emojiMenu && emojiButton && !emojiButton.contains(e.target) && !emojiMenu.contains(e.target)) {
-                emojiMenu.style.display = 'none';
-            }
+        this.elements.mentionButton.addEventListener('click', () => {
+            this.showMentionAgentModal();
         });
 
-        // 创建房间相关事件
+        // 创建房间按钮 - 在模态框中的实际创建按钮
         const modalCreateBtn = document.getElementById('modalCreateRoomBtn');
-        if (modalCreateBtn) modalCreateBtn.addEventListener('click', () => this.createRoom());
-
-        const createRoomForm = document.getElementById('createRoomForm');
-        if (createRoomForm) createRoomForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.createRoom();
-        });
-
-        const roomNameInput = document.getElementById('roomName');
-        if (roomNameInput) roomNameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
+        if (modalCreateBtn) {
+            modalCreateBtn.addEventListener('click', () => {
+                console.log('🔧 [前端] 模态框中的创建房间按钮被点击');
                 this.createRoom();
-            }
-        });
-
-        // 再次确保定位（某些早期加载顺序可能导致未设置）
-        this.ensureInputMenusPositioning();
-    }
-
-    /**
-     * 确保输入框区域的+菜单和表情菜单具备正确定位上下文与层级
-     * 解决：点击+或表情需要先点@才显示的问题（@逻辑曾临时把.chat-input设为relative）
-     */
-    ensureInputMenusPositioning() {
-        try {
-            const chatInput = document.querySelector('.chat-input');
-            if (chatInput) {
-                const style = window.getComputedStyle(chatInput);
-                if (!style || style.position === 'static') {
-                    chatInput.style.position = 'relative';
-                }
-            }
-
-            // 提升菜单层级，避免被周围元素遮挡
-            const addMenu = this.elements.addMenu || document.getElementById('addMenu');
-            const emojiMenu = this.elements.emojiMenu || document.getElementById('emojiMenu');
-            if (addMenu) {
-                addMenu.style.zIndex = addMenu.style.zIndex || '1100';
-            }
-            if (emojiMenu) {
-                emojiMenu.style.zIndex = emojiMenu.style.zIndex || '1100';
-            }
-        } catch (e) {
-            console.warn('ensureInputMenusPositioning failed:', e);
+            });
+            console.log('✅ [前端] 创建房间按钮事件绑定成功');
+        } else {
+            console.error('❌ [前端] 创建房间按钮元素未找到');
         }
+
+        // 防止创建房间表单的默认提交行为
+        const createRoomForm = document.getElementById('createRoomForm');
+        if (createRoomForm) {
+            createRoomForm.addEventListener('submit', (e) => {
+                e.preventDefault(); // 阻止表单默认提交
+                console.log('🔧 [前端] 创建房间表单提交被拦截');
+                this.createRoom(); // 手动调用创建函数
+            });
+            console.log('✅ [前端] 创建房间表单事件绑定成功');
+        }
+
+        // 创建房间输入框回车键支持
+        const roomNameInput = document.getElementById('roomName');
+        if (roomNameInput) {
+            roomNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // 防止表单提交
+                    this.createRoom();
+                }
+            });
+        }
+
+        // 消息输入框自动调整高度
+        this.elements.messageInput.addEventListener('input', () => {
+            this.adjustTextareaHeight();
+        });
+        
+        // 移动端添加调试按钮（临时禁用）
+        // this.addMobileDebugButton();
     }
 
     /**
@@ -1740,43 +852,17 @@ width: ${computedStyle.width}`;
     /**
      * 加入房间
      */
-    async joinRoom(roomId) {
-        try {
-            if (!this.websocket || !this.websocket.connected) {
-                this.showError('WebSocket未连接');
-                return;
-            }
+    joinRoom(roomId) {
+        if (!this.websocket || !this.websocket.connected) {
+            this.showError('WebSocket未连接');
+            return;
+        }
 
-            if (this.currentRoom?.roomId === roomId || this.currentRoom?.id === roomId) {
-                return; // 已在当前房间
-            }
+        if (this.currentRoom?.roomId === roomId || this.currentRoom?.id === roomId) {
+            return; // 已在当前房间
+        }
 
-            // PIN验证检查 - 根据自动锁定时间判断
-            if (window.pinVerification && window.pinVerification.isEnabled()) {
-                const lastVerification = localStorage.getItem('pin_last_verification');
-                const verificationTimeout = window.pinVerification.getLockTimeout();
-                const now = Date.now();
-
-                if (!lastVerification || (now - parseInt(lastVerification)) > verificationTimeout) {
-                    try {
-                        await window.pinVerification.showVerification('请输入PIN码以进入房间');
-                        localStorage.setItem('pin_last_verification', now.toString());
-                        this.resetAutoLockTimer();
-                    } catch (error) {
-                        console.log('房间PIN验证失败或取消:', error.message);
-                        showToast('PIN验证失败，无法进入房间', 'warning');
-                        return;
-                    }
-                } else {
-                    // 重置自动锁定定时器
-                    this.resetAutoLockTimer();
-                }
-            }
-
-            // 用户操作：重置自动锁定计时器
-            this.resetAutoLockTimer?.();
-
-            // 清除私聊状态
+        // 清除私聊状态
         if (this.friendsManager) {
             this.friendsManager.clearPrivateChat();
         }
@@ -1821,9 +907,6 @@ width: ${computedStyle.width}`;
                 await this.updateRoomInfo(this.currentRoom);
                 this.showSuccess(`已选择房间: ${this.currentRoom.roomName}`);
                 
-                // 保存聊天状态
-                this.saveCurrentChatState();
-                
                 // 请求房间状态和在线用户信息
                 setTimeout(() => {
                     console.log('🔄 [前端] 请求房间状态和在线用户信息 (临时方案):', roomId);
@@ -1834,10 +917,6 @@ width: ${computedStyle.width}`;
 
         // 保存timeout ID以便在成功时清除
         this.joinRoomTimeout = timeoutId;
-        } catch (error) {
-            console.error('加入房间失败:', error);
-            this.showError('加入房间失败: ' + error.message);
-        }
     }
 
     /**
@@ -1906,14 +985,16 @@ width: ${computedStyle.width}`;
         if (!roomData) {
             // 清空状态 - 没有选择房间
             this.elements.currentRoomName.innerHTML = '<i class="fas fa-users me-2"></i>请选择聊天室';
+            // 退出房间或未选择房间时，确保移除私聊模式样式
+            try {
+                const chatArea = document.querySelector('.chat-area');
+                if (chatArea) chatArea.classList.remove('private-mode');
+            } catch (e) { /* noop */ }
             
             // 禁用输入控件
             this.elements.messageInput.disabled = true;
             this.elements.sendButton.disabled = true;
             this.elements.mentionButton.disabled = true;
-            if (this.elements.emojiButton) {
-                this.elements.emojiButton.disabled = true;
-            }
             if (this.elements.imageUploadButton) {
                 this.elements.imageUploadButton.disabled = true;
             }
@@ -1948,14 +1029,16 @@ width: ${computedStyle.width}`;
             <i class="fas fa-users me-2"></i>
             ${this.escapeHtml(roomData.roomName || roomData.roomId)}
         `;
+        // 进入房间视图时，确保不是私聊模式样式
+        try {
+            const chatArea = document.querySelector('.chat-area');
+            if (chatArea) chatArea.classList.remove('private-mode');
+        } catch (e) { /* noop */ }
 
         // 启用输入控件
         this.elements.messageInput.disabled = false;
         this.elements.sendButton.disabled = false;
         this.elements.mentionButton.disabled = false;
-        if (this.elements.emojiButton) {
-            this.elements.emojiButton.disabled = false;
-        }
         if (this.elements.imageUploadButton) {
             this.elements.imageUploadButton.disabled = false;
         }
@@ -2017,39 +1100,22 @@ width: ${computedStyle.width}`;
 
         // 只有当API调用失败时，才使用WebSocket返回的消息作为备用
         if (!apiSuccess && roomData.recentMessages && roomData.recentMessages.length > 0) {
-            console.log('🔄 [前端] API加载失败，使用WebSocket备用消息:', roomData.recentMessages.length);
-            console.log('📋 [前端] WebSocket消息详情:', roomData.recentMessages);
+            console.log('� [前端] API加载失败，使用WebSocket备用消息:', roomData.recentMessages.length);
             
             roomData.recentMessages.forEach((message, index) => {
-                // 检查是否是智能体消息
-                const isAgent = message.senderType === 'agent' || message.type === 'agent_response' || message.agentId;
-                
-                console.log(`📜 [WebSocket备用消息] ${index + 1}:`, {
+                console.log(`📜 [调试] WebSocket备用消息 ${index + 1}:`, {
                     id: message.id,
                     content: message.content?.substring(0, 50) + '...',
-                    type: message.type,
-                    senderType: message.senderType,
-                    agentId: message.agentId,
-                    agentName: message.agentName,
-                    userId: message.userId,
-                    username: message.username,
-                    isAgentMessage: isAgent,
                     hasAttachments: !!message.attachments,
+                    attachments: message.attachments,
                     messageType: message.type || message.message_type
                 });
                 this.addMessage(message, false);
             });
-            
-            // 备用消息加载完成后滚动到底部
-            setTimeout(() => {
-                this.scrollToBottom();
-            }, 200);
         }
         
         // 如果没有任何消息，显示欢迎信息
         if (!apiSuccess && (!roomData.recentMessages || roomData.recentMessages.length === 0)) {
-            console.log('📭 [前端] 没有找到任何历史消息');
-            console.log('🔍 [前端] 当前聊天区域消息数量:', this.elements.chatMessages?.children?.length || 0);
             this.elements.chatMessages.innerHTML = `
                 <div class="text-center text-muted mt-3">
                     <i class="fas fa-comments fa-2x mb-2"></i>
@@ -2061,9 +1127,6 @@ width: ${computedStyle.width}`;
 
         // 重新渲染房间列表以更新激活状态
         this.renderRoomList();
-        
-        // 重新加载智能体列表（因为现在使用全局智能体，不依赖特定聊天室）
-        await this.loadAgents();
     }
 
     /**
@@ -2092,12 +1155,6 @@ width: ${computedStyle.width}`;
         try {
             console.log('🚀 [前端] 开始通过API加载房间历史消息:', roomId);
             
-            // 检查 roomManagementService 是否存在
-            if (!this.roomManagementService) {
-                console.error('❌ [前端] roomManagementService 未初始化');
-                return false;
-            }
-            
             // 调用房间管理服务获取历史消息
             const result = await this.roomManagementService.getRoomMessages(roomId, {
                 limit: 50,
@@ -2111,90 +1168,9 @@ width: ${computedStyle.width}`;
                 hasMessages: !!(result?.messages?.length),
                 fullResult: result
             });
-            
-            // 显示API返回的原始数据结构
-            if (result && result.messages && result.messages.length > 0) {
-                console.log('🔍 [API原始数据] 前3条消息的完整数据结构:', 
-                    result.messages.slice(0, 3).map(msg => ({
-                        id: msg.id,
-                        content: msg.content?.substring(0, 30) + '...',
-                        allFields: Object.keys(msg),
-                        rawMessage: msg
-                    }))
-                );
-            }
 
             if (result && result.messages && result.messages.length > 0) {
                 console.log('✅ [前端] 找到API历史消息，开始渲染:', result.messages.length);
-                
-                // 检查API返回的消息中是否有智能体消息
-                const apiAgentMessages = result.messages.filter(msg => 
-                    msg.senderType === 'agent' || msg.type === 'agent_response' || msg.agentId || 
-                    (msg.userId === null && msg.agentName)
-                );
-                console.log('🤖 [API智能体消息] API返回的智能体消息数量:', apiAgentMessages.length);
-                
-                if (apiAgentMessages.length > 0) {
-                    console.log('🤖 [API智能体消息] 第一条智能体消息详细结构:', {
-                        id: apiAgentMessages[0].id,
-                        senderType: apiAgentMessages[0].senderType,
-                        type: apiAgentMessages[0].type,
-                        agentId: apiAgentMessages[0].agentId,
-                        agentName: apiAgentMessages[0].agentName,
-                        userId: apiAgentMessages[0].userId,
-                        username: apiAgentMessages[0].username,
-                        sender_username: apiAgentMessages[0].sender_username,
-                        content: apiAgentMessages[0].content?.substring(0, 50) + '...',
-                        allFields: Object.keys(apiAgentMessages[0]).sort()
-                    });
-                    
-                    // 🔍 检查是否有重复的智能体消息
-                    console.log('🔍 [重复检查] 检查所有智能体消息的ID和内容:');
-                    apiAgentMessages.forEach((msg, index) => {
-                        console.log(`   智能体消息 ${index + 1}:`, {
-                            id: msg.id,
-                            agentId: msg.agentId,
-                            agentName: msg.agentName,
-                            username: msg.username,
-                            content: msg.content?.substring(0, 100) + '...',
-                            createdAt: msg.createdAt
-                        });
-                    });
-                    
-                    // 检查是否有相同内容的消息
-                    const contentGroups = {};
-                    apiAgentMessages.forEach(msg => {
-                        const content = msg.content;
-                        if (!contentGroups[content]) {
-                            contentGroups[content] = [];
-                        }
-                        contentGroups[content].push({
-                            id: msg.id,
-                            agentName: msg.agentName || msg.username,
-                            agentId: msg.agentId
-                        });
-                    });
-                    
-                    Object.keys(contentGroups).forEach(content => {
-                        if (contentGroups[content].length > 1) {
-                            console.error('❌ [重复内容] 发现相同内容的多条消息:', {
-                                content: content?.substring(0, 100) + '...',
-                                messages: contentGroups[content]
-                            });
-                        }
-                    });
-                } else {
-                    console.log('❌ [API问题] API返回的消息中没有智能体标识字段！');
-                    console.log('🔍 [API问题] 第一条消息的字段:', {
-                        id: result.messages[0].id,
-                        allFields: Object.keys(result.messages[0]).sort(),
-                        senderType: result.messages[0].senderType,
-                        type: result.messages[0].type,
-                        agentId: result.messages[0].agentId,
-                        userId: result.messages[0].userId,
-                        sender_username: result.messages[0].sender_username
-                    });
-                }
                 
                 // 检查消息格式并添加调试信息
                 result.messages.forEach((message, index) => {
@@ -2218,24 +1194,6 @@ width: ${computedStyle.width}`;
                     if (!message.username && message.sender_username) {
                         message.username = message.sender_username;
                     }
-                    
-                    // 处理智能体消息字段
-                    if (message.senderType === 'agent' || message.type === 'agent_response' || message.agentId) {
-                        // 确保智能体消息有正确的agentName
-                        if (!message.agentName && message.username) {
-                            message.agentName = message.username;
-                        }
-                        if (!message.agentName && message.sender_username) {
-                            message.agentName = message.sender_username;
-                        }
-                        console.log('🤖 [API智能体消息] 处理智能体字段:', {
-                            agentId: message.agentId,
-                            agentName: message.agentName,
-                            senderType: message.senderType,
-                            type: message.type
-                        });
-                    }
-                    
                     if (!message.senderId) {
                         // 尝试多种可能的发送者ID字段
                         message.senderId = message.sender_id || message.user_id || message.senderId;
@@ -2257,13 +1215,10 @@ width: ${computedStyle.width}`;
                         content: message.content?.substring(0, 50) + '...',
                         content_type: message.content_type,
                         messageType: message.messageType,
-                        type: message.type,
-                        senderType: message.senderType,
-                        agentId: message.agentId,
-                        agentName: message.agentName,
-                        userId: message.userId,
                         hasAttachments: !!(message.attachments && message.attachments.length > 0),
                         attachments: message.attachments,
+                        attachmentsType: typeof message.attachments,
+                        attachmentsLength: message.attachments?.length,
                         sender: message.sender_username || message.senderInfo?.username,
                         mappedFields: {
                             senderName: message.senderName,
@@ -2277,14 +1232,6 @@ width: ${computedStyle.width}`;
                 });
 
                 console.log('✅ [前端] API历史消息渲染完成');
-                console.log('📊 [前端] 当前聊天区域消息总数:', this.elements.chatMessages?.children?.length || 0);
-                console.log('🔍 [前端] 聊天区域HTML内容预览:', this.elements.chatMessages?.innerHTML?.substring(0, 200) + '...');
-                
-                // 确保在所有消息渲染完成后滚动到底部
-                setTimeout(() => {
-                    this.scrollToBottom();
-                }, 200);
-                
                 return true;
             } else {
                 console.log('📭 [前端] API未返回历史消息');
@@ -2323,9 +1270,6 @@ width: ${computedStyle.width}`;
             return;
         }
 
-    // 用户操作：重置自动锁定计时器
-    this.resetAutoLockTimer?.();
-
         // 检查是否在私聊模式
         if (this.friendsManager && this.friendsManager.isPrivateChatMode()) {
             this.friendsManager.sendPrivateMessage(content);
@@ -2344,14 +1288,11 @@ width: ${computedStyle.width}`;
         if (mentionMatch) {
             this.mentionAgent(mentionMatch[1], content);
         } else {
-            // 发送普通消息 - 但仍然检测是否包含@智能体
-            const agentMentions = this.extractAgentMentions(content);
-            
+            // 发送普通消息
             console.log('📤 [前端] 发送普通消息:', {
                 roomId: this.currentRoom.id || this.currentRoom.roomId,
                 content: content,
-                type: 'text',
-                agentMentions: agentMentions
+                type: 'text'
             });
             
             const messageData = {
@@ -2359,8 +1300,7 @@ width: ${computedStyle.width}`;
                 content: content,
                 type: 'text',
                 timestamp: Date.now(),
-                clientId: this.websocket.id,  // 客户端标识，用于消息确认
-                agentMentions: agentMentions  // 添加智能体提及信息
+                clientId: this.websocket.id  // 客户端标识，用于消息确认
             };
             
             // 先在本地显示消息（乐观更新）
@@ -2409,82 +1349,31 @@ width: ${computedStyle.width}`;
     }
 
     /**
-     * @智能体 - 根据后端反馈优化版本
+     * @智能体
      */
-    async mentionAgent(agentName, content) {
-        try {
-            // 查找智能体（确保智能体存在）
-            const agent = this.agents.find(a => 
-                a.name === agentName || a.id === agentName || a.agentName === agentName
-            );
+    mentionAgent(agentName, content) {
+        // 查找智能体
+        const agent = this.agents.find(a => 
+            a.name === agentName || a.id === agentName || a.agentName === agentName
+        );
 
-            if (!agent) {
-                this.showError(`未找到智能体: ${agentName}`);
-                return;
-            }
-
-            // 提取所有@智能体提及
-            const agentMentions = this.extractAgentMentions(content);
-
-            console.log('🤖 [前端] @智能体发送 (优化版):', {
-                agentId: agent.id,
-                agentName: agent.name || agent.agentName,
-                content: content,
-                agentMentions: agentMentions,
-                roomId: this.currentRoom.id || this.currentRoom.roomId
-            });
-
-            // 根据后端反馈的消息格式
-            const messageData = {
-                roomId: this.currentRoom.id || this.currentRoom.roomId,
-                content: content, // 包含@智能体名称的完整消息内容
-                type: 'text',
-                timestamp: Date.now(),
-                clientId: this.websocket.id,
-                agentMentions: agentMentions, // 后端要求的字段
-                metadata: {
-                    mentionedAgent: {
-                        id: agent.id,
-                        name: agent.name
-                    }
-                }
-            };
-            
-            // 先在本地显示消息（乐观更新）
-            const localMessageId = 'temp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            const localMessage = {
-                id: localMessageId,
-                content: content,
-                type: 'text',
-                senderId: this.currentUser.id,
-                userId: this.currentUser.id,
-                senderName: this.currentUser.username,
-                username: this.currentUser.username,
-                timestamp: Date.now(),
-                createdAt: new Date().toISOString(),
-                isLocalPending: true  // 标记为本地待确认消息
-            };
-            
-            this.addMessage(localMessage);
-            console.log('📤 [前端] 添加本地@智能体消息:', localMessageId);
-            
-            // 通过WebSocket发送
-            this.websocket.emit('send-message', messageData);
-            
-            // 设置超时检查
-            const timeoutId = setTimeout(() => {
-                if (localMessage.isLocalPending) {
-                    console.warn('⚠️ [前端] @智能体消息5秒内未收到确认:', localMessageId);
-                    this.showWarning('@智能体消息发送可能延迟，请稍候...');
-                }
-            }, 5000);
-
-            localMessage.timeoutId = timeoutId;
-
-        } catch (error) {
-            console.error('💥 [前端] @智能体失败:', error);
-            this.showError('@智能体失败: ' + error.message);
+        if (!agent) {
+            this.showError(`未找到智能体: ${agentName}`);
+            return;
         }
+
+        console.log('🤖 [前端] @智能体 (根据API指南):', {
+            agentId: agent.id,
+            agentName: agent.name || agent.agentName,
+            query: content
+        });
+        
+        // 根据API指南使用 mention-agent 事件
+        this.websocket.emit('mention-agent', {
+            roomId: this.currentRoom.id || this.currentRoom.roomId,
+            agentId: agent.id,
+            query: content  // API指南中使用 query 字段而不是 content
+        });
     }
 
     /**
@@ -2499,20 +1388,11 @@ width: ${computedStyle.width}`;
             content: message.content?.substring(0, 50) + '...',
             currentUserId: this.currentUser?.id,
             currentUsername: this.currentUser?.username,
-            currentRoomId: this.currentRoom?.id || this.currentRoom?.roomId,
-            isStreaming: message.isStreaming,
-            type: message.type
+            currentRoomId: this.currentRoom?.id || this.currentRoom?.roomId
         });
         
         const messageElement = document.createElement('div');
         messageElement.className = 'message';
-        
-        // 设置消息ID和流式状态
-        messageElement.setAttribute('data-message-id', message.id);
-        if (message.isStreaming) {
-            messageElement.setAttribute('data-streaming', 'true');
-            messageElement.classList.add('streaming');
-        }
 
         // 判断消息类型
         let messageClass = 'message-other';
@@ -2527,17 +1407,9 @@ width: ${computedStyle.width}`;
             (message.username && message.username === this.currentUser.username)
         );
         
-        // 根据后端修复后的数据格式识别智能体消息
-        const isAgentMessage = (
-            message.senderType === 'agent' || 
-            message.type === 'agent_response' || 
-            message.agentId ||
-            (message.userId === null && message.agentName)
-        );
-
         if (isCurrentUser) {
             messageClass = 'message-user';
-        } else if (isAgentMessage) {
+        } else if (message.type === 'agent_response' || message.agentId) {
             messageClass = 'message-agent';
         } else if (message.type === 'system') {
             messageClass = 'message-system';
@@ -2547,13 +1419,11 @@ width: ${computedStyle.width}`;
             messageClass: messageClass,
             messageId: message.id,
             senderId: message.senderId,
-            senderType: message.senderType,
-            agentId: message.agentId,
-            agentName: message.agentName,
-            userId: message.userId,
+            sender_username: message.sender_username,
             currentUserId: this.currentUser.id,
+            currentUsername: this.currentUser.username,
             isCurrentUser: isCurrentUser,
-            isAgentMessage: isAgentMessage,
+            isAgent: message.type === 'agent_response' || message.agentId,
             isSystem: message.type === 'system'
         });
 
@@ -2564,150 +1434,52 @@ width: ${computedStyle.width}`;
 
         // 消息头部（发送者和时间）
         if (messageClass !== 'message-system') {
-            // 根据消息类型选择合适的发送者名称
-            let senderName;
-            if (isAgentMessage) {
-                // 智能体消息：优先使用 agentName，然后是 username
-                senderName = message.agentName || message.username || '智能体';
-            } else {
-                // 用户消息：使用 username 或 senderName
-                senderName = message.username || message.senderName || '未知用户';
-            }
-            
+            const senderName = message.senderName || message.username || message.agentName || '未知用户';
             const timestamp = this.formatTime(message.createdAt || message.timestamp);
             
             messageHTML += `
                 <div class="message-header">
-                    <span class="message-sender">
-                        ${isAgentMessage ? '🤖 ' : '👤 '}${this.escapeHtml(senderName)}
-                    </span>
+                    <span class="message-sender">${this.escapeHtml(senderName)}</span>
                     <span class="message-time">${timestamp}</span>
                 </div>
             `;
         }
 
-        // 回复预览 - 检查是否为加密内容
+        // 回复预览
         if (message.replyToContent) {
-            // 检查回复内容是否是加密格式（包含冒号分隔的加密字符串）
-            const isEncryptedReply = message.replyToContent.includes(':') && 
-                                   message.replyToContent.split(':').length >= 3 &&
-                                   /^[a-f0-9:]+$/i.test(message.replyToContent);
-            
-            if (isEncryptedReply) {
-                // 如果是加密内容，显示简化的回复标识
-                messageHTML += `
-                    <div class="reply-preview">
-                        <i class="fas fa-reply me-1"></i>回复消息
-                    </div>
-                `;
-                console.log('🔒 [回复] 检测到加密回复内容，使用简化显示:', {
-                    messageId: message.id,
-                    encryptedContent: message.replyToContent?.substring(0, 50) + '...'
-                });
-            } else {
-                // 正常的回复内容，截断显示
-                const replyContent = message.replyToContent.length > 50 
-                    ? message.replyToContent.substring(0, 50) + '...' 
-                    : message.replyToContent;
-                messageHTML += `
-                    <div class="reply-preview">
-                        <i class="fas fa-reply me-1"></i>回复: ${this.escapeHtml(replyContent)}
-                    </div>
-                `;
-                console.log('💬 [回复] 显示正常回复内容:', {
-                    messageId: message.id,
-                    replyContent: replyContent
-                });
-            }
+            messageHTML += `
+                <div class="reply-preview">
+                    回复: ${this.escapeHtml(message.replyToContent)}
+                </div>
+            `;
         }
 
-        // 消息内容处理 - 对于图片消息，不显示加密文本
+        // 消息内容 - 对于图片消息，不显示加密文本
         let contentToShow = message.content;
-        console.log('🔍 [调试] 消息内容处理开始:', {
-            messageId: message.id,
-            originalContent: contentToShow?.substring(0, 100) + (contentToShow?.length > 100 ? '...' : ''),
-            contentLength: contentToShow?.length,
-            hasAttachments: !!(message.attachments && message.attachments.length > 0),
-            attachmentsCount: message.attachments?.length || 0
-        });
-
+        
+        // 如果消息有附件，需要特殊处理内容显示
         if (message.attachments && message.attachments.length > 0) {
-            // 检查内容是否像加密字符串或系统提示
+            // 检查内容是否像加密字符串（包含冒号分隔的长字符串）
             const isEncryptedContent = contentToShow && 
                 contentToShow.includes(':') && 
                 contentToShow.length > 50 && 
                 /^[a-f0-9:]+$/.test(contentToShow);
                 
+            // 检查是否是系统生成的图片消息提示
             const isImageSystemMessage = contentToShow && 
                 (contentToShow.includes('发送了图片') || 
                  contentToShow.includes('sent an image') ||
                  contentToShow.match(/^[a-f0-9_.-]+\.(jpg|jpeg|png|gif|webp)$/i));
             
-            console.log('🔍 [调试] 图片消息内容检查:', {
-                messageId: message.id,
-                isEncryptedContent,
-                isImageSystemMessage,
-                willHideContent: isEncryptedContent || isImageSystemMessage,
-                contentPreview: contentToShow?.substring(0, 100)
-            });
-            
             if (isEncryptedContent || isImageSystemMessage) {
-                contentToShow = '';
+                contentToShow = ''; // 不显示加密的内容或系统提示
             }
         }
         
-        // 对于没有附件的消息，也要检查是否是加密hash码
-        if ((!message.attachments || message.attachments.length === 0) && contentToShow) {
-            // 更严格的加密内容检测，避免误判正常消息
-            const hasNonHexChars = /[^a-f0-9:]/.test(contentToShow);
-            const isEncryptedContent = contentToShow && 
-                !hasNonHexChars &&  // 只包含十六进制字符和冒号
-                contentToShow.includes(':') && 
-                contentToShow.length > 100 &&  // 增加长度要求
-                contentToShow.split(':').length > 10;  // 确保有足够多的冒号分割
-                
-            console.log('🔍 [调试] 纯文本消息内容检查:', {
-                messageId: message.id,
-                contentLength: contentToShow.length,
-                hasColon: contentToShow.includes(':'),
-                hasNonHexChars: hasNonHexChars,
-                isHexOnly: !hasNonHexChars,
-                colonCount: contentToShow.split(':').length - 1,
-                isEncryptedContent,
-                willHideContent: isEncryptedContent,
-                contentPreview: contentToShow.substring(0, 100) + (contentToShow.length > 100 ? '...' : '')
-            });
-                
-            if (isEncryptedContent) {
-                console.log('🔒 [聊天室] 检测到加密hash码内容，已过滤:', contentToShow.substring(0, 50) + '...');
-                contentToShow = '';
-            }
-        }
-        
-        // 流式消息特殊处理：即使内容为空也要创建内容元素
         if (contentToShow && contentToShow.trim()) {
-            console.log('✅ [调试] 将显示消息内容:', {
-                messageId: message.id,
-                contentPreview: contentToShow.substring(0, 100) + (contentToShow.length > 100 ? '...' : ''),
-                contentLength: contentToShow.length
-            });
             messageHTML += `
                 <div class="message-content">${this.formatMessageContent(contentToShow)}</div>
             `;
-        } else if (message.isStreaming) {
-            console.log('🌊 [调试] 流式消息创建空内容元素:', {
-                messageId: message.id,
-                isStreaming: message.isStreaming
-            });
-            messageHTML += `
-                <div class="message-content"><span class="typing-cursor">|</span></div>
-            `;
-        } else {
-            console.log('⚠️ [调试] 消息内容为空，不显示:', {
-                messageId: message.id,
-                originalContent: message.content?.substring(0, 50),
-                wasFiltered: message.content && !contentToShow
-            });
         }
 
         // 处理附件（图片）
@@ -2805,111 +1577,96 @@ width: ${computedStyle.width}`;
                     return;
                 }
                 
-                // 优先使用图片优化服务
-                if (this.imageOptimizer) {
-                    console.log('🚀 [优化] 使用ImageOptimizationService处理图片:', { attachment, fileName });
-                    
-                    // 从附件对象或字符串中提取文件ID
-                    const fileId = (typeof attachment === 'object' && attachment !== null) ? attachment.id : attachment;
-                    
-                    if (fileId) {
-                        const imageContainer = this.imageOptimizer.progressiveLoadImage(fileId, fileName);
-                        
-                        // 重写点击事件，使用ChatroomController的showImageModal
-                        const that = this; // 保持上下文引用
-                        setTimeout(() => {
-                            // 等待图片优化服务创建完容器后，重新绑定点击事件
-                            if (imageContainer && imageContainer.onclick) {
-                                console.log('🔧 [修复] 重写图片优化服务的点击事件，使用ChatroomController的showImageModal');
-                                
-                                imageContainer.onclick = function(e) {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-
-                                    const img = imageContainer.querySelector('img');
-                                    let actualImageUrl = imageUrl;
-
-                                    // 优先使用全尺寸原图 URL（带 token 的 dataset.srcFull）
-                                    if (img && img.dataset && img.dataset.srcFull) {
-                                        actualImageUrl = img.dataset.srcFull;
-                                    } else if (img && img.dataset && img.dataset.srcMedium) {
-                                        // 退化到中等
-                                        actualImageUrl = img.dataset.srcMedium;
-                                    } else if (img && img.src) {
-                                        // 最后退化到当前显示的 src
-                                        actualImageUrl = img.src;
-                                    }
-
-                                    // 如果缺少token而本地仍有token，则补充（避免鉴权失败）
-                                    if (typeof TokenManager !== 'undefined') {
-                                        try {
-                                            const tk = TokenManager.getAccessToken?.();
-                                            if (tk && !/([?&])token=/.test(actualImageUrl)) {
-                                                actualImageUrl += (actualImageUrl.includes('?') ? '&' : '?') + 'token=' + tk;
-                                            }
-                                        } catch (_) {}
-                                    }
-
-                                    // 如果原图尚未加载，提前加入 userRequested 队列加速加载
-                                    try {
-                                        if (window.imageOptimizer && img?.dataset?.imageId) {
-                                            const state = window.imageOptimizer.imageStates.get(img.dataset.imageId);
-                                            if (state && !state.fullLoaded) {
-                                                window.imageOptimizer.addToQueue('userRequested', {
-                                                    img,
-                                                    imageId: img.dataset.imageId,
-                                                    priority: Date.now()
-                                                });
-                                            }
-                                        }
-                                    } catch (err) {
-                                        console.warn('⚠️ [图片] 加速原图加载队列失败:', err);
-                                    }
-
-                                    console.log('🖼️ [点击-原图] 打开原图(统一使用ChatroomController模态框): ', actualImageUrl);
-                                    // 统一使用当前控制器的模态框，避免与ImageOptimizationService的遮罩样式冲突导致看不到图片
-                                    that.showImageModal(actualImageUrl, fileName);
-                                };
-                            }
-                        }, 100);
-                        
-                        attachmentsContainer.appendChild(imageContainer);
-                    } else {
-                        console.error('❌ [优化] 附件中缺少文件ID，无法优化:', attachment);
-                        // 如果缺少文件ID，显示错误信息
-                        const errorDiv = document.createElement('div');
-                        errorDiv.textContent = `图片加载失败: ${fileName}`;
-                        errorDiv.style.cssText = 'padding: 10px; background: #f5f5f5; border-radius: 4px; color: #666;';
-                        attachmentsContainer.appendChild(errorDiv);
+                // 创建图片元素 - 改进加载方式
+                const img = document.createElement('img');
+                img.className = 'message-image img-fluid';
+                img.alt = fileName;
+                img.title = fileName;
+                img.style.cssText = 'max-width: 300px; max-height: 200px; border-radius: 8px; cursor: pointer;';
+                
+                // 处理图片加载错误
+                img.onerror = () => {
+                    console.error('❌ 图片加载失败:', imageUrl);
+                    img.style.display = 'none';
+                    const errorDiv = document.createElement('div');
+                    errorDiv.textContent = `图片加载失败: ${fileName}`;
+                    errorDiv.style.cssText = 'padding: 10px; background: #f5f5f5; border-radius: 4px; color: #666;';
+                    img.parentNode.replaceChild(errorDiv, img);
+                };
+                
+                // 成功加载时的处理
+                img.onload = () => {
+                    console.log('✅ 图片加载成功:', imageUrl);
+                };
+                
+                // 添加点击放大功能 - 改进为模态框效果
+                img.onclick = function() {
+                    // 检查是否已有放大模态框
+                    let existingModal = document.getElementById('imageModal');
+                    if (existingModal) {
+                        document.body.removeChild(existingModal);
+                        return;
                     }
-                } else {
-                    // 降级方案：直接设置图片src显示
-                    const img = document.createElement('img');
-                    img.className = 'message-image img-fluid';
-                    img.alt = fileName;
-                    img.title = fileName;
-                    img.style.cssText = 'border-radius: 8px; cursor: pointer; max-width: 100%; height: auto; display: block; min-height: 100px; background: #f0f0f0;';
-                    img.src = imageUrl;
                     
-                    img.onerror = () => {
-                        if (img.parentNode) {
-                            img.parentNode.innerHTML = `<div style="padding: 10px; background: #f5f5f5; border-radius: 4px; color: #666;">图片加载失败: ${fileName}</div>`;
-                        }
+                    // 创建模态框
+                    const modal = document.createElement('div');
+                    modal.id = 'imageModal';
+                    modal.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0, 0, 0, 0.8);
+                        z-index: 9999;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        cursor: pointer;
+                    `;
+                    
+                    // 创建放大的图片
+                    const enlargedImg = document.createElement('img');
+                    enlargedImg.src = this.src;
+                    enlargedImg.alt = this.alt;
+                    enlargedImg.style.cssText = `
+                        max-width: 90%;
+                        max-height: 90%;
+                        object-fit: contain;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+                        cursor: pointer;
+                    `;
+                    
+                    // 点击模态框或图片时关闭
+                    modal.onclick = function() {
+                        document.body.removeChild(modal);
                     };
                     
-                    // 图片加载完成后重新滚动到底部
-                    img.onload = () => {
-                        if (shouldScroll) {
-                            setTimeout(() => {
-                                this.scrollToBottom();
-                            }, 100);
-                        }
+                    // 阻止图片点击事件冒泡
+                    enlargedImg.onclick = function(e) {
+                        e.stopPropagation();
+                        document.body.removeChild(modal);
                     };
                     
-                    img.onclick = () => this.showImageModal(imageUrl, fileName);
+                    // ESC键关闭
+                    const handleKeyPress = function(e) {
+                        if (e.key === 'Escape') {
+                            document.body.removeChild(modal);
+                            document.removeEventListener('keydown', handleKeyPress);
+                        }
+                    };
+                    document.addEventListener('keydown', handleKeyPress);
                     
-                    attachmentsContainer.appendChild(img);
-                }
+                    modal.appendChild(enlargedImg);
+                    document.body.appendChild(modal);
+                };
+                
+                // 设置图片源 - 直接使用构建的URL（已包含token）
+                img.src = imageUrl;
+                console.log('🖼️ [调试] 设置图片源:', imageUrl);
+                
+                attachmentsContainer.appendChild(img);
             });
             
             // 将附件容器添加到消息气泡中
@@ -3023,32 +1780,8 @@ width: ${computedStyle.width}`;
         
         // 消息去重：检查是否已经处理过这条消息
         if (message.id && this.processedMessages.has(message.id)) {
-            console.log('🔄 [前端] 跳过重复消息:', {
-                messageId: message.id,
-                content: message.content?.substring(0, 50) + '...',
-                source: '消息去重检查'
-            });
+            console.log('🔄 [前端] 跳过重复消息:', message.id);
             return;
-        }
-        
-        // 额外检查：对于智能体消息，按内容和时间戳去重
-        if (message.type === 'agent_response' || message.senderType === 'agent' || message.agentId) {
-            const contentHash = message.content + '_' + (message.createdAt || message.timestamp);
-            const duplicateCheckKey = `agent_${message.agentId || 'unknown'}_${contentHash}`;
-            
-            if (this.processedMessages.has(duplicateCheckKey)) {
-                console.log('🔄 [智能体去重] 跳过重复的智能体消息:', {
-                    messageId: message.id,
-                    agentId: message.agentId,
-                    agentName: message.agentName || message.username,
-                    content: message.content?.substring(0, 50) + '...',
-                    duplicateCheckKey: duplicateCheckKey
-                });
-                return;
-            }
-            
-            // 记录智能体消息的内容哈希
-            this.processedMessages.add(duplicateCheckKey);
         }
         
         // 记录已处理的消息ID
@@ -3607,543 +2340,6 @@ justifyContent: ${debugInfo.justifyContent}
     }
 
     /**
-     * 显示图片放大模态框 - 支持缩放功能
-     */
-    showImageModal(imageUrl, altText) {
-        // 检查是否已有放大模态框
-        let existingModal = document.getElementById('imageModal');
-        if (existingModal) {
-            // 若已存在则先移除旧的，再继续创建新的（而不是直接返回，避免第一次打开后无法重新打开更大尺寸）
-            document.body.removeChild(existingModal);
-        }
-        
-        console.log('📸 [模态框] 显示图片模态框:', { imageUrl, altText });
-        
-        // 创建模态框
-        const modal = document.createElement('div');
-        modal.id = 'imageModal';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            z-index: 9999;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: zoom-out;
-            backdrop-filter: blur(2px);
-        `;
-        
-        // 移动端临时启用缩放
-        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-        let originalViewport = null;
-        if (isMobileDevice) {
-            const viewport = document.querySelector('meta[name="viewport"]');
-            if (viewport) {
-                originalViewport = viewport.getAttribute('content');
-                viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes');
-            }
-        }
-        
-        // 创建图片容器 - 根据屏幕大小智能调整
-        const imageContainer = document.createElement('div');
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        
-        // 大屏幕使用更大的初始尺寸
-        let maxWidth, maxHeight;
-        if (screenWidth >= 1920) {
-            // 4K或超宽屏
-            maxWidth = '85%';
-            maxHeight = '85%';
-        } else if (screenWidth >= 1366) {
-            // 标准桌面屏幕
-            maxWidth = '80%';
-            maxHeight = '80%';
-        } else if (screenWidth >= 768) {
-            // 平板
-            maxWidth = '90%';
-            maxHeight = '85%';
-        } else {
-            // 移动端
-            maxWidth = '95%';
-            maxHeight = '90%';
-        }
-        
-        imageContainer.style.cssText = `
-            position: relative;
-            overflow: visible;
-            max-width: ${maxWidth};
-            max-height: ${maxHeight};
-            width: auto;
-            height: auto;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            background: transparent;
-        `;
-        
-        // 创建加载指示器
-        const loadingIndicator = document.createElement('div');
-        loadingIndicator.style.cssText = `
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 1.2rem;
-            z-index: 1;
-        `;
-        loadingIndicator.innerHTML = `
-            <i class="fas fa-spinner fa-spin"></i>
-            <span style="margin-left: 8px;">加载中...</span>
-        `;
-        imageContainer.appendChild(loadingIndicator);
-        
-        // 创建放大的图片 - 智能尺寸适配（改进：大屏使用更大显示区域，取消1200px硬限制）
-        const enlargedImg = document.createElement('img');
-        enlargedImg.alt = altText;
-        
-        // 根据屏幕大小设置初始尺寸（移除像素上限，改为纯 vw/vh 以适配 2K/4K）
-        let imgMaxWidth, imgMaxHeight;
-        if (screenWidth >= 2560) { // 2K/4K
-            imgMaxWidth = '90vw';
-            imgMaxHeight = '90vh';
-        } else if (screenWidth >= 1920) { // FHD+ 大屏
-            imgMaxWidth = '88vw';
-            imgMaxHeight = '88vh';
-        } else if (screenWidth >= 1366) { // 普通桌面
-            imgMaxWidth = '85vw';
-            imgMaxHeight = '85vh';
-        } else if (screenWidth >= 768) { // 平板
-            imgMaxWidth = '90vw';
-            imgMaxHeight = '80vh';
-        } else { // 移动
-            imgMaxWidth = '95vw';
-            imgMaxHeight = '85vh';
-        }
-        
-        enlargedImg.style.cssText = `
-            max-width: ${imgMaxWidth};
-            max-height: ${imgMaxHeight};
-            width: auto;
-            height: auto;
-            object-fit: contain;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            cursor: zoom-in; /* 初始提示可缩放 */
-            transition: transform 0.2s ease, opacity 0.3s ease;
-            transform-origin: center center;
-            opacity: 0;
-            visibility: hidden;
-        `;
-        
-        // 图片加载成功处理
-        enlargedImg.onload = function() {
-            console.log('✅ [模态框] 图片加载成功');
-            // 隐藏加载指示器
-            if (loadingIndicator.parentNode) {
-                loadingIndicator.parentNode.removeChild(loadingIndicator);
-            }
-            // 记录原始尺寸
-            naturalWidth = enlargedImg.naturalWidth;
-            naturalHeight = enlargedImg.naturalHeight;
-
-            // 视口允许的最大像素尺寸（与容器 90% 规则保持一致）
-            const vpW = window.innerWidth * 0.9;
-            const vpH = window.innerHeight * 0.9;
-            // 计算缩放(只缩小，不放大会导致模糊)
-            const shrinkScale = Math.min(vpW / naturalWidth, vpH / naturalHeight, 1);
-
-            // 通过实际宽度限制避免浏览器把小图拉伸造成模糊
-            const targetW = Math.round(naturalWidth * shrinkScale);
-            const targetH = Math.round(naturalHeight * shrinkScale);
-            enlargedImg.style.maxWidth = 'none';
-            enlargedImg.style.maxHeight = 'none';
-            enlargedImg.style.width = targetW + 'px';
-            enlargedImg.style.height = 'auto';
-            enlargedImg.style.imageRendering = 'auto'; // 需要像素风可改为 'crisp-edges'
-
-            // 初始化平移/缩放状态
-            scale = 1; // 1 代表当前显示尺寸，不进行额外放大
-            translateX = 0;
-            translateY = 0;
-            updateTransform();
-
-            // 显示图片
-            enlargedImg.style.opacity = '1';
-            enlargedImg.style.visibility = 'visible';
-            if (zoomIndicator) zoomIndicator.textContent = '100%';
-        };
-        
-        // 图片加载失败处理
-        enlargedImg.onerror = function() {
-            console.error('❌ [模态框] 图片加载失败:', imageUrl);
-            // 隐藏加载指示器
-            if (loadingIndicator.parentNode) {
-                loadingIndicator.parentNode.removeChild(loadingIndicator);
-            }
-            // 显示错误信息
-            const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = `
-                color: white;
-                text-align: center;
-                padding: 20px;
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 8px;
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            `;
-            errorDiv.innerHTML = `
-                <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 10px; color: #ffc107;"></i><br>
-                <span style="font-size: 1.1rem;">图片加载失败</span><br>
-                <small style="opacity: 0.7; margin-top: 8px; display: block;">点击背景关闭</small>
-            `;
-            imageContainer.appendChild(errorDiv);
-        };
-        
-        // 设置图片加载超时（15秒）
-        const loadTimeout = setTimeout(() => {
-            if (enlargedImg.complete === false || enlargedImg.naturalWidth === 0) {
-                console.warn('⚠️ [模态框] 图片加载超时');
-                enlargedImg.onerror();
-            }
-        }, 15000);
-        
-        // 当图片加载完成时清除超时定时器
-        enlargedImg.addEventListener('load', () => clearTimeout(loadTimeout));
-        enlargedImg.addEventListener('error', () => clearTimeout(loadTimeout));
-        
-        // 设置图片源（延迟设置以确保事件绑定完成）
-        setTimeout(() => {
-            console.log('📸 [模态框] 开始加载图片:', imageUrl);
-            enlargedImg.src = imageUrl;
-        }, 10);
-        
-        // 缩放控制变量
-    let scale = 1;
-        let isDragging = false;
-        let startX, startY, translateX = 0, translateY = 0;
-        const minScale = 1;
-    const maxScale = 10; // 放大上限提高，适配大屏查看细节
-    let naturalWidth = 0, naturalHeight = 0;
-    // 预先声明，避免在 updateTransform 初次执行时未定义
-    let zoomIndicator = null;
-    let baseDisplayWidth = 0;
-    let baseDisplayHeight = 0;
-        
-        // 更新图片变换
-        function clampTranslation() {
-            if (scale <= 1 || !naturalWidth || !naturalHeight) {
-                translateX = 0;
-                translateY = 0;
-                return;
-            }
-            const rect = enlargedImg.getBoundingClientRect();
-            // 允许溢出边界的比例（留一点黑边）
-            const overflowAllowance = 0.1;
-            const visibleW = rect.width / scale;
-            const visibleH = rect.height / scale;
-            const maxOffsetX = (rect.width - rect.width / scale) / 2 + rect.width * overflowAllowance / 2;
-            const maxOffsetY = (rect.height - rect.height / scale) / 2 + rect.height * overflowAllowance / 2;
-            translateX = Math.min(Math.max(translateX, -maxOffsetX), maxOffsetX);
-            translateY = Math.min(Math.max(translateY, -maxOffsetY), maxOffsetY);
-        }
-
-        function updateTransform() {
-            clampTranslation();
-            // 使用3D加速
-            enlargedImg.style.transform = `translate3d(${translateX}px, ${translateY}px,0) scale(${scale})`;
-            enlargedImg.style.willChange = 'transform';
-            if (zoomIndicator) zoomIndicator.textContent = `${Math.round(scale * 100)}%`;
-            // Fallback：如果 transform 后宽度没有明显变化，改用直接设置宽度
-            if (baseDisplayWidth && scale !== 1) {
-                const rect = enlargedImg.getBoundingClientRect();
-                const expectedWidth = baseDisplayWidth * scale * 0.9; // 允许 10% 误差
-                if (rect.width < expectedWidth) {
-                    enlargedImg.style.transform = 'translate3d(0,0,0)';
-                    enlargedImg.style.width = Math.min(naturalWidth * scale, window.innerWidth * 0.95) + 'px';
-                    enlargedImg.style.height = 'auto';
-                }
-            }
-        }
-        
-        // 重置图片位置和缩放
-        function resetTransform() {
-            scale = 1;
-            translateX = 0;
-            translateY = 0;
-            // 记录初始显示尺寸供缩放回退判断
-            const rect = enlargedImg.getBoundingClientRect();
-            baseDisplayWidth = rect.width;
-            baseDisplayHeight = rect.height;
-            updateTransform();
-        }
-        
-        // PC端：鼠标滚轮缩放 - 优化版本
-        function handleWheel(e) {
-            // 允许按住Ctrl时使用浏览器默认缩放（可辅助无障碍），其它情况自行处理
-            if (e.ctrlKey) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const rect = enlargedImg.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-            const oldScale = scale;
-            // 使用指数缩放获得更平滑体验
-            const zoomFactor = 1.15; // 单步缩放比例
-            scale = e.deltaY > 0 ? scale / zoomFactor : scale * zoomFactor;
-            scale = Math.min(Math.max(scale, minScale), maxScale);
-            if (scale !== oldScale) {
-                const scaleRatio = scale / oldScale;
-                // 以鼠标位置为中心缩放
-                translateX = (translateX + (mouseX - rect.width / 2)) * scaleRatio - (mouseX - rect.width / 2);
-                translateY = (translateY + (mouseY - rect.height / 2)) * scaleRatio - (mouseY - rect.height / 2);
-                updateTransform();
-                enlargedImg.style.cursor = scale > 1 ? 'grab' : 'zoom-in';
-            }
-        }
-        
-        // 移动端：双指缩放
-        let lastTouchDistance = 0;
-        let lastTouchX = 0;
-        let lastTouchY = 0;
-        
-        function getTouchDistance(touches) {
-            const dx = touches[0].clientX - touches[1].clientX;
-            const dy = touches[0].clientY - touches[1].clientY;
-            return Math.sqrt(dx * dx + dy * dy);
-        }
-        
-        function getTouchCenter(touches) {
-            return {
-                x: (touches[0].clientX + touches[1].clientX) / 2,
-                y: (touches[0].clientY + touches[1].clientY) / 2
-            };
-        }
-        
-        function handleTouchStart(e) {
-            if (e.touches.length === 2) {
-                e.preventDefault();
-                lastTouchDistance = getTouchDistance(e.touches);
-                const center = getTouchCenter(e.touches);
-                lastTouchX = center.x;
-                lastTouchY = center.y;
-            } else if (e.touches.length === 1 && scale > 1) {
-                isDragging = true;
-                startX = e.touches[0].clientX - translateX;
-                startY = e.touches[0].clientY - translateY;
-                enlargedImg.style.cursor = 'grabbing';
-            }
-        }
-        
-        function handleTouchMove(e) {
-            if (e.touches.length === 2) {
-                e.preventDefault();
-                
-                const currentDistance = getTouchDistance(e.touches);
-                const currentCenter = getTouchCenter(e.touches);
-                
-                if (lastTouchDistance > 0) {
-                    const scaleChange = currentDistance / lastTouchDistance;
-                    const newScale = Math.min(Math.max(scale * scaleChange, minScale), maxScale);
-                    
-                    if (newScale !== scale) {
-                        // 计算缩放中心相对于图片容器的偏移
-                        const containerRect = imageContainer.getBoundingClientRect();
-                        const centerX = currentCenter.x - containerRect.left - containerRect.width / 2;
-                        const centerY = currentCenter.y - containerRect.top - containerRect.height / 2;
-                        
-                        // 调整平移以保持双指中心为缩放中心
-                        const scaleRatio = newScale / scale;
-                        translateX = translateX - centerX * (scaleRatio - 1);
-                        translateY = translateY - centerY * (scaleRatio - 1);
-                        
-                        scale = newScale;
-                        updateTransform();
-                    }
-                }
-                
-                lastTouchDistance = currentDistance;
-                lastTouchX = currentCenter.x;
-                lastTouchY = currentCenter.y;
-            } else if (e.touches.length === 1 && isDragging && scale > 1) {
-                e.preventDefault();
-                translateX = e.touches[0].clientX - startX;
-                translateY = e.touches[0].clientY - startY;
-                updateTransform();
-            }
-        }
-        
-        function handleTouchEnd(e) {
-            if (e.touches.length < 2) {
-                lastTouchDistance = 0;
-            }
-            if (e.touches.length === 0) {
-                isDragging = false;
-                enlargedImg.style.cursor = 'grab';
-            }
-        }
-        
-        // PC端：鼠标拖拽
-        function handleMouseDown(e) {
-            if (scale > 1) {
-                isDragging = true;
-                startX = e.clientX - translateX;
-                startY = e.clientY - translateY;
-                enlargedImg.style.cursor = 'grabbing';
-                e.preventDefault();
-            }
-        }
-        
-        function handleMouseMove(e) {
-            if (isDragging && scale > 1) {
-                translateX = e.clientX - startX;
-                translateY = e.clientY - startY;
-                updateTransform();
-            }
-        }
-        
-        function handleMouseUp() {
-            isDragging = false;
-            enlargedImg.style.cursor = scale > 1 ? 'grab' : 'grab';
-        }
-        
-        // 双击重置缩放
-        let lastClickTime = 0;
-        function handleImageClick(e) {
-            e.stopPropagation();
-            
-            const currentTime = Date.now();
-            if (currentTime - lastClickTime < 300) {
-                // 双击重置
-                resetTransform();
-                enlargedImg.style.cursor = 'grab';
-            } else if (scale === 1) {
-                // 单击放大到2倍
-                scale = 2;
-                updateTransform();
-                enlargedImg.style.cursor = 'grab';
-            }
-            lastClickTime = currentTime;
-        }
-        
-        // 绑定事件 - 优化版本
-        // 为图片绑定所有交互事件
-    enlargedImg.addEventListener('wheel', handleWheel, { passive: false });
-        enlargedImg.addEventListener('touchstart', handleTouchStart, { passive: false });
-        enlargedImg.addEventListener('touchmove', handleTouchMove, { passive: false });
-        enlargedImg.addEventListener('touchend', handleTouchEnd, { passive: false });
-        enlargedImg.addEventListener('mousedown', handleMouseDown);
-        enlargedImg.addEventListener('click', handleImageClick);
-        
-        // 为整个模态框也添加滚轮事件，确保在图片外围也能缩放
-    modal.addEventListener('wheel', function(e) { handleWheel(e); }, { passive: false });
-        
-        // 全局鼠标事件（用于拖拽）
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        
-        // 为模态框添加触摸事件处理（防止默认行为）
-        modal.addEventListener('touchstart', function(e) {
-            if (e.touches.length === 2) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-        
-        modal.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 2) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-        
-        // 统一的关闭模态框函数
-        function closeModal() {
-            if (document.body.contains(modal)) {
-                document.body.removeChild(modal);
-            }
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-            document.removeEventListener('keydown', handleKeyPress);
-            
-            // 恢复原始viewport设置
-            if (isMobileDevice && originalViewport) {
-                const viewport = document.querySelector('meta[name="viewport"]');
-                if (viewport) {
-                    viewport.setAttribute('content', originalViewport);
-                }
-            }
-        }
-        
-        // 点击模态框背景关闭
-        modal.onclick = function(e) {
-            if (e.target === modal) {
-                closeModal();
-            }
-        };
-        
-        // ESC键关闭
-        const handleKeyPress = function(e) {
-            if (e.key === 'Escape') {
-                closeModal();
-            }
-        };
-        document.addEventListener('keydown', handleKeyPress);
-        
-        // 添加缩放提示
-        const hint = document.createElement('div');
-        hint.style.cssText = `
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            pointer-events: none;
-            z-index: 1;
-        `;
-        
-        // 检测设备类型显示对应提示
-        hint.textContent = isMobileDevice ? 
-            '双指缩放 | 单指拖拽 | 双击重置' : 
-            '滚轮缩放 | 拖拽移动 | 双击重置 | 按住Ctrl使用浏览器缩放';
-
-        // 缩放百分比指示器
-        zoomIndicator = document.createElement('div');
-        zoomIndicator.style.cssText = `
-            position: absolute;
-            left: 20px;
-            bottom: 20px;
-            background: rgba(0,0,0,0.6);
-            color: #fff;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-family: system-ui, sans-serif;
-            pointer-events: none;
-        `;
-        zoomIndicator.textContent = '100%';
-
-        // 图片原始尺寸加载后根据自然尺寸决定是否初始放大（如果图片比视口小很多，可保持 100%）
-        enlargedImg.addEventListener('load', () => {
-            naturalWidth = enlargedImg.naturalWidth;
-            naturalHeight = enlargedImg.naturalHeight;
-            // 如果图片本身小于容器，不自动放大（保持清晰度）
-            updateTransform();
-        });
-        
-        imageContainer.appendChild(enlargedImg);
-        modal.appendChild(imageContainer);
-    modal.appendChild(hint);
-    modal.appendChild(zoomIndicator);
-        document.body.appendChild(modal);
-    }
-
-    /**
      * 创建房间
      */
     createRoom() {
@@ -4208,82 +2404,58 @@ justifyContent: ${debugInfo.justifyContent}
     }
 
     /**
-     * 加载智能体列表 - 使用与simple-agent-service.js相同的逻辑
+     * 加载智能体列表
      */
     async loadAgents() {
         try {
             console.log('🤖 [前端] 开始加载智能体列表');
             
-            // 使用环境配置的API基础URL，支持生产环境反代
-            const baseURL = window.ENV_CONFIG?.API_BASE_URL || 'http://localhost:4005';
-            const url = `${baseURL}/api/agents`;
-            console.log('🔗 [前端] 请求智能体列表URL:', url);
+            // 获取API基础URL，优先使用环境配置
+            const apiBaseUrl = (window.ENV_CONFIG && window.ENV_CONFIG.getApiUrl) ? 
+                window.ENV_CONFIG.getApiUrl() : 
+                (globalConfig ? globalConfig.api.baseURL : 'http://localhost:4005/api');
             
-            // 获取访问令牌
-            const token = TokenManager.getAccessToken();
-            console.log('🔐 [前端] Token状态:', !!token);
-            
-            // 构建请求头，如果有token则添加认证信息
-            const headers = {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            };
-
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-                console.log('🔐 [前端] 使用认证token请求智能体列表');
-                
-                // 解析token显示用户信息（调试用）
-                try {
-                    const payload = JSON.parse(atob(token.split('.')[1]));
-                    console.log('👤 [前端] 当前用户:', payload.username, `(${payload.role})`);
-                } catch (e) {
-                    console.warn('⚠️ [前端] token解析失败，但继续请求');
-                }
-            } else {
-                console.log('👤 [前端] 未登录用户，只能获取公开智能体');
-            }
-            
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: headers
-            });
-
-            console.log('📡 [前端] API响应状态:', response.status, response.statusText);
-
-            if (response.ok) {
-                const result = await response.json();
-                console.log('📦 [前端] API响应数据:', result);
-                
-                if (result.success && result.data && Array.isArray(result.data.agents)) {
-                    this.agents = result.data.agents;
-                    const total = result.data.total || this.agents.length;
-                    
-                    console.log(`✅ [前端] 成功获取 ${this.agents.length} 个可访问智能体 (总计: ${total})`);
-                    console.log('📋 [前端] 智能体详情:', this.agents.map(a => ({
-                        id: a.id,
-                        name: a.name,
-                        description: a.description
-                    })));
-                } else {
-                    console.warn('⚠️ [前端] 智能体数据格式异常:', result);
-                    throw new Error(result.message || '数据格式异常');
-                }
-            } else {
-                const errorText = await response.text();
-                console.error('❌ [前端] 智能体API响应错误:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    body: errorText
+            // 调用智能体管理API（根据API指南第8章）
+            if (window.AuthService) {
+                const response = await fetch(apiBaseUrl + '/agents', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + TokenManager.getAccessToken(),
+                        'Content-Type': 'application/json'
+                    }
                 });
-                throw new Error(`智能体API请求失败: ${response.status} ${response.statusText}`);
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.success && result.data) {
+                        this.agents = result.data;
+                        console.log('✅ [前端] 智能体列表加载成功:', this.agents.length, '个智能体');
+                    } else {
+                        throw new Error(result.message || '获取智能体列表失败');
+                    }
+                } else {
+                    throw new Error('智能体API请求失败');
+                }
+            } else {
+                // 如果AuthService不可用，使用模拟数据
+                console.warn('⚠️ [前端] AuthService不可用，使用模拟智能体数据');
+                this.agents = [
+                    { id: 'agent_1', name: 'AI助手', description: '通用AI助手' },
+                    { id: 'agent_2', name: '代码助手', description: '编程专家' },
+                    { id: 'agent_3', name: '翻译助手', description: '多语言翻译' }
+                ];
             }
             
+            console.log('🎯 [前端] 智能体列表加载完成:', this.agents);
         } catch (error) {
             console.error('💥 [前端] 加载智能体失败:', error);
-            // 发生错误时清空列表
-            this.agents = [];
-            this.showError('加载智能体列表失败: ' + error.message);
+            // 发生错误时使用模拟数据
+            this.agents = [
+                { id: 'agent_1', name: 'AI助手', description: '通用AI助手' },
+                { id: 'agent_2', name: '代码助手', description: '编程专家' },
+                { id: 'agent_3', name: '翻译助手', description: '多语言翻译' }
+            ];
+            this.showWarning('加载智能体列表失败，使用默认列表');
         }
     }
 
@@ -4346,25 +2518,9 @@ justifyContent: ${debugInfo.justifyContent}
      */
     adjustTextareaHeight() {
         const textarea = this.elements.messageInput;
-        if (!textarea) return;
         textarea.style.height = 'auto';
-        const newHeight = Math.min(textarea.scrollHeight, 120); // Max height 120px
+        const newHeight = Math.min(textarea.scrollHeight, 120);
         textarea.style.height = newHeight + 'px';
-    }
-
-    /**
-     * 插入表情到光标位置
-     */
-    insertEmojiAtCursor(textarea, emoji) {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const text = textarea.value;
-        textarea.value = text.substring(0, start) + emoji + text.substring(end);
-        const newCursorPos = start + emoji.length;
-        textarea.selectionStart = newCursorPos;
-        textarea.selectionEnd = newCursorPos;
-        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        textarea.focus();
     }
 
     /**
@@ -4372,77 +2528,7 @@ justifyContent: ${debugInfo.justifyContent}
      */
     scrollToBottom() {
         const messagesElement = this.elements.chatMessages;
-        if (!messagesElement) return;
-        
-        // 创建一个更强制和精确的滚动方法
-        const forceScrollToBottom = () => {
-            // 获取容器的样式信息
-            const computedStyle = window.getComputedStyle(messagesElement);
-            const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0;
-            
-            // 确保滚动到绝对底部，考虑padding
-            const maxScrollTop = messagesElement.scrollHeight - messagesElement.clientHeight;
-            messagesElement.scrollTop = maxScrollTop;
-            
-            // 如果仍然没有到底部，使用更直接的方法
-            if (messagesElement.scrollTop < maxScrollTop) {
-                messagesElement.scrollTop = messagesElement.scrollHeight;
-            }
-            
-            // 使用 scrollIntoView 作为最终保障
-            const lastMessage = messagesElement.lastElementChild;
-            if (lastMessage && !lastMessage.classList.contains('text-center')) {
-                lastMessage.scrollIntoView({ 
-                    behavior: 'instant', 
-                    block: 'end',
-                    inline: 'nearest'
-                });
-            }
-            
-            console.log('🔄 [滚动调试]', {
-                scrollHeight: messagesElement.scrollHeight,
-                clientHeight: messagesElement.clientHeight,
-                scrollTop: messagesElement.scrollTop,
-                maxScrollTop: maxScrollTop,
-                paddingBottom: paddingBottom,
-                isAtBottom: messagesElement.scrollTop >= maxScrollTop - 5
-            });
-        };
-        
-        // 立即执行第一次滚动
-        forceScrollToBottom();
-        
-        // 使用双重 requestAnimationFrame 确保DOM完全更新
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                forceScrollToBottom();
-                
-                // 短延时后再次检查和修正
-                setTimeout(() => {
-                    const maxScrollTop = messagesElement.scrollHeight - messagesElement.clientHeight;
-                    const currentScrollTop = messagesElement.scrollTop;
-                    const isAtBottom = currentScrollTop >= maxScrollTop - 10; // 允许10px的容差
-                    
-                    if (!isAtBottom) {
-                        console.log('🔄 [滚动修正] 未完全到达底部，再次强制滚动', {
-                            current: currentScrollTop,
-                            max: maxScrollTop,
-                            diff: maxScrollTop - currentScrollTop
-                        });
-                        forceScrollToBottom();
-                    }
-                }, 100);
-                
-                // 长延时后的最终检查（处理图片加载）
-                setTimeout(() => {
-                    const maxScrollTop = messagesElement.scrollHeight - messagesElement.clientHeight;
-                    if (messagesElement.scrollTop < maxScrollTop - 10) {
-                        console.log('🔄 [最终滚动修正] 执行最终滚动调整');
-                        forceScrollToBottom();
-                    }
-                }, 800);
-            });
-        });
+        messagesElement.scrollTop = messagesElement.scrollHeight;
     }
 
     /**
@@ -4857,642 +2943,6 @@ justifyContent: ${debugInfo.justifyContent}
             // 降级为直接加载
             img.src = imageUrl;
         }
-    }
-
-    /**
-     * 处理@智能体输入
-     */
-    handleAtMention(event) {
-        const input = this.elements.messageInput;
-        const text = input.value;
-        const cursorPosition = input.selectionStart;
-        
-        // 获取光标前的文本
-        const textBeforeCursor = text.substring(0, cursorPosition);
-        
-        // 检查是否有@符号且在@符号后输入内容
-        const atMatch = textBeforeCursor.match(/@(\w*)$/);
-        
-        if (atMatch) {
-            const searchText = atMatch[1]; // @符号后的文本
-            console.log('🎯 [前端] 检测到@输入:', { searchText, cursorPosition });
-            
-            // 过滤智能体列表
-            const filteredAgents = this.agents.filter(agent => 
-                agent.name.toLowerCase().includes(searchText.toLowerCase())
-            );
-            
-            if (filteredAgents.length > 0) {
-                this.showAgentSuggestions(filteredAgents, atMatch.index);
-            } else if (searchText === '') {
-                // 刚输入@符号，显示所有智能体
-                this.showAgentSuggestions(this.agents, atMatch.index);
-            } else {
-                // 没有匹配的智能体
-                this.hideAgentSuggestions();
-            }
-        } else {
-            // 没有@符号，隐藏建议列表
-            this.hideAgentSuggestions();
-        }
-    }
-
-    /**
-     * 显示智能体建议列表
-     */
-    showAgentSuggestions(agents, atPosition) {
-        if (!this.agentSuggestionsList) {
-            this.createAgentSuggestionsList();
-        }
-
-        // 清空现有内容
-        this.agentSuggestionsList.innerHTML = '';
-        
-        if (agents.length === 0) {
-            const noResults = document.createElement('div');
-            noResults.className = 'agent-suggestion-item no-results';
-            noResults.textContent = '没有找到匹配的智能体';
-            this.agentSuggestionsList.appendChild(noResults);
-        } else {
-            agents.forEach((agent, index) => {
-                const item = document.createElement('div');
-                item.className = 'agent-suggestion-item';
-                item.innerHTML = `
-                    <i class="fas fa-robot me-2"></i>
-                    <span class="agent-name">${this.escapeHtml(agent.name)}</span>
-                `;
-                item.setAttribute('data-agent-id', agent.id);
-                item.setAttribute('data-agent-name', agent.name);
-                item.setAttribute('data-index', index);
-                
-                // 点击事件
-                item.addEventListener('click', () => {
-                    this.selectAgentFromSuggestions(agent.name);
-                });
-                
-                // 鼠标悬停事件
-                item.addEventListener('mouseenter', () => {
-                    this.setSelectedSuggestion(index);
-                });
-                
-                this.agentSuggestionsList.appendChild(item);
-            });
-        }
-
-        // 显示列表
-        this.agentSuggestionsList.style.display = 'block';
-        this.selectedSuggestionIndex = 0;
-        this.updateSelectedSuggestion();
-        this.atPosition = atPosition;
-    }
-
-    /**
-     * 创建智能体建议列表DOM元素
-     */
-    createAgentSuggestionsList() {
-        this.agentSuggestionsList = document.createElement('div');
-        this.agentSuggestionsList.className = 'agent-suggestions-list';
-        this.agentSuggestionsList.style.cssText = `
-            position: absolute;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 1000;
-            display: none;
-            min-width: 200px;
-            bottom: 100%;
-            left: 0;
-            margin-bottom: 5px;
-        `;
-
-        // 添加到聊天输入区域的父元素
-        const chatInput = document.querySelector('.chat-input');
-        if (chatInput) {
-            chatInput.style.position = 'relative';
-            chatInput.appendChild(this.agentSuggestionsList);
-        }
-
-        // 添加CSS样式（如果还没有的话）
-        if (!document.getElementById('agent-suggestions-styles')) {
-            const style = document.createElement('style');
-            style.id = 'agent-suggestions-styles';
-            style.textContent = `
-                .agent-suggestion-item {
-                    padding: 8px 12px;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    border-bottom: 1px solid #f0f0f0;
-                    transition: background-color 0.2s ease;
-                }
-                
-                .agent-suggestion-item:hover,
-                .agent-suggestion-item.selected {
-                    background-color: #f8f9fa;
-                }
-                
-                .agent-suggestion-item:last-child {
-                    border-bottom: none;
-                }
-                
-                .agent-suggestion-item.no-results {
-                    color: #666;
-                    font-style: italic;
-                    cursor: default;
-                }
-                
-                .agent-suggestion-item .agent-name {
-                    font-weight: 500;
-                }
-                
-                .agent-suggestion-item i {
-                    color: #28a745;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-    }
-
-    /**
-     * 隐藏智能体建议列表
-     */
-    hideAgentSuggestions() {
-        if (this.agentSuggestionsList) {
-            this.agentSuggestionsList.style.display = 'none';
-        }
-        this.selectedSuggestionIndex = -1;
-    }
-
-    /**
-     * 处理智能体建议列表的键盘导航
-     */
-    handleAgentSuggestionKeydown(event) {
-        const items = this.agentSuggestionsList.querySelectorAll('.agent-suggestion-item:not(.no-results)');
-        
-        switch (event.key) {
-            case 'ArrowDown':
-                event.preventDefault();
-                this.selectedSuggestionIndex = Math.min(this.selectedSuggestionIndex + 1, items.length - 1);
-                this.updateSelectedSuggestion();
-                break;
-                
-            case 'ArrowUp':
-                event.preventDefault();
-                this.selectedSuggestionIndex = Math.max(this.selectedSuggestionIndex - 1, 0);
-                this.updateSelectedSuggestion();
-                break;
-                
-            case 'Enter':
-                event.preventDefault();
-                const selectedItem = items[this.selectedSuggestionIndex];
-                if (selectedItem) {
-                    const agentName = selectedItem.getAttribute('data-agent-name');
-                    this.selectAgentFromSuggestions(agentName);
-                }
-                break;
-                
-            case 'Escape':
-                event.preventDefault();
-                this.hideAgentSuggestions();
-                break;
-        }
-    }
-
-    /**
-     * 更新选中的建议项样式
-     */
-    updateSelectedSuggestion() {
-        const items = this.agentSuggestionsList.querySelectorAll('.agent-suggestion-item');
-        items.forEach((item, index) => {
-            if (index === this.selectedSuggestionIndex) {
-                item.classList.add('selected');
-            } else {
-                item.classList.remove('selected');
-            }
-        });
-    }
-
-    /**
-     * 设置选中的建议项索引
-     */
-    setSelectedSuggestion(index) {
-        this.selectedSuggestionIndex = index;
-        this.updateSelectedSuggestion();
-    }
-
-    /**
-     * 从建议列表中选择智能体
-     */
-    selectAgentFromSuggestions(agentName) {
-        const input = this.elements.messageInput;
-        const text = input.value;
-        const cursorPosition = input.selectionStart;
-        
-        // 获取光标前的文本
-        const textBeforeCursor = text.substring(0, cursorPosition);
-        const textAfterCursor = text.substring(cursorPosition);
-        
-        // 找到@符号的位置
-        const atMatch = textBeforeCursor.match(/@(\w*)$/);
-        if (atMatch) {
-            const beforeAt = textBeforeCursor.substring(0, atMatch.index);
-            const newText = beforeAt + `@${agentName} ` + textAfterCursor;
-            
-            input.value = newText;
-            
-            // 设置光标位置到@智能体名称之后
-            const newCursorPosition = beforeAt.length + agentName.length + 2; // @智能体名 + 空格
-            input.setSelectionRange(newCursorPosition, newCursorPosition);
-        }
-        
-        this.hideAgentSuggestions();
-        input.focus();
-    }
-
-    /**
-     * 插入@符号到输入框
-     */
-    insertAtSymbol() {
-        const input = this.elements.messageInput;
-        const cursorPosition = input.selectionStart;
-        const text = input.value;
-        
-        // 在光标位置插入@符号
-        const newText = text.substring(0, cursorPosition) + '@' + text.substring(cursorPosition);
-        input.value = newText;
-        
-        // 设置光标位置到@符号之后
-        input.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
-        input.focus();
-        
-        // 触发input事件以显示智能体建议
-        const inputEvent = new Event('input', { bubbles: true });
-        input.dispatchEvent(inputEvent);
-    }
-
-    /**
-     * 提取消息中的智能体提及
-     */
-    extractAgentMentions(content) {
-        const regex = /@(\S+)/g;
-        const mentions = [];
-        let match;
-        
-        while ((match = regex.exec(content)) !== null) {
-            const agentName = match[1];
-            const agent = this.agents.find(a => 
-                a.name === agentName || a.id === agentName || a.agentName === agentName
-            );
-            
-            if (agent) {
-                mentions.push({
-                    name: agent.name,
-                    id: agent.id,
-                    position: match.index
-                });
-            }
-        }
-        
-        console.log('🎯 [前端] 提取智能体提及:', mentions);
-        return mentions;
-    }
-
-    /**
-     * 显示开始流式响应的占位符 - 按照后端文档方案B
-     */
-    displayStreamingMessageStart(streamingMsg) {
-        const agentMessage = {
-            id: streamingMsg.id,
-            content: '', // 开始时内容为空
-            username: streamingMsg.agentName || 'AI智能体',
-            agentId: streamingMsg.agentId,
-            createdAt: streamingMsg.timestamp || new Date().toISOString(),
-            type: 'agent_response',
-            isStreaming: true,
-            replyToId: streamingMsg.replyToId
-        };
-        
-        this.addMessage(agentMessage);
-        this.scrollToBottom();
-    }
-
-    /**
-     * 更新流式消息内容 - 按照后端文档方案B
-     */
-    updateStreamingMessageContent(messageId, content) {
-        console.log('📝 [前端] 更新流式消息内容:', {
-            messageId,
-            contentLength: content.length,
-            contentPreview: content.substring(0, 50) + (content.length > 50 ? '...' : '')
-        });
-        
-        const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${messageId}"]`);
-        if (!messageElement) {
-            console.warn('⚠️ [前端] 未找到流式消息元素:', messageId);
-            return;
-        }
-        
-        const contentElement = messageElement.querySelector('.message-content');
-        if (contentElement) {
-            // 更新内容，使用formatMessageContent处理换行符，保留光标效果
-            contentElement.innerHTML = this.formatMessageContent(content) + '<span class="typing-cursor">|</span>';
-            this.scrollToBottom();
-            console.log('✅ [前端] 流式内容已更新');
-        } else {
-            console.warn('⚠️ [前端] 未找到消息内容元素');
-        }
-    }
-
-    /**
-     * 完成流式消息 - 按照后端文档方案B，修复ID不匹配问题
-     */
-    finalizeStreamingMessage(data) {
-        // 使用传入的 streamingMessageId 或者 data.id
-        const targetMessageId = data.streamingMessageId || data.id;
-        
-        console.log('🎯 [前端] 完成流式消息:', {
-            targetMessageId: targetMessageId,
-            dataId: data.id,
-            agentName: data.agentName || data.username,
-            contentLength: data.content?.length
-        });
-        
-        const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${targetMessageId}"]`);
-        if (messageElement) {
-            // 移除流式样式
-            messageElement.classList.remove('streaming');
-            delete messageElement.dataset.streaming;
-            
-            // 更新为最终内容（移除光标）
-            const contentElement = messageElement.querySelector('.message-content');
-            if (contentElement) {
-                contentElement.innerHTML = this.formatMessageContent(data.content);
-            }
-            
-            // 添加使用量信息（如果有）
-            if (data.usage || data.metadata?.usage) {
-                this.addTokenUsageToMessage(targetMessageId, data.usage || data.metadata.usage);
-            }
-            
-            console.log('✅ [前端] 流式消息已完成:', targetMessageId);
-        } else {
-            console.warn('⚠️ [前端] 未找到要完成的流式消息元素:', targetMessageId);
-            console.log('🔍 [调试] 当前DOM中的消息元素:', 
-                Array.from(this.elements.chatMessages.querySelectorAll('[data-message-id]'))
-                     .map(el => el.getAttribute('data-message-id')));
-        }
-    }
-
-    /**
-     * 防重复处理机制
-     */
-    initializeMessageProcessing() {
-        if (!this.processingMessages) {
-            this.processingMessages = new Set();
-        }
-    }
-
-    /**
-     * 检查是否正在处理中
-     */
-    isMessageProcessing(messageKey) {
-        this.initializeMessageProcessing();
-        return this.processingMessages.has(messageKey);
-    }
-
-    /**
-     * 标记消息为处理中
-     */
-    markMessageProcessing(messageKey) {
-        this.initializeMessageProcessing();
-        this.processingMessages.add(messageKey);
-    }
-
-    /**
-     * 清除消息处理标记
-     */
-    clearMessageProcessing(messageKey) {
-        this.initializeMessageProcessing();
-        this.processingMessages.delete(messageKey);
-    }
-
-    /**
-     * 处理智能体流式响应片段
-     */
-    handleAgentStreamChunk(data) {
-        console.log('📝 [前端] 处理流式片段:', {
-            messageId: data.messageId,
-            chunk: data.chunk,
-            chunkLength: data.chunk?.length,
-            currentStreamingId: this.currentStreamingMessageId
-        });
-        
-        // 查找或创建智能体回复消息
-        let streamingMessageId = this.currentStreamingMessageId;
-        
-        if (!streamingMessageId) {
-            // 第一次收到流式数据，创建新的智能体消息
-            const agentMessage = {
-                id: data.messageId || 'agent_stream_' + Date.now(),
-                content: data.chunk || '',
-                username: data.agentName || 'AI智能体',
-                agentId: data.agentId,
-                createdAt: new Date().toISOString(),
-                type: 'agent_response',
-                isStreaming: true,
-                replyToId: data.replyToId // 关联到用户消息
-            };
-            
-            this.addMessage(agentMessage);
-            this.currentStreamingMessageId = agentMessage.id;
-            streamingMessageId = agentMessage.id;
-            
-            console.log('✨ [前端] 创建新的流式智能体消息:', streamingMessageId);
-        } else {
-            // 更新现有的流式消息内容
-            this.appendToStreamingMessage(streamingMessageId, data.chunk);
-        }
-    }
-
-    /**
-     * 追加内容到流式消息
-     */
-    appendToStreamingMessage(messageId, chunk) {
-        const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${messageId}"]`);
-        if (!messageElement) {
-            console.warn('⚠️ [前端] 未找到流式消息元素:', messageId);
-            return;
-        }
-        
-        const contentElement = messageElement.querySelector('.message-content');
-        if (contentElement) {
-            // 追加新的chunk到现有内容
-            contentElement.textContent += chunk;
-            this.scrollToBottom();
-            console.log('📝 [前端] 已追加流式内容，当前长度:', contentElement.textContent.length);
-        }
-    }
-
-    /**
-     * 完成智能体消息 - 防重复优化版
-     */
-    finalizeAgentMessage(data) {
-        console.log('✅ [前端] 完成智能体消息:', {
-            dataId: data.id,
-            dataMessageId: data.messageId,
-            currentStreamingId: this.currentStreamingMessageId,
-            hasStreamingMessage: !!this.currentStreamingMessageId
-        });
-        
-        if (this.currentStreamingMessageId) {
-            // 有流式消息，更新其最终状态
-            const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${this.currentStreamingMessageId}"]`);
-            if (messageElement) {
-                const contentElement = messageElement.querySelector('.message-content');
-                if (contentElement) {
-                    // 确保显示完整内容（但优先保留流式累积的内容）
-                    const currentContent = contentElement.textContent;
-                    const finalContent = data.content || currentContent;
-                    
-                    if (finalContent !== currentContent) {
-                        console.log('🔄 [前端] 更新最终内容:', {
-                            from: currentContent.substring(0, 50),
-                            to: finalContent.substring(0, 50)
-                        });
-                        contentElement.textContent = finalContent;
-                    }
-                }
-                
-                // 移除流式状态
-                messageElement.classList.remove('streaming');
-                delete messageElement.dataset.streaming;
-                
-                // 添加使用量信息（如果有）
-                if (data.usage) {
-                    this.addTokenUsageToMessage(this.currentStreamingMessageId, data.usage);
-                }
-            }
-            
-            console.log('✅ [前端] 流式消息已完成:', this.currentStreamingMessageId);
-            this.currentStreamingMessageId = null;
-        } else {
-            // 没有流式消息，说明可能是直接接收完整回复，避免重复添加
-            console.log('⚠️ [前端] 没有流式消息，检查是否已存在相同消息');
-            
-            // 检查是否已有相同内容的消息
-            const existingMessage = this.findExistingAgentMessage(data);
-            if (existingMessage) {
-                console.log('🔍 [前端] 发现重复消息，跳过添加:', existingMessage.id);
-                return;
-            }
-            
-            // 确实没有相同消息，添加新消息
-            const agentMessage = {
-                id: data.id || data.messageId || 'agent_final_' + Date.now(),
-                content: data.content,
-                username: data.agentName || 'AI智能体',
-                agentId: data.agentId,
-                createdAt: data.timestamp || new Date().toISOString(),
-                type: 'agent_response',
-                replyToId: data.replyToId
-            };
-            
-            console.log('➕ [前端] 添加完整智能体消息:', agentMessage.id);
-            this.addMessage(agentMessage);
-            
-            if (data.usage) {
-                this.addTokenUsageToMessage(agentMessage.id, data.usage);
-            }
-        }
-    }
-
-    /**
-     * 查找是否已存在相同的智能体消息
-     */
-    findExistingAgentMessage(data) {
-        if (!data.content) return null;
-        
-        const messageElements = this.elements.chatMessages.querySelectorAll('.message-agent');
-        for (const element of messageElements) {
-            const contentElement = element.querySelector('.message-content');
-            if (contentElement && contentElement.textContent.trim() === data.content.trim()) {
-                return {
-                    id: element.getAttribute('data-message-id'),
-                    content: contentElement.textContent
-                };
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 显示智能体错误
-     */
-    showAgentError(data) {
-        console.error('❌ [前端] 智能体错误:', data);
-        
-        // 如果有正在进行的流式消息，将其标记为错误
-        if (this.currentStreamingMessageId) {
-            const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${this.currentStreamingMessageId}"]`);
-            if (messageElement) {
-                const contentElement = messageElement.querySelector('.message-content');
-                if (contentElement) {
-                    contentElement.innerHTML = `
-                        <div class="agent-error">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            智能体响应失败: ${data.error || '未知错误'}
-                        </div>
-                    `;
-                }
-                messageElement.classList.add('error');
-            }
-            this.currentStreamingMessageId = null;
-        } else {
-            // 添加一个错误消息
-            const errorMessage = {
-                id: 'error_' + Date.now(),
-                content: `❌ 智能体响应失败: ${data.error || '未知错误'}`,
-                username: 'System',
-                type: 'system',
-                createdAt: new Date().toISOString()
-            };
-            this.addMessage(errorMessage);
-        }
-        
-        this.showError('智能体回复失败: ' + (data.error || '未知错误'));
-    }
-
-    /**
-     * 为消息添加Token使用量信息
-     */
-    addTokenUsageToMessage(messageId, usage) {
-        const messageElement = this.elements.chatMessages.querySelector(`[data-message-id="${messageId}"]`);
-        if (!messageElement || !usage) return;
-        
-        const messageBubble = messageElement.querySelector('.message-bubble');
-        if (!messageBubble) return;
-        
-        // 检查是否已经有使用量信息
-        const existingUsage = messageBubble.querySelector('.token-usage');
-        if (existingUsage) {
-            existingUsage.remove();
-        }
-        
-        const usageElement = document.createElement('div');
-        usageElement.className = 'token-usage';
-        usageElement.innerHTML = `
-            <small class="text-muted">
-                <i class="fas fa-chart-bar me-1"></i>
-                Token: ${usage.prompt_tokens || 0}输入 + ${usage.completion_tokens || 0}输出 = ${usage.total_tokens || 0}总计
-                ${usage.latency ? ` | 耗时: ${parseFloat(usage.latency).toFixed(2)}s` : ''}
-            </small>
-        `;
-        
-        // 添加到消息气泡的末尾
-        messageBubble.appendChild(usageElement);
     }
 
 }

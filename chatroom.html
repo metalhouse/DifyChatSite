@@ -11,21 +11,12 @@
     <link rel="alternate icon" href="assets/images/favicon.svg">
     <meta name="theme-color" content="#28a745">
     
-    <!-- 字体预加载 - 移动端优化 -->
-    <link rel="preload" href="./vendor/font-awesome/webfonts/fa-solid-900.woff2?v=6.4.0" as="font" type="font/woff2" crossorigin>
-    
     <!-- Bootstrap CSS -->
-    <link href="./vendor/bootstrap/bootstrap.min.css?v=5.3.0" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
-    <link href="./vendor/font-awesome/all.min.css?v=6.4.0" rel="stylesheet">
-    <!-- 移动端Font Awesome修复 -->
-    <link href="./vendor/font-awesome/mobile-font-fix.css" rel="stylesheet">
-    <!-- 移动端图片显示修复 -->
-    <link href="./assets/css/mobile-image-fix.css" rel="stylesheet">
-    <!-- UI组件样式 -->
-    <link href="./assets/css/components.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <!-- Socket.IO Client -->
-    <script src="./vendor/socket.io/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     
     <style>
         body {
@@ -216,7 +207,6 @@
             padding: 0.75rem;
             border-bottom: 1px solid rgba(0, 0, 0, 0.1);
             flex-shrink: 0;
-            margin-bottom: 0; /* 移除底部外边距 */
         }
 
         .friend-search .form-control {
@@ -234,70 +224,20 @@
             border-radius: 0 20px 20px 0;
         }
 
-        /* 搜索结果容器 */
-        #searchResults {
-            margin: 0 !important;
-            padding: 0 !important;
-            min-height: 0 !important;
-        }
-
         /* 好友请求提示 */
         .friend-requests-badge {
             padding: 0.5rem;
             flex-shrink: 0;
-            margin-top: 0; /* 移除顶部外边距 */
         }
 
         .friend-requests-badge .alert {
-            padding: 0.75rem;
+            padding: 0.5rem;
             margin: 0;
             border-radius: 8px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             border: none;
             background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-            position: relative;
-        }
-
-        .friend-request-actions {
-            position: absolute;
-            bottom: 4px;
-            right: 6px;
-        }
-
-        .friend-request-actions .btn {
-            font-size: 0.65rem;
-            padding: 0.15rem 0.25rem;
-            border-radius: 3px;
-            min-width: 20px;
-            height: 20px;
-            margin-left: 2px;
-        }
-
-        .friend-request-actions .btn i {
-            font-size: 0.6rem;
-        }
-
-        .friend-request-actions .btn-success {
-            background: #28a745;
-            border-color: #28a745;
-        }
-
-        .friend-request-actions .btn-success:hover {
-            background: #218838;
-            border-color: #1e7e34;
-            transform: scale(1.1);
-        }
-
-        .friend-request-actions .btn-outline-secondary {
-            color: #6c757d;
-            border-color: #6c757d;
-        }
-
-        .friend-request-actions .btn-outline-secondary:hover {
-            background: #6c757d;
-            border-color: #6c757d;
-            color: white;
-            transform: scale(1.1);
+            color: #1565c0;
         }
 
         .room-list, .friend-list {
@@ -386,61 +326,6 @@
 
         .friend-item.active .friend-status {
             color: rgba(255, 255, 255, 0.8) !important;
-        }
-
-        /* 好友操作按钮样式 */
-        .friend-actions {
-            display: flex;
-            gap: 0.25rem;
-            margin-left: 0.5rem;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .friend-item:hover .friend-actions {
-            opacity: 1;
-        }
-
-        .action-btn {
-            width: 28px;
-            height: 28px;
-            border: none;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-size: 0.75rem;
-        }
-
-        .action-btn.primary {
-            background: #007bff;
-            color: white;
-        }
-
-        .action-btn.primary:hover {
-            background: #0056b3;
-            transform: scale(1.1);
-        }
-
-        .action-btn.danger {
-            background: #dc3545;
-            color: white;
-        }
-
-        .action-btn.danger:hover {
-            background: #c82333;
-            transform: scale(1.1);
-        }
-
-        .friend-item.active .action-btn {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-        }
-
-        .friend-item.active .action-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
         }
 
         .online-indicator {
@@ -690,18 +575,18 @@
         }
 
         .member-avatar {
-            width: 20px !important;
-            height: 20px !important;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             background: linear-gradient(135deg, #007bff, #0056b3);
             display: inline-flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 0.6rem !important;
+            font-size: 0.75rem;
             font-weight: 600;
-            margin: 0 2px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin: 0 3px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
             cursor: pointer;
             transition: all 0.2s ease;
             user-select: none;
@@ -787,22 +672,26 @@
         .message {
             margin-bottom: 1rem;
             animation: fadeInUp 0.3s ease;
+            width: 100%; /* 让每条消息占满一行，便于气泡自适应宽度 */
         }
 
         /* 消息布局 - 强化样式确保左右分布 */
         .message-user {
             display: flex !important;
             justify-content: flex-end !important;
+            width: 100%;
         }
 
         .message-other {
             display: flex !important;
             justify-content: flex-start !important;
+            width: 100%;
         }
 
         .message-agent {
             display: flex !important;
             justify-content: flex-start !important;
+            width: 100%;
         }
 
         /* 移动端和PC端通用样式 - 不使用媒体查询 */
@@ -841,12 +730,20 @@
         .message-bubble {
             max-width: clamp(250px, 75vw, 600px);
             min-width: clamp(140px, 30vw, 180px); /* 响应式最小宽度，确保不会太宽 */
-            padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(0.75rem, 2vw, 1rem);
+            /* 调整内边距：右侧更贴合，左侧保持原样 */
+            padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(0.625rem, 1.6vw, 0.875rem) clamp(0.5rem, 1.5vw, 0.75rem) clamp(0.75rem, 2vw, 1rem);
             border-radius: 18px;
             position: relative;
-            word-wrap: break-word;
+            /* 对中英文的更自然换行：仅在溢出时断词，避免中文过早断行 */
+            overflow-wrap: break-word; /* 代替过时的 word-wrap */
+            word-break: normal; /* 不随意在中文字符间断行 */
+            /* 优化中日韩文本：更严格，减少不必要的断行 */
+            line-break: strict;
             font-size: clamp(0.8rem, 2.2vw, 0.9rem);
             line-height: 1.4;
+            /* 支持内容自适应宽度 */
+            display: inline-block;
+            box-sizing: border-box;
         }
 
         .message-user .message-bubble {
@@ -854,7 +751,7 @@
             margin-right: 10px !important; /* 添加右边距防止贴边 */
             background: linear-gradient(135deg, #007bff, #0056b3) !important;
             color: white !important;
-            max-width: calc(85% - 20px) !important; /* 确保不超出容器 */
+            max-width: calc(96% - 20px) !important; /* 默认更宽，减少过早换行 */
         }
 
         .message-other .message-bubble {
@@ -863,7 +760,7 @@
             background: linear-gradient(135deg, #d4edda, #bee4c7) !important;
             color: #155724 !important;
             border: 1px solid rgba(40, 167, 69, 0.2);
-            max-width: calc(85% - 20px) !important; /* 确保不超出容器 */
+            max-width: calc(96% - 20px) !important; /* 默认更宽，减少过早换行 */
         }
 
         .message-agent .message-bubble {
@@ -872,8 +769,22 @@
             background: linear-gradient(135deg, #e3f2fd, #bbdefb) !important;
             color: #1565c0 !important;
             border: 1px solid rgba(25, 118, 210, 0.2);
-            max-width: calc(85% - 20px) !important; /* 确保不超出容器 */
+            max-width: calc(96% - 20px) !important; /* 默认更宽，减少过早换行 */
         }
+
+        /* 私聊模式下放宽最大宽度：让长消息可以顶到对侧（保留窄边距） */
+        .chat-area.private-mode .message-user .message-bubble,
+        .chat-area.private-mode .message-other .message-bubble,
+        .chat-area.private-mode .message-agent .message-bubble {
+            /* 预留左右各10px的安全间距，时间/图标区占位再减去约 32px */
+            max-width: calc(100% - 32px) !important;
+        }
+
+    /* 极端超长连续英文/URL：仅在必要时断开；保持中文自然换行 */
+    .chat-area.private-mode .message-bubble {
+        word-break: normal;
+        overflow-wrap: break-word;
+    }
 
         /* 发送中的消息样式 */
         .message.sending .message-bubble {
@@ -901,124 +812,6 @@
             background: linear-gradient(135deg, #e3f2fd, #bbdefb);
             color: #1565c0;
             border: 1px solid rgba(25, 118, 210, 0.2);
-        }
-
-        /* 流式消息样式 - 按照后端文档优化 */
-        .message.streaming .message-bubble {
-            border-left: 3px solid #00bcd4;
-            background: linear-gradient(135deg, #f0f9ff, #e0f7fa);
-            position: relative;
-        }
-
-        .message.streaming .message-content {
-            position: relative;
-        }
-
-        /* 光标样式 */
-        .typing-cursor {
-            animation: blink 1s infinite;
-            color: #00bcd4;
-            font-weight: bold;
-            margin-left: 2px;
-        }
-
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0; }
-        }
-
-        /* 流式响应状态指示器 */
-        .streaming-indicator {
-            color: #00bcd4;
-            font-size: 12px;
-            animation: pulse 1.5s ease-in-out infinite;
-            margin-left: 8px;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* 移除旧的光标动画 */
-        .message.streaming .message-content::after {
-            display: none;
-        }
-
-        /* 智能体错误状态 */
-        .message.error .message-bubble {
-            background: linear-gradient(135deg, #ffebee, #ffcdd2) !important;
-            color: #c62828 !important;
-            border: 1px solid rgba(198, 40, 40, 0.3) !important;
-        }
-
-        .agent-error {
-            color: #c62828;
-            font-style: italic;
-        }
-
-        /* Token使用量显示 */
-        .token-usage {
-            margin-top: 8px;
-            padding: 6px 10px;
-            background: rgba(255, 255, 255, 0.7);
-            border-radius: 6px;
-            font-size: 0.75rem;
-            color: #666;
-            border-left: 3px solid #28a745;
-        }
-
-        .token-usage .fas {
-            color: #28a745;
-        }
-
-        /* 智能体建议列表样式增强 */
-        .agent-suggestions-list {
-            position: absolute;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 1000;
-            display: none;
-            min-width: 200px;
-            bottom: 100%;
-            left: 0;
-            margin-bottom: 5px;
-        }
-
-        .agent-suggestion-item {
-            padding: 8px 12px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            border-bottom: 1px solid #f0f0f0;
-            transition: background-color 0.2s ease;
-        }
-        
-        .agent-suggestion-item:hover,
-        .agent-suggestion-item.selected {
-            background-color: #d4edda !important;
-        }
-        
-        .agent-suggestion-item:last-child {
-            border-bottom: none;
-        }
-        
-        .agent-suggestion-item.no-results {
-            color: #666;
-            font-style: italic;
-            cursor: default;
-        }
-        
-        .agent-suggestion-item .agent-name {
-            font-weight: 500;
-        }
-        
-        .agent-suggestion-item i {
-            color: #28a745;
         }
 
         .message-system .message-bubble {
@@ -1099,6 +892,10 @@
             font-size: 0.75rem;
             opacity: 0.8;
         }
+        /* 让发送者名称占据左侧，时间与加密图标贴右侧 */
+        .message-sender { flex: 1 1 auto; margin-right: 0.5rem; }
+        .message-time { margin-left: auto; }
+        .message-header .fa-lock { margin-left: 6px; }
 
         .message-sender {
             font-weight: 600;
@@ -1112,6 +909,10 @@
 
         .message-content {
             margin-bottom: 0.25rem;
+            /* 确保中文短句不被过早断开 */
+            word-break: normal;
+            overflow-wrap: break-word;
+            line-break: strict;
         }
 
         /* 消息已读状态指示器 */
@@ -1166,12 +967,52 @@
         }
 
         .reply-preview {
-            background: rgba(0, 0, 0, 0.1);
+            background: #FAF3E0; /* 浅米色底 */
+            color: #333;        /* 深灰文字 */
             padding: 0.25rem 0.5rem;
             border-radius: 6px;
             margin-bottom: 0.5rem;
             font-size: 0.8em;
-            border-left: 3px solid rgba(0, 0, 0, 0.3);
+            border-left: 3px solid #E0CBA8; /* 柔和米色边线 */
+        }
+        .reply-preview .small,
+        .reply-preview .text-muted {
+            color: #444 !important; /* 引用头部也使用较深的灰色 */
+        }
+
+        /* 输入框上的引用预览（作答区预览条） */
+        .composer-reply {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            background: #FAF3E0;       /* 浅米色底 */
+            border-left: 3px solid #E0CBA8; /* 柔和米色边线 */
+            padding: 6px 8px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            color: #333;               /* 深灰文字 */
+        }
+        .composer-reply .meta {
+            font-size: 12px;
+            color: #555; /* 稍深灰 */
+            margin-bottom: 2px;
+        }
+        .composer-reply .snippet {
+            font-size: 13px;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 70vw;
+        }
+        .composer-reply .close-btn {
+            margin-left: auto;
+            border: none;
+            background: transparent;
+            color: #666;
+            cursor: pointer;
+            padding: 0 4px;
+            line-height: 1;
         }
 
         /* 正在输入指示器 */
@@ -1341,10 +1182,12 @@
         }
 
         /* 图片消息样式 */
-        .message-image {
+        .message-attachments {
             max-width: 100%;
-            max-height: 300px;
-            width: auto;
+        }
+        .message-image {
+            /* 在气泡内自适应，且不超过300px；同时保证不溢出气泡 */
+            max-width: min(300px, 100%);
             height: auto;
             border-radius: 8px;
             cursor: pointer;
@@ -1352,170 +1195,24 @@
             display: block;
         }
 
-        .message-image:hover {
-            transform: scale(1.02);
-        }
-
-        /* 包含图片的消息气泡样式调整 */
-        .message-bubble:has(.message-image) {
-            padding: clamp(0.3rem, 1vw, 0.5rem);
-            max-width: clamp(200px, 60vw, 320px);
+        /* 仅含图片/附件（无文本内容）的消息：气泡按内容收缩，减少空白 */
+        .message-bubble.image-only {
             min-width: auto;
+            padding: 6px 6px; /* 更紧凑的边距 */
+            max-width: 100%;
+            /* 让气泡宽度贴合图片内容 */
             width: fit-content;
         }
 
-        .message-user .message-bubble:has(.message-image) {
-            max-width: min(320px, calc(75% - 20px));
-        }
-
-        .message-other .message-bubble:has(.message-image),
-        .message-agent .message-bubble:has(.message-image) {
-            max-width: min(320px, calc(75% - 20px));
-        }
-
-        /* 兼容性：为不支持:has()的浏览器提供备选方案 - 使用更高优先级 */
+        /* 包含图片的气泡：使用内容自适应宽度，覆盖所有其他max-width设置 */
         .message-bubble.has-image {
-            padding: clamp(0.3rem, 1vw, 0.5rem) !important;
-            max-width: clamp(200px, 60vw, 320px) !important;
-            min-width: auto !important;
-            width: fit-content !important;
-        }
-
-        .message-user .message-bubble.has-image {
-            max-width: 320px !important;
-        }
-
-        .message-other .message-bubble.has-image,
-        .message-agent .message-bubble.has-image {
-            max-width: 320px !important;
-        }
-
-        /* 更具体的选择器确保样式生效 */
-        .message.message-user .message-bubble.has-image,
-        .message-user.message .message-bubble.has-image {
-            max-width: 320px !important;
-        }
-
-        .message.message-other .message-bubble.has-image,
-        .message-other.message .message-bubble.has-image,
-        .message.message-agent .message-bubble.has-image,
-        .message-agent.message .message-bubble.has-image {
-            max-width: 320px !important;
-        }
-
-        /* 图片消息的消息气泡特殊样式 - 覆盖所有基础样式 */
-        .message .message-bubble.has-image.image-bubble-adjusted {
-            max-width: 320px !important;
-            width: fit-content !important;
-            min-width: auto !important;
-            padding: 0.5rem !important;
-        }
-
-        .message-user .message-bubble.has-image.image-bubble-adjusted {
-            max-width: 320px !important;
-        }
-
-        .message-other .message-bubble.has-image.image-bubble-adjusted,
-        .message-agent .message-bubble.has-image.image-bubble-adjusted {
-            max-width: 320px !important;
-        }
-
-        /* 终极覆盖方案 - 最高优先级 */
-        div.message div.message-bubble.has-image {
-            max-width: 320px !important;
+            max-width: fit-content !important;
             width: fit-content !important;
             min-width: auto !important;
         }
 
-        div.message-user div.message-bubble.has-image,
-        div.message.message-user div.message-bubble.has-image {
-            max-width: 320px !important;
-        }
-
-        div.message-other div.message-bubble.has-image,
-        div.message.message-other div.message-bubble.has-image,
-        div.message-agent div.message-bubble.has-image,
-        div.message.message-agent div.message-bubble.has-image {
-            max-width: 320px !important;
-        }
-
-        /* 图片模态框修复样式 - 响应式优化版本 */
-        #imageModal {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100vw !important;
-            height: 100vh !important;
-            background: rgba(0, 0, 0, 0.8) !important;
-            z-index: 9999 !important;
-            display: flex !important;
-            justify-content: center !important;
-            align-items: center !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-        }
-
-        /* 响应式图片尺寸 */
-        #imageModal img {
-            border-radius: 8px !important;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
-            cursor: grab !important;
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            background: transparent !important;
-            filter: none !important;
-            transform: none !important;
-            transition: transform 0.2s ease, opacity 0.3s ease !important;
-            object-fit: contain !important;
-        }
-
-        /* 大屏幕 (>=1920px) */
-        @media (min-width: 1920px) {
-            #imageModal img {
-                max-width: min(80vw, 1200px) !important;
-                max-height: min(80vh, 900px) !important;
-            }
-        }
-
-        /* 标准桌面屏幕 (1366px-1919px) */
-        @media (min-width: 1366px) and (max-width: 1919px) {
-            #imageModal img {
-                max-width: min(75vw, 1000px) !important;
-                max-height: min(75vh, 750px) !important;
-            }
-        }
-
-        /* 小桌面和平板 (768px-1365px) */
-        @media (min-width: 768px) and (max-width: 1365px) {
-            #imageModal img {
-                max-width: 85vw !important;
-                max-height: 70vh !important;
-            }
-        }
-
-        /* 移动端 (<768px) */
-        @media (max-width: 767px) {
-            #imageModal img {
-                max-width: 95vw !important;
-                max-height: 85vh !important;
-            }
-        }
-
-        #imageModal img:hover {
-            filter: none !important;
-        }
-
-        /* 确保模态框不被其他样式干扰 */
-        #imageModal * {
-            box-sizing: border-box !important;
-        }
-
-        #imageModal .image-container {
-            background: transparent !important;
-            display: flex !important;
-            justify-content: center !important;
-            align-items: center !important;
+        .message-image:hover {
+            transform: scale(1.02);
         }
 
         /* 拖拽上传样式 */
@@ -1901,54 +1598,23 @@
             position: relative;
             display: flex;
             align-items: flex-start;
+            width: 100%; /* 容器全宽，百分比max-width生效 */
+        }
+        
+        /* 包含图片的wrapper需要适应内容宽度 */
+        .message-select-wrapper:has(.message-bubble.has-image) {
+            width: fit-content;
+        }
+        
+        /* fallback for browsers without :has() support */
+        .message-select-wrapper.has-image-wrapper {
+            width: fit-content;
         }
 
         .message-checkbox {
-            margin-right: 0.75rem;
+            margin-right: 0.5rem;
             margin-top: 0.25rem;
             flex-shrink: 0;
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-            accent-color: #28a745;
-            border-radius: 3px;
-            transform: scale(1.2);
-            transition: transform 0.2s ease, opacity 0.2s ease;
-        }
-        
-        .message-checkbox:hover {
-            transform: scale(1.3);
-        }
-        
-        .message-checkbox:checked {
-            background-color: #28a745;
-            border-color: #28a745;
-        }
-
-        /* 消息选中状态样式 */
-        .message-selected {
-            background-color: rgba(40, 167, 69, 0.05);
-            border-left: 3px solid #28a745;
-            transition: all 0.3s ease;
-        }
-
-        .message-selected .message-bubble {
-            box-shadow: 0 2px 8px rgba(40, 167, 69, 0.2);
-        }
-
-        /* 选择模式下的消息样式 */
-        .selection-mode .message {
-            transition: all 0.2s ease;
-            cursor: pointer;
-        }
-
-        .selection-mode .message:hover {
-            background-color: rgba(0, 0, 0, 0.02);
-            transform: translateX(2px);
-        }
-
-        .selection-mode .message:hover .message-checkbox {
-            transform: scale(1.4);
         }
 
         .message-actions {
@@ -1967,73 +1633,9 @@
             position: sticky;
             top: 0;
             z-index: 10;
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            background: #f8f9fa;
             border-bottom: 1px solid #dee2e6;
             border-radius: 8px 8px 0 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .message-selection-toolbar .btn {
-            margin: 0 2px;
-            padding: 0.375rem 0.75rem;
-            font-weight: 500;
-        }
-
-        .message-selection-toolbar .btn small {
-            opacity: 0.8;
-            font-size: 0.75em;
-            font-weight: 400;
-        }
-
-        .message-selection-toolbar .btn-outline-primary {
-            border-color: #28a745;
-            color: #28a745;
-        }
-
-        .message-selection-toolbar .btn-outline-primary:hover {
-            background-color: #28a745;
-            border-color: #28a745;
-            color: white;
-        }
-
-        .message-selection-toolbar .btn-outline-secondary:hover {
-            background-color: #6c757d;
-            border-color: #6c757d;
-        }
-
-        .selection-count {
-            font-weight: 600;
-            color: #495057;
-            background: rgba(255,255,255,0.8);
-            padding: 0.25rem 0.75rem;
-            border-radius: 15px;
-            border: 1px solid #dee2e6;
-            transition: all 0.3s ease;
-        }
-
-        .selection-count.selected {
-            background: rgba(40, 167, 69, 0.1);
-            border-color: #28a745;
-            color: #28a745;
-        }
-
-        /* 工具栏按钮状态动画 */
-        .message-selection-toolbar .btn {
-            transition: all 0.2s ease;
-        }
-
-        .message-selection-toolbar .btn:disabled {
-            opacity: 0.5;
-        }
-
-        .message-selection-toolbar .btn-success {
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
         }
 
         .message-context-menu {
@@ -2254,7 +1856,8 @@
                 min-width: 140px !important; /* 移动端也适当增加最小宽度 */
                 max-width: 85% !important;
                 font-size: 0.85rem !important;
-                padding: 0.65rem 0.875rem !important;
+                /* top right bottom left - 右侧更贴合 */
+                padding: 0.65rem 0.7rem 0.65rem 0.875rem !important;
             }
             
             /* 移动端房间标题优化 */
@@ -2296,9 +1899,9 @@
             }
             
             .member-avatar {
-                width: 20px !important;
-                height: 20px !important;
-                font-size: 0.6rem !important;
+                width: 22px !important;
+                height: 22px !important;
+                font-size: 0.65rem !important;
                 margin-right: 0.15rem !important;
                 flex-shrink: 0;
             }
@@ -2340,350 +1943,33 @@
 
             /* 移动端图片预览优化 */
             .message-image {
-                max-width: 100% !important;
-                max-height: 250px !important;
+                max-width: 250px !important;
+                max-height: 180px !important;
                 border-radius: 6px !important;
-                width: auto !important;
-                height: auto !important;
-            }
-
-            /* 移动端图片气泡样式调整 */
-            .message-bubble:has(.message-image) {
-                padding: 0.4rem !important;
-                max-width: min(280px, calc(85% - 20px)) !important;
-                min-width: auto !important;
-            }
-
-            .message-user .message-bubble:has(.message-image) {
-                max-width: min(280px, calc(80% - 20px)) !important;
-            }
-
-            .message-other .message-bubble:has(.message-image),
-            .message-agent .message-bubble:has(.message-image) {
-                max-width: min(280px, calc(80% - 20px)) !important;
-            }
-
-            /* 移动端兼容性：为不支持:has()的浏览器提供备选方案 */
-            .message-bubble.has-image {
-                padding: 0.4rem !important;
-                max-width: 280px !important;
-                min-width: auto !important;
-                width: fit-content !important;
-            }
-
-            .message-user .message-bubble.has-image {
-                max-width: 280px !important;
-            }
-
-            .message-other .message-bubble.has-image,
-            .message-agent .message-bubble.has-image {
-                max-width: 280px !important;
-            }
-
-            /* 更具体的移动端选择器 */
-            .message.message-user .message-bubble.has-image,
-            .message-user.message .message-bubble.has-image {
-                max-width: 280px !important;
-            }
-
-            .message.message-other .message-bubble.has-image,
-            .message-other.message .message-bubble.has-image,
-            .message.message-agent .message-bubble.has-image,
-            .message-agent.message .message-bubble.has-image {
-                max-width: 280px !important;
-            }
-
-            /* 移动端图片消息的消息气泡特殊样式 */
-            .message .message-bubble.has-image.image-bubble-adjusted {
-                max-width: 280px !important;
-                width: fit-content !important;
-                min-width: auto !important;
-                padding: 0.4rem !important;
-            }
-
-            .message-user .message-bubble.has-image.image-bubble-adjusted {
-                max-width: 280px !important;
-            }
-
-            .message-other .message-bubble.has-image.image-bubble-adjusted,
-            .message-agent .message-bubble.has-image.image-bubble-adjusted {
-                max-width: 280px !important;
-            }
-
-            /* 移动端终极覆盖方案 - 最高优先级 */
-            div.message div.message-bubble.has-image {
-                max-width: 280px !important;
-                width: fit-content !important;
-                min-width: auto !important;
-            }
-
-            div.message-user div.message-bubble.has-image,
-            div.message.message-user div.message-bubble.has-image {
-                max-width: 280px !important;
-            }
-
-            div.message-other div.message-bubble.has-image,
-            div.message.message-other div.message-bubble.has-image,
-            div.message-agent div.message-bubble.has-image,
-            div.message.message-agent div.message-bubble.has-image {
-                max-width: 280px !important;
             }
         }
-
-        /* 集成输入框设计 */
-        .integrated-input-container {
-            display: flex;
-            align-items: stretch;
-            background: white;
-            border-radius: 25px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            padding: 4px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s ease;
-            position: relative;
-        }
-
-        .integrated-input-container:focus-within {
-            border-color: #007bff;
-            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-        }
-
-        .input-action-btn {
-            width: 36px;
-            height: 36px;
-            border: none;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s ease;
-            flex-shrink: 0;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .input-action-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .add-btn {
-            background: #f8f9fa;
-            color: #ffffff !important;
-            margin-right: 4px;
-            width: 36px !important;
-            height: 36px !important;
-            font-size: 16px;
-        }
-        /* 确保内部图标始终纯白 */
-        .add-btn i, .add-btn .fa, .add-btn svg { color: #ffffff !important; fill: #ffffff !important; }
-
-        .add-btn:hover:not(:disabled) {
-            background: #e9ecef;
-            transform: scale(1.05);
-        }
-
-        .mention-btn {
-            background: #e3f2fd;
-            color: #1976d2;
-            margin-right: 4px;
-            width: 36px !important;
-            height: 36px !important;
-            font-size: 16px;
-        }
-
-        .mention-btn:hover:not(:disabled) {
-            background: #bbdefb;
-            transform: scale(1.05);
-        }
-
-        .emoji-btn {
-            background: #fff3e0;
-            color: #f57c00;
-            margin-right: 4px;
-            width: 36px !important;
-            height: 36px !important;
-            font-size: 16px;
-        }
-
-        .emoji-btn:hover:not(:disabled) {
-            background: #ffe0b2;
-            transform: scale(1.05);
-        }
-
-        .send-btn {
-            background: #007bff;
-            color: white;
-            margin-left: 4px;
-        }
-
-        .send-btn:hover:not(:disabled) {
-            background: #0056b3;
-            transform: scale(1.05);
-        }
-
-        .input-wrapper {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            min-width: 0;
-        }
-
-        .input-wrapper textarea {
-            width: 100%;
-            border: none;
-            outline: none;
-            resize: none;
-            padding: 8px 12px;
-            font-size: 14px;
-            line-height: 1.4;
-            background: transparent;
-            min-height: 20px;
-            max-height: 120px;
-            font-family: inherit;
-        }
-
-        .input-wrapper textarea::placeholder {
-            color: #6c757d;
-        }
-
-        /* 添加菜单样式 */
-        .add-menu {
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            margin-bottom: 8px;
-            z-index: 1000;
-            min-width: 120px;
-        }
-
-        .add-menu-item {
-            padding: 12px 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: background 0.2s ease;
-            font-size: 14px;
-        }
-
-        .add-menu-item:hover {
-            background: #f8f9fa;
-        }
-
-        .add-menu-item:first-child {
-            border-radius: 8px 8px 0 0;
-        }
-
-        .add-menu-item:last-child {
-            border-radius: 0 0 8px 8px;
-        }
-
-        .add-menu-item i {
-            color: #6c757d;
-            width: 16px;
-        }
-
-        /* 表情菜单样式 */
-        .emoji-menu {
-            position: absolute;
-            bottom: 100%;
-            left: 40px; /* 位置在表情按钮下方 */
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            margin-bottom: 8px;
-            z-index: 1000;
-            width: 320px;
-            max-height: 240px;
-            overflow-y: auto;
-        }
-
-        .emoji-category {
-            padding: 8px;
-        }
-
-        .emoji-grid {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 4px;
-        }
-
-        .emoji-item {
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-            font-size: 18px;
-            user-select: none;
-        }
-
-        .emoji-item:hover {
-            background: #f8f9fa;
-            transform: scale(1.1);
-        }
-
-        .emoji-item:active {
-            transform: scale(0.95);
-        }
-
-        /* 表情菜单滚动条样式 */
-        .emoji-menu::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .emoji-menu::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 3px;
-        }
-
-        .emoji-menu::-webkit-scrollbar-thumb {
-            background: #c1c1c1;
-            border-radius: 3px;
-        }
-
-        .emoji-menu::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8;
-        }
-        /* ===== 修复模态框底部按钮不可见 ===== */
-        .modal-footer .btn {
-            position: relative;
-            z-index: 2;
-            opacity: 1 !important;
-            color: #fff !important;
-            font-weight: 500;
-        }
-        .modal-footer .btn.btn-secondary { background: #6c757d !important; border-color: #6c757d !important; }
-        .modal-footer .btn.btn-secondary:hover { background:#5a6268 !important; }
-        .modal-footer .btn.btn-success { background: #28a745 !important; border-color:#28a745 !important; }
-        .modal-footer .btn.btn-success:hover { background:#218838 !important; }
-        .modal-footer .btn.btn-danger { background:#dc3545 !important; border-color:#dc3545 !important; }
-        .modal-footer .btn.btn-danger:hover { background:#c82333 !important; }
-        .modal-content .modal-footer { position: relative; }
-        .modal-content .modal-footer::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(145deg, rgba(255,255,255,0.95), rgba(240,240,240,0.9));
-            z-index: 1;
-            pointer-events: none;
-            border-top: 1px solid rgba(0,0,0,0.1);
-        }
-        .modal-footer > * { position: relative; z-index: 3; }
-        .modal-footer button[disabled] { opacity: .65 !important; }
-        .modal-footer .btn:focus { outline: none; box-shadow: 0 0 0 0.25rem rgba(40,167,69,0.3); }
     </style>
 </head>
 <body>
+    <!-- 移动端调试信息显示区域 -->
+    <div id="mobile-debug-info" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: rgba(255, 0, 0, 0.9);
+        color: white;
+        padding: 10px;
+        font-size: 12px;
+        z-index: 10000;
+        display: none;
+        max-height: 150px;
+        overflow-y: auto;
+    ">
+        <div style="float: right; cursor: pointer;" onclick="this.parentElement.style.display='none'">×</div>
+        <div id="debug-content"></div>
+    </div>
+
     <!-- 导航栏 -->
     <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
         <div class="container-fluid">
@@ -2726,10 +2012,6 @@
                             </a></li>
                             <li><a class="dropdown-item" href="./settings.html">
                                 <i class="fas fa-cog me-2"></i>设置
-                            </a></li>
-                            <li><a class="dropdown-item" href="#" id="toggleAutoRestore" onclick="toggleAutoRestoreChat()">
-                                <i class="fas fa-history me-2"></i>
-                                <span id="autoRestoreText">自动恢复聊天: 开启</span>
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="#" id="nav-logout">
@@ -2802,29 +2084,18 @@
                     <div class="friend-search">
                         <div class="input-group input-group-sm">
                             <input type="text" class="form-control" id="friendSearchInput" placeholder="搜索好友...">
-                            <button class="btn btn-outline-secondary" type="button" id="searchFriendsBtn">
+                            <button class="btn btn-outline-secondary" type="button" id="friendSearchBtn">
                                 <i class="fas fa-search"></i>
                             </button>
                         </div>
-                        <!-- 搜索结果容器 -->
-                        <div id="searchResults" style="display: none;"></div>
                     </div>
 
                     <!-- 好友请求提示 -->
                     <div class="friend-requests-badge" id="friendRequestsBadge" style="display:none;">
-                        <div class="alert alert-info alert-sm position-relative">
-                            <div class="d-flex align-items-center">
-                                <i class="fas fa-user-clock me-2"></i>
-                                <span id="requestSenderName">用户名</span> 请求加你为好友
-                            </div>
-                            <div class="friend-request-actions">
-                                <button class="btn btn-success btn-sm me-1" id="acceptRequestBtn" title="同意">
-                                    <i class="fas fa-check"></i>
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm" id="declineRequestBtn" title="拒绝">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
+                        <div class="alert alert-info alert-sm">
+                            <i class="fas fa-user-clock me-2"></i>
+                            <span id="requestsCount">0</span> 个好友请求
+                            <button class="btn btn-link btn-sm p-0 ms-2" onclick="showFriendRequestsModal()">查看</button>
                         </div>
                     </div>
 
@@ -2834,8 +2105,6 @@
                             <div class="spinner"></div>
                             <span>加载好友列表...</span>
                         </div>
-                        <!-- FriendsController 使用的容器 -->
-                        <div id="friendsList"></div>
                     </div>
                 </div>
             </div>
@@ -2910,183 +2179,34 @@
                 <!-- 正在输入的用户列表将动态添加 -->
             </div>
 
-            <!-- 输入区域 - 集成设计 -->
+            <!-- 输入区域 -->
             <div class="chat-input">
-                <div class="integrated-input-container">
-                    <button id="addButton" class="input-action-btn add-btn" title="添加内容" disabled>
-                        <i class="fas fa-plus"></i>
-                    </button>
-                    <button id="emojiButton" class="input-action-btn emoji-btn" title="表情" disabled>
-                        <i class="fas fa-smile"></i>
-                    </button>
-                    <button id="mentionButton" class="input-action-btn mention-btn" title="@智能体" disabled>
-                        <i class="fas fa-at"></i>
-                    </button>
-                    <div class="input-wrapper">
-                        <textarea 
-                            id="messageInput" 
-                            placeholder="输入您的消息..."
-                            rows="1"
-                            disabled
-                        ></textarea>
-                    </div>
-                    <button id="sendButton" class="input-action-btn send-btn" title="发送消息" disabled>
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
-                
-                <!-- 隐藏的文件输入 -->
-                <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
-                <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display: none;">
-                
-                <!-- 添加菜单 -->
-                <div id="addMenu" class="add-menu" style="display: none;">
-                    <div class="add-menu-item" data-action="image">
-                        <i class="fas fa-image"></i> 图片
-                    </div>
-                    <div class="add-menu-item" data-action="camera">
-                        <i class="fas fa-camera"></i> 拍照
-                    </div>
-                </div>
-                
-                <!-- 表情菜单 -->
-                <div id="emojiMenu" class="emoji-menu" style="display: none;">
-                    <div class="emoji-category">
-                        <div class="emoji-grid">
-                            <div class="emoji-item" data-emoji="😀">😀</div>
-                            <div class="emoji-item" data-emoji="😃">😃</div>
-                            <div class="emoji-item" data-emoji="😄">😄</div>
-                            <div class="emoji-item" data-emoji="😁">😁</div>
-                            <div class="emoji-item" data-emoji="😆">😆</div>
-                            <div class="emoji-item" data-emoji="😅">😅</div>
-                            <div class="emoji-item" data-emoji="😂">😂</div>
-                            <div class="emoji-item" data-emoji="🤣">🤣</div>
-                            <div class="emoji-item" data-emoji="😊">😊</div>
-                            <div class="emoji-item" data-emoji="😇">😇</div>
-                            <div class="emoji-item" data-emoji="🙂">🙂</div>
-                            <div class="emoji-item" data-emoji="🙃">🙃</div>
-                            <div class="emoji-item" data-emoji="😉">😉</div>
-                            <div class="emoji-item" data-emoji="😌">😌</div>
-                            <div class="emoji-item" data-emoji="😍">😍</div>
-                            <div class="emoji-item" data-emoji="🥰">🥰</div>
-                            <div class="emoji-item" data-emoji="😘">😘</div>
-                            <div class="emoji-item" data-emoji="😗">😗</div>
-                            <div class="emoji-item" data-emoji="😙">😙</div>
-                            <div class="emoji-item" data-emoji="😚">😚</div>
-                            <div class="emoji-item" data-emoji="😋">😋</div>
-                            <div class="emoji-item" data-emoji="😛">😛</div>
-                            <div class="emoji-item" data-emoji="😝">😝</div>
-                            <div class="emoji-item" data-emoji="😜">😜</div>
-                            <div class="emoji-item" data-emoji="🤪">🤪</div>
-                            <div class="emoji-item" data-emoji="🤨">🤨</div>
-                            <div class="emoji-item" data-emoji="🧐">🧐</div>
-                            <div class="emoji-item" data-emoji="🤓">🤓</div>
-                            <div class="emoji-item" data-emoji="😎">😎</div>
-                            <div class="emoji-item" data-emoji="🤩">🤩</div>
-                            <div class="emoji-item" data-emoji="🥳">🥳</div>
-                            <div class="emoji-item" data-emoji="😏">😏</div>
-                            <div class="emoji-item" data-emoji="😒">😒</div>
-                            <div class="emoji-item" data-emoji="😞">😞</div>
-                            <div class="emoji-item" data-emoji="😔">😔</div>
-                            <div class="emoji-item" data-emoji="😟">😟</div>
-                            <div class="emoji-item" data-emoji="😕">😕</div>
-                            <div class="emoji-item" data-emoji="🙁">🙁</div>
-                            <div class="emoji-item" data-emoji="☹️">☹️</div>
-                            <div class="emoji-item" data-emoji="😣">😣</div>
-                            <div class="emoji-item" data-emoji="😖">😖</div>
-                            <div class="emoji-item" data-emoji="😫">😫</div>
-                            <div class="emoji-item" data-emoji="😩">😩</div>
-                            <div class="emoji-item" data-emoji="🥺">🥺</div>
-                            <div class="emoji-item" data-emoji="😢">😢</div>
-                            <div class="emoji-item" data-emoji="😭">😭</div>
-                            <div class="emoji-item" data-emoji="😤">😤</div>
-                            <div class="emoji-item" data-emoji="😠">😠</div>
-                            <div class="emoji-item" data-emoji="😡">😡</div>
-                            <div class="emoji-item" data-emoji="🤬">🤬</div>
-                            <div class="emoji-item" data-emoji="🤯">🤯</div>
-                            <div class="emoji-item" data-emoji="😳">😳</div>
-                            <div class="emoji-item" data-emoji="🥵">🥵</div>
-                            <div class="emoji-item" data-emoji="🥶">🥶</div>
-                            <div class="emoji-item" data-emoji="😱">😱</div>
-                            <div class="emoji-item" data-emoji="😨">😨</div>
-                            <div class="emoji-item" data-emoji="😰">😰</div>
-                            <div class="emoji-item" data-emoji="😥">😥</div>
-                            <div class="emoji-item" data-emoji="😓">😓</div>
-                            <div class="emoji-item" data-emoji="🤗">🤗</div>
-                            <div class="emoji-item" data-emoji="🤔">🤔</div>
-                            <div class="emoji-item" data-emoji="🤭">🤭</div>
-                            <div class="emoji-item" data-emoji="🤫">🤫</div>
-                            <div class="emoji-item" data-emoji="🤥">🤥</div>
-                            <div class="emoji-item" data-emoji="😶">😶</div>
-                            <div class="emoji-item" data-emoji="😐">😐</div>
-                            <div class="emoji-item" data-emoji="😑">😑</div>
-                            <div class="emoji-item" data-emoji="😬">😬</div>
-                            <div class="emoji-item" data-emoji="🙄">🙄</div>
-                            <div class="emoji-item" data-emoji="😯">😯</div>
-                            <div class="emoji-item" data-emoji="😦">😦</div>
-                            <div class="emoji-item" data-emoji="😧">😧</div>
-                            <div class="emoji-item" data-emoji="😮">😮</div>
-                            <div class="emoji-item" data-emoji="😲">😲</div>
-                            <div class="emoji-item" data-emoji="🥱">🥱</div>
-                            <div class="emoji-item" data-emoji="😴">😴</div>
-                            <div class="emoji-item" data-emoji="🤤">🤤</div>
-                            <div class="emoji-item" data-emoji="😪">😪</div>
-                            <div class="emoji-item" data-emoji="😵">😵</div>
-                            <div class="emoji-item" data-emoji="🤐">🤐</div>
-                            <div class="emoji-item" data-emoji="🥴">🥴</div>
-                            <div class="emoji-item" data-emoji="🤢">🤢</div>
-                            <div class="emoji-item" data-emoji="🤮">🤮</div>
-                            <div class="emoji-item" data-emoji="🤧">🤧</div>
-                            <div class="emoji-item" data-emoji="😷">😷</div>
-                            <div class="emoji-item" data-emoji="🤒">🤒</div>
-                            <div class="emoji-item" data-emoji="🤕">🤕</div>
-                            <div class="emoji-item" data-emoji="🤑">🤑</div>
-                            <div class="emoji-item" data-emoji="🤠">🤠</div>
-                            <div class="emoji-item" data-emoji="👍">👍</div>
-                            <div class="emoji-item" data-emoji="👎">👎</div>
-                            <div class="emoji-item" data-emoji="👌">👌</div>
-                            <div class="emoji-item" data-emoji="✌️">✌️</div>
-                            <div class="emoji-item" data-emoji="🤞">🤞</div>
-                            <div class="emoji-item" data-emoji="🤟">🤟</div>
-                            <div class="emoji-item" data-emoji="🤘">🤘</div>
-                            <div class="emoji-item" data-emoji="🤙">🤙</div>
-                            <div class="emoji-item" data-emoji="👈">👈</div>
-                            <div class="emoji-item" data-emoji="👉">👉</div>
-                            <div class="emoji-item" data-emoji="👆">👆</div>
-                            <div class="emoji-item" data-emoji="🖕">🖕</div>
-                            <div class="emoji-item" data-emoji="👇">👇</div>
-                            <div class="emoji-item" data-emoji="☝️">☝️</div>
-                            <div class="emoji-item" data-emoji="👏">👏</div>
-                            <div class="emoji-item" data-emoji="🙌">🙌</div>
-                            <div class="emoji-item" data-emoji="👐">👐</div>
-                            <div class="emoji-item" data-emoji="🤲">🤲</div>
-                            <div class="emoji-item" data-emoji="🤝">🤝</div>
-                            <div class="emoji-item" data-emoji="🙏">🙏</div>
-                            <div class="emoji-item" data-emoji="❤️">❤️</div>
-                            <div class="emoji-item" data-emoji="🧡">🧡</div>
-                            <div class="emoji-item" data-emoji="💛">💛</div>
-                            <div class="emoji-item" data-emoji="💚">💚</div>
-                            <div class="emoji-item" data-emoji="💙">💙</div>
-                            <div class="emoji-item" data-emoji="💜">💜</div>
-                            <div class="emoji-item" data-emoji="🤎">🤎</div>
-                            <div class="emoji-item" data-emoji="🖤">🖤</div>
-                            <div class="emoji-item" data-emoji="🤍">🤍</div>
-                            <div class="emoji-item" data-emoji="💯">💯</div>
-                            <div class="emoji-item" data-emoji="💢">💢</div>
-                            <div class="emoji-item" data-emoji="💥">💥</div>
-                            <div class="emoji-item" data-emoji="💫">💫</div>
-                            <div class="emoji-item" data-emoji="💦">💦</div>
-                            <div class="emoji-item" data-emoji="💨">💨</div>
-                            <div class="emoji-item" data-emoji="🕳️">🕳️</div>
-                            <div class="emoji-item" data-emoji="💬">💬</div>
-                            <div class="emoji-item" data-emoji="🗨️">🗨️</div>
-                            <div class="emoji-item" data-emoji="🗯️">🗯️</div>
-                            <div class="emoji-item" data-emoji="💭">💭</div>
-                            <div class="emoji-item" data-emoji="💤">💤</div>
+                <div class="input-group">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="输入您的消息... (Shift+Enter换行，Enter发送，@智能体名 可以@智能体)"
+                        rows="2"
+                        disabled
+                    ></textarea>
+                    <div class="input-actions">
+                        <!-- 图片上传按钮组 -->
+                        <div class="image-upload-group">
+                            <button id="imageUploadButton" class="action-button image-button" title="发送图片" disabled>
+                                <i class="fas fa-image"></i>
+                            </button>
+                            <!-- 相册选择 -->
+                            <input type="file" id="imageFileInput" accept="image/*" style="display: none;">
+                            <!-- 相机拍照（移动端） -->
+                            <input type="file" id="cameraFileInput" accept="image/*" capture="environment" style="display: none;">
                         </div>
+                        <button id="mentionButton" class="action-button mention-button" title="@智能体" disabled>
+                            <i class="fas fa-at"></i>
+                        </button>
+                        <button id="sendButton" class="action-button send-button" type="button" title="发送消息" disabled>
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
                     </div>
                 </div>
-            </div>
             </div>
         </div>
     </div>
@@ -3479,7 +2599,11 @@
     </div>
 
     <!-- Bootstrap JS -->
-    <script src="./vendor/bootstrap/bootstrap.bundle.min.js?v=5.3.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 开发工具 -->
+    <script src="js/utils/dev-tools.js?v=1.0.0"></script>
+    <script src="js/utils/health-checker.js?v=1.0.0"></script>
     
     <!-- 全局配置 -->
     <script type="module" src="config/env.js?v=2.0.0"></script>
@@ -3492,32 +2616,17 @@
     <script src="js/utils/error-handler-simple.js"></script>
     <script src="js/services/auth-service-simple.js"></script>
     
-    <!-- PIN验证服务 -->
-    <script src="js/services/pin-verification-service.js"></script>
-    
     <!-- 房间管理服务 (ES模块) -->
     <script type="module" src="js/services/room-management.js"></script>
     
     <!-- 图片上传服务 -->
-    <!-- 路径处理工具 -->
-    <script src="js/utils/path-utils.js"></script>
-    <script src="js/utils/production-path-fix.js"></script>
     <script src="js/services/simple-image-uploader.js"></script>
-    
-    <!-- API客户端 -->
-    <script type="module" src="js/api/api-client.js"></script>
     
     <!-- 好友API服务 -->
     <script src="js/api/friends-api.js"></script>
     
     <!-- 好友管理器 -->
     <script src="js/services/friends-manager.js"></script>
-    
-    <!-- 好友功能控制器 -->
-    <script src="js/controllers/friends-controller.js"></script>
-    
-    <!-- 好友功能自动修复脚本 -->
-    <script src="js/utils/friends-auto-fix.js"></script>
     
     <!-- 聊天室页面控制器 -->
     <script src="js/controllers/chatroom-controller.js"></script>
@@ -3546,8 +2655,7 @@
         
         // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
-            // 页面DOM加载完成
-            // console.log('页面DOM加载完成');
+            console.log('页面DOM加载完成');
             
             // 初始时隐藏所有房间管理按钮
             const deleteRoomBtn = document.getElementById('deleteRoomBtn');
@@ -3578,11 +2686,6 @@
             // 初始化标签页切换处理
             handleTabSwitch();
 
-            // 立即尝试加载用户资料（独立于其他初始化过程）
-            setTimeout(() => {
-                loadUserProfile();
-            }, 500);
-
             // 等待环境配置加载完成后初始化
             waitForEnvConfig(function() {
                 try {
@@ -3593,13 +2696,6 @@
                     
                     // 初始化图片上传功能
                     initImageUpload();
-                    
-                    // 立即尝试加载用户资料（有重试机制）
-                    loadUserProfile();
-                    
-                    // 初始化自动恢复功能显示
-                    initAutoRestoreDisplay();
-                    
                 } catch (error) {
                     console.error('初始化聊天室控制器失败:', error);
                     showToast('聊天室初始化失败: ' + error.message, 'error');
@@ -3620,7 +2716,7 @@
             }
 
             // 好友列表搜索
-            const friendSearchBtn = document.getElementById('searchFriendsBtn');
+            const friendSearchBtn = document.getElementById('friendSearchBtn');
             const friendSearchInput = document.getElementById('friendSearchInput');
             
             if (friendSearchBtn && friendSearchInput) {
@@ -3632,57 +2728,6 @@
                 });
             }
         });
-
-        // ========================================
-        // 👤 用户资料加载功能
-        // ========================================
-        
-        // 加载用户资料并更新导航栏显示
-        async function loadUserProfile(retryCount = 0) {
-            try {
-                // 检查API客户端是否可用，最多重试5次
-                if (typeof window.apiClient === 'undefined') {
-                    if (retryCount < 5) {
-                        console.warn(`⚠️ API客户端未初始化，1秒后重试 (${retryCount + 1}/5)`);
-                        setTimeout(() => loadUserProfile(retryCount + 1), 1000);
-                        return;
-                    } else {
-                        console.error('❌ API客户端初始化超时，放弃加载用户资料');
-                        return;
-                    }
-                }
-                
-                console.log('📡 开始加载用户资料...');
-                const response = await window.apiClient.get('/users/profile');
-                if (response.success && response.data) {
-                    const user = response.data;
-                    console.log('📋 用户资料加载成功:', user);
-                    
-                    // 更新导航栏用户名显示
-                    const currentUsernameNav = document.getElementById('currentUsername');
-                    if (currentUsernameNav) {
-                        currentUsernameNav.textContent = user.nickname || user.username || '用户';
-                        console.log('✅ 导航栏用户名已更新为:', currentUsernameNav.textContent);
-                    } else {
-                        console.warn('⚠️ 找不到ID为currentUsername的元素');
-                    }
-                } else {
-                    console.warn('⚠️ 用户资料加载失败:', response);
-                }
-            } catch (error) {
-                console.error('❌ 加载用户资料时出错:', error);
-                // 失败时保持默认显示，不影响页面功能
-            }
-        }
-
-        // 调试函数：手动触发用户资料加载
-        window.debugLoadUserProfile = function() {
-            // 手动触发用户资料加载
-            // console.log('🔧 手动触发用户资料加载...');
-            // console.log('🔧 API客户端状态:', typeof window.apiClient);
-            // console.log('🔧 Token状态:', !!TokenManager.getAccessToken());
-            loadUserProfile();
-        };
 
         // 用户搜索处理函数
         async function handleUserSearch() {
@@ -3711,43 +2756,6 @@
             } catch (error) {
                 console.error('搜索用户失败:', error);
                 resultsList.innerHTML = '<div class="text-danger">搜索失败: ' + error.message + '</div>';
-            }
-        }
-
-        // 切换自动恢复聊天功能
-        function toggleAutoRestoreChat() {
-            try {
-                const currentSetting = localStorage.getItem('dify_auto_restore_chat');
-                const newSetting = currentSetting === 'false' ? 'true' : 'false';
-                
-                localStorage.setItem('dify_auto_restore_chat', newSetting);
-                
-                const autoRestoreText = document.getElementById('autoRestoreText');
-                const isEnabled = newSetting !== 'false';
-                
-                if (autoRestoreText) {
-                    autoRestoreText.textContent = `自动恢复聊天: ${isEnabled ? '开启' : '关闭'}`;
-                }
-                
-                const message = isEnabled ? '已开启自动恢复聊天功能' : '已关闭自动恢复聊天功能';
-                const type = isEnabled ? 'success' : 'info';
-                showToast(message, type);
-                
-                console.log(`🔄 自动恢复聊天功能已${isEnabled ? '开启' : '关闭'}`);
-            } catch (error) {
-                console.error('切换自动恢复功能失败:', error);
-                showToast('设置失败，请重试', 'error');
-            }
-        }
-
-        // 初始化自动恢复功能状态显示
-        function initAutoRestoreDisplay() {
-            const autoRestoreText = document.getElementById('autoRestoreText');
-            const currentSetting = localStorage.getItem('dify_auto_restore_chat');
-            const isEnabled = currentSetting !== 'false'; // 默认开启
-            
-            if (autoRestoreText) {
-                autoRestoreText.textContent = `自动恢复聊天: ${isEnabled ? '开启' : '关闭'}`;
             }
         }
 
@@ -3797,176 +2805,11 @@
             // 清空搜索结果
             document.getElementById('userSearchResults').style.display = 'none';
             document.getElementById('userSearchInput').value = '';
-            
-            // 绑定搜索功能
-            bindUserSearchEvents();
-        }
-        
-        // 绑定用户搜索事件
-        function bindUserSearchEvents() {
-            const searchInput = document.getElementById('userSearchInput');
-            const searchBtn = document.getElementById('userSearchBtn');
-            
-            // 搜索按钮点击事件
-            if (searchBtn) {
-                searchBtn.onclick = function() {
-                    const username = searchInput.value.trim();
-                    if (username) {
-                        searchUsers(username);
-                    }
-                };
-            }
-            
-            // 回车搜索
-            if (searchInput) {
-                searchInput.onkeypress = function(e) {
-                    if (e.key === 'Enter') {
-                        const username = searchInput.value.trim();
-                        if (username) {
-                            searchUsers(username);
-                        }
-                    }
-                };
-            }
-        }
-        
-        // 搜索用户
-        async function searchUsers(username) {
-            const resultsContainer = document.getElementById('userSearchResults');
-            const resultsList = document.getElementById('searchResultsList');
-            
-            try {
-                // 显示加载状态
-                resultsList.innerHTML = `
-                    <div class="loading-state">
-                        <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
-                        <p class="mb-0">搜索中...</p>
-                    </div>
-                `;
-                resultsContainer.style.display = 'block';
-                
-                // 调用搜索API
-                if (window.FriendsApi) {
-                    const response = await window.FriendsApi.searchUsers(username);
-                    
-                    if (response.success && response.data && response.data.users) {
-                        displaySearchResults(response.data.users);
-                    } else {
-                        resultsList.innerHTML = `
-                            <div class="empty-state">
-                                <i class="fas fa-search"></i>
-                                <p class="mb-0">没有找到相关用户</p>
-                            </div>
-                        `;
-                    }
-                } else {
-                    console.error('FriendsApi 不可用');
-                    resultsList.innerHTML = `
-                        <div class="empty-state">
-                            <i class="fas fa-exclamation-triangle text-warning"></i>
-                            <p class="mb-0 text-warning">搜索功能暂不可用</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('搜索用户失败:', error);
-                resultsList.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-times-circle text-danger"></i>
-                        <p class="mb-0 text-danger">搜索失败: ${error.message}</p>
-                    </div>
-                `;
-            }
-        }
-        
-        // 显示搜索结果
-        function displaySearchResults(users) {
-            const resultsList = document.getElementById('searchResultsList');
-            
-            if (users.length === 0) {
-                resultsList.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-users"></i>
-                        <p class="mb-0">没有找到相关用户</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            const html = users.map(user => {
-                const friendshipStatus = user.friendshipStatus || 'none';
-                let actionButton = '';
-                let statusBadge = '';
-                
-                switch(friendshipStatus) {
-                    case 'none':
-                        actionButton = `<button class="btn btn-primary btn-sm" onclick="sendFriendRequest('${user.username}')">
-                            <i class="fas fa-user-plus me-1"></i>添加好友
-                        </button>`;
-                        break;
-                    case 'pending':
-                        statusBadge = '<span class="badge bg-warning">请求已发送</span>';
-                        break;
-                    case 'accepted':
-                        statusBadge = '<span class="badge bg-success">已是好友</span>';
-                        break;
-                    default:
-                        actionButton = `<button class="btn btn-primary btn-sm" onclick="sendFriendRequest('${user.username}')">
-                            <i class="fas fa-user-plus me-1"></i>添加好友
-                        </button>`;
-                }
-                
-                return `
-                    <div class="search-result-item">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div class="d-flex align-items-center">
-                                <div class="user-avatar me-3">
-                                    ${(user.nickname || user.username).charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                    <div class="fw-semibold text-dark mb-1">${user.nickname || user.username}</div>
-                                    ${user.email ? `<div class="text-muted small">${user.email}</div>` : ''}
-                                </div>
-                            </div>
-                            <div>
-                                ${actionButton}
-                                ${statusBadge}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-            
-            resultsList.innerHTML = html;
-        }
-        
-        // 发送好友请求
-        async function sendFriendRequest(username) {
-            
-            try {
-                if (window.FriendsApi) {
-                    const response = await window.FriendsApi.sendFriendRequest(username);
-                    
-                    if (response.success) {
-                        // 重新搜索以更新状态
-                        const searchInput = document.getElementById('userSearchInput');
-                        if (searchInput.value.trim()) {
-                            searchUsers(searchInput.value.trim());
-                        }
-                    } else {
-                        alert('发送失败: ' + (response.message || '未知错误'));
-                    }
-                } else {
-                    alert('功能暂不可用');
-                }
-            } catch (error) {
-                console.error('发送好友请求失败:', error);
-                alert('发送失败: ' + error.message);
-            }
         }
 
         // 显示好友请求模态框
         function showFriendRequestsModal() {
+            console.log('显示好友请求模态框');
             const modal = new bootstrap.Modal(document.getElementById('friendRequestsModal'));
             modal.show();
             
@@ -3982,58 +2825,22 @@
             const roomsTab = document.getElementById('rooms-tab');
             const createRoomBtn = document.getElementById('createRoomBtn');
             const addFriendBtn = document.getElementById('addFriendBtn');
-            const deleteModeBtn = document.getElementById('deleteModeBtn');
-            const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
-            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
             
             if (friendsTab && roomsTab && createRoomBtn && addFriendBtn) {
-                friendsTab.addEventListener('shown.bs.tab', async function () {
-                    // 好友标签页：隐藏房间相关按钮，显示好友相关按钮
+                friendsTab.addEventListener('shown.bs.tab', function () {
                     createRoomBtn.style.display = 'none';
                     addFriendBtn.style.display = 'block';
                     
-                    // 隐藏删除房间相关按钮
-                    if (deleteModeBtn) deleteModeBtn.style.display = 'none';
-                    if (cancelDeleteBtn) cancelDeleteBtn.style.display = 'none';
-                    if (confirmDeleteBtn) confirmDeleteBtn.style.display = 'none';
-                    
-                    // 退出删除房间模式（如果正在删除模式中）
-                    const body = document.body;
-                    if (body.classList.contains('room-delete-mode')) {
-                        body.classList.remove('room-delete-mode');
-                        console.log('📤 切换到好友标签页，退出删除模式');
-                    }
-                    
-                    // 确保好友控制器已初始化
-                    if (!window.friendsController) {
-                        console.log('🤝 创建好友控制器');
-                        window.friendsController = new FriendsController();
-                        
-                        // 尝试立即初始化，如果失败则使用延迟初始化
-                        try {
-                            await window.friendsController.initialize();
-                        } catch (error) {
-                            console.warn('⚠️ 立即初始化失败，尝试延迟初始化:', error.message);
-                            await window.friendsController.delayedInitialize();
-                        }
-                    } else {
-                        // 如果控制器已存在，刷新数据
-                        console.log('🔄 刷新现有好友控制器');
-                        await window.friendsController.refresh();
+                    // 加载好友列表
+                    if (window.chatroomController && window.chatroomController.friendsManager) {
+                        window.chatroomController.friendsManager.loadFriendsList();
+                        window.chatroomController.friendsManager.loadFriendRequests();
                     }
                 });
 
                 roomsTab.addEventListener('shown.bs.tab', function () {
-                    // 房间标签页：显示房间相关按钮，隐藏好友相关按钮
                     createRoomBtn.style.display = 'block';
                     addFriendBtn.style.display = 'none';
-                    
-                    // 显示删除房间按钮
-                    if (deleteModeBtn) deleteModeBtn.style.display = 'block';
-                    
-                    // 确保删除模式按钮状态正确
-                    if (cancelDeleteBtn) cancelDeleteBtn.style.display = 'none';
-                    if (confirmDeleteBtn) confirmDeleteBtn.style.display = 'none';
                 });
             }
         }
@@ -4042,48 +2849,6 @@
         window.showCreateRoomModal = showCreateRoomModal;
         window.showAddFriendModal = showAddFriendModal;
         window.showFriendRequestsModal = showFriendRequestsModal;
-        
-        // @智能体相关的全局函数
-        window.selectAgentFromSuggestions = function(agentName) {
-            console.log('🎯 [全局] 选择智能体:', agentName);
-            if (window.chatroomController) {
-                window.chatroomController.selectAgentFromSuggestions(agentName);
-            }
-        };
-
-        window.handleAgentSuggestionKeydown = function(event) {
-            if (window.chatroomController && window.chatroomController.agentSuggestionsList) {
-                return window.chatroomController.handleAgentSuggestionKeydown(event);
-            }
-        };
-
-        window.copyMessage = function(button) {
-            const content = button.getAttribute('data-content');
-            if (content) {
-                navigator.clipboard.writeText(content).then(() => {
-                    // 临时显示复制成功
-                    const originalIcon = button.querySelector('i');
-                    const originalClass = originalIcon.className;
-                    originalIcon.className = 'fas fa-check';
-                    setTimeout(() => {
-                        originalIcon.className = originalClass;
-                    }, 1000);
-                }).catch(err => {
-                    console.error('复制失败:', err);
-                });
-            }
-        };
-
-        window.regenerateMessage = function(button) {
-            const messageElement = button.closest('.message');
-            const messageId = messageElement.getAttribute('data-message-id');
-            
-            if (window.chatroomController && messageId) {
-                console.log('🔄 [全局] 重新生成智能体回复:', messageId);
-                // 这里可以扩展重新生成功能
-                window.chatroomController.showInfo('重新生成功能开发中...');
-            }
-        };
         
         // 房间成员管理功能
         let selectedFriends = [];
@@ -5187,8 +3952,8 @@
 
             // 添加点击聊天区域自动聚焦输入框的功能（仅移动端）
             chatMessages.addEventListener('click', function(e) {
-                // 如果点击的不是链接、按钮、图片等交互元素
-                if (!e.target.closest('a, button, .message-actions, img, .message-image')) {
+                // 如果点击的不是链接、按钮等交互元素
+                if (!e.target.closest('a, button, .message-actions')) {
                     messageInput.focus();
                 }
             });
@@ -5210,16 +3975,11 @@
          * 初始化图片上传功能 - 增强版支持移动端相机
          */
         function initImageUpload() {
-            // 避免重复初始化
-            if (window.imageUploadInitialized) {
-                console.log('图片上传功能已初始化，跳过重复初始化');
-                return;
-            }
-            
+            const imageUploadButton = document.getElementById('imageUploadButton');
             const imageFileInput = document.getElementById('imageFileInput');
             const cameraFileInput = document.getElementById('cameraFileInput');
             
-            if (!imageFileInput) {
+            if (!imageUploadButton || !imageFileInput) {
                 console.warn('图片上传元素未找到');
                 return;
             }
@@ -5230,25 +3990,36 @@
             // 检测是否为移动设备
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
+            // 点击上传按钮 - 移动端显示选择选项，桌面端直接选择文件
+            imageUploadButton.addEventListener('click', function() {
+                if (this.disabled) return;
+                
+                // 检查是否有选中的聊天室或好友
+                const hasActiveRoom = window.chatroomController?.currentRoom;
+                const hasActiveFriend = window.friendsManager?.currentPrivateChat;
+                
+                if (!hasActiveRoom && !hasActiveFriend) {
+                    showToast('请先选择一个聊天室或好友', 'warning');
+                    return;
+                }
+
+                if (isMobile && cameraFileInput) {
+                    // 移动端显示选择菜单
+                    showImageSourceModal();
+                } else {
+                    // 桌面端直接打开文件选择
+                    imageFileInput.click();
+                }
+            });
+
             // 文件选择后自动上传 - 相册
             imageFileInput.addEventListener('change', async function(e) {
                 const file = e.target.files[0];
                 if (!file) return;
 
                 console.log('📁 相册文件选择:', file.name);
-                
-                // 防止重复处理同一文件
-                const fileKey = `${file.name}_${file.size}_${file.lastModified}`;
-                if (window.lastUploadedFile === fileKey) {
-                    console.warn('检测到重复文件选择，忽略');
-                    return;
-                }
-                window.lastUploadedFile = fileKey;
-                
                 // 重置文件输入，允许重复选择同一文件
-                setTimeout(() => {
-                    e.target.value = '';
-                }, 100);
+                e.target.value = '';
 
                 await uploadAndSendImage(file);
             });
@@ -5260,19 +4031,8 @@
                     if (!file) return;
 
                     console.log('📷 相机拍照完成:', file.name);
-                    
-                    // 防止重复处理同一文件
-                    const fileKey = `${file.name}_${file.size}_${file.lastModified}`;
-                    if (window.lastUploadedFile === fileKey) {
-                        console.warn('检测到重复文件选择，忽略');
-                        return;
-                    }
-                    window.lastUploadedFile = fileKey;
-                    
                     // 重置文件输入，允许重复拍照
-                    setTimeout(() => {
-                        e.target.value = '';
-                    }, 100);
+                    e.target.value = '';
 
                     await uploadAndSendImage(file);
                 });
@@ -5327,7 +4087,6 @@
             }
 
             console.log('✅ 图片上传功能初始化完成');
-            window.imageUploadInitialized = true; // 标记为已初始化
         }
 
         /**
@@ -5433,14 +4192,7 @@
          * 上传并发送图片
          */
         async function uploadAndSendImage(file) {
-            const imageUploadButton = document.getElementById('addButton'); // 更新为新的addButton ID
-            
-            // 防重复提交检查
-            if (imageUploadButton && imageUploadButton.disabled) {
-                console.warn('已有图片正在上传中，忽略重复请求');
-                return;
-            }
-            
+            const imageUploadButton = document.getElementById('imageUploadButton');
             let progressElement = null;
 
             try {
@@ -5455,16 +4207,10 @@
                     return;
                 }
 
-                // 显示上传状态 - 添加防重复检查
-                if (imageUploadButton) {
-                    if (imageUploadButton.disabled) {
-                        console.warn('检测到按钮已禁用，可能有重复上传');
-                        return;
-                    }
-                    imageUploadButton.classList.add('uploading');
-                    imageUploadButton.disabled = true;
-                    // 不修改按钮内容，保持加号图标
-                }
+                // 显示上传状态
+                imageUploadButton.classList.add('uploading');
+                imageUploadButton.disabled = true;
+                imageUploadButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
                 // 创建进度提示
                 progressElement = document.createElement('div');
@@ -5480,72 +4226,44 @@
                 `;
                 document.body.appendChild(progressElement);
 
-                // 上传文件 - 添加重试机制
-                let result;
-                let retryCount = 0;
-                const maxRetries = 2;
-                
-                while (retryCount <= maxRetries) {
-                    try {
-                        result = await window.imageUploader.uploadImage(file, 'room', (progress) => {
-                            const progressBar = progressElement.querySelector('.progress-bar');
-                            if (progressBar) {
-                                progressBar.style.width = progress + '%';
-                            }
-                        });
-                        break; // 上传成功，跳出重试循环
-                    } catch (error) {
-                        retryCount++;
-                        if (retryCount > maxRetries) {
-                            throw error; // 超过最大重试次数，抛出错误
-                        }
-                        console.warn(`图片上传失败，正在重试 (${retryCount}/${maxRetries}):`, error.message);
-                        await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒后重试
+                // 上传文件
+                const result = await window.imageUploader.uploadImage(file, 'room', (progress) => {
+                    const progressBar = progressElement.querySelector('.progress-bar');
+                    if (progressBar) {
+                        progressBar.style.width = progress + '%';
                     }
-                }
+                });
 
                 console.log('📤 图片上传成功:', result);
-
-                // 防止重复发送的唯一标识
-                const messageKey = `img_${result.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                
-                // 检查是否已经发送过这个文件
-                if (window.sentImageMessages && window.sentImageMessages.has(result.id)) {
-                    console.warn('⚠️ 检测到重复的图片消息，跳过发送:', result.id);
-                    showToast('图片已发送，请勿重复操作', 'warning');
-                    return;
-                }
-                
-                // 初始化已发送图片记录
-                if (!window.sentImageMessages) {
-                    window.sentImageMessages = new Set();
-                }
-                
-                // 记录已发送的图片
-                window.sentImageMessages.add(result.id);
-                
-                // 5秒后清除记录，允许重新发送相同图片
-                setTimeout(() => {
-                    if (window.sentImageMessages) {
-                        window.sentImageMessages.delete(result.id);
-                    }
-                }, 5000);
 
                 // 构建图片消息
                 const imageMessage = {
                     content: `发送了图片: ${file.name}`,
                     message_type: 'image',
                     type: 'image',
-                    attachments: [result.id],
-                    messageKey: messageKey  // 添加唯一标识
+                    attachments: [result.id]
                 };
 
                 // 发送图片消息
                 if (window.chatroomController?.currentRoom) {
                     // 聊天室场景
-                    console.log('📤 聊天室发送图片消息:', result);
-                    
-                    // 构建发送数据
+                    // 先在本地显示图片消息
+                    const imageUrl = window.imageUploader.getImageUrl(result.id, 'view');
+                    const localMessage = {
+                        id: 'temp_' + Date.now(),
+                        content: imageMessage.content,
+                        type: 'image',
+                        senderId: window.chatroomController.currentUser?.id,
+                        senderName: window.chatroomController.currentUser?.username,
+                        timestamp: Date.now(),
+                        attachments: [result],
+                        isLocalPending: true
+                    };
+
+                    // 添加到聊天界面
+                    window.chatroomController.addMessage(localMessage);
+
+                    // 发送到服务器
                     const messageData = {
                         roomId: window.chatroomController.currentRoom.id || window.chatroomController.currentRoom.roomId,
                         ...imageMessage,
@@ -5553,12 +4271,8 @@
                         clientId: window.chatroomController.websocket?.id
                     };
 
-                    // 只通过WebSocket发送，不在本地预显示
-                    // WebSocket服务器会广播消息回来，届时统一显示
-                    console.log('📤 即将通过WebSocket发送图片消息:', messageData);
+                    // 使用WebSocket发送
                     window.chatroomController.websocket?.emit('send-message', messageData);
-                    
-                    console.log('✅ 图片消息已通过WebSocket发送，等待服务器确认');
                 } else if (window.friendsManager?.currentPrivateChat) {
                     // 好友私聊场景
                     console.log('📤 好友私聊发送图片:', result);
@@ -5579,7 +4293,7 @@
                 if (imageUploadButton) {
                     imageUploadButton.classList.remove('uploading');
                     imageUploadButton.disabled = false;
-                    // 不修改按钮内容，保持加号图标
+                    imageUploadButton.innerHTML = '<i class="fas fa-image"></i>';
                 }
 
                 // 移除进度提示
@@ -5592,216 +4306,6 @@
                 }
             }
         }
-
-        /**
-         * 图片气泡自适应处理（兼容不支持:has()的浏览器）
-         * 当消息中包含图片时，自动调整气泡大小
-         */
-        function adjustImageBubbleSize() {
-            const messageBubbles = document.querySelectorAll('.message-bubble');
-            console.log(`🔧 调整图片气泡大小，找到 ${messageBubbles.length} 个气泡`);
-            
-            messageBubbles.forEach((bubble, index) => {
-                const hasImage = bubble.querySelector('.message-image');
-                
-                if (hasImage) {
-                    console.log(`📷 气泡 ${index} 包含图片，开始调整`);
-                    // 添加包含图片的类名用于样式控制
-                    bubble.classList.add('has-image');
-                    
-                    // 为了兼容不支持:has()的浏览器，直接设置样式
-                    const isUser = bubble.closest('.message-user');
-                    const isMobile = window.innerWidth <= 768;
-                    
-                    // 移除之前可能设置的内联样式，让CSS类来控制
-                    bubble.style.padding = '';
-                    bubble.style.minWidth = '';
-                    bubble.style.width = '';
-                    bubble.style.maxWidth = '';
-                    
-                    // 添加调试类名以便识别
-                    bubble.classList.add('image-bubble-adjusted');
-                    if (isUser) {
-                        bubble.classList.add('user-image-bubble');
-                    } else {
-                        bubble.classList.add('other-image-bubble');
-                    }
-                    
-                    // 确保图片自适应
-                    const images = bubble.querySelectorAll('.message-image');
-                    images.forEach(img => {
-                        img.style.maxWidth = '100%';
-                        img.style.height = 'auto';
-                        img.style.display = 'block';
-                        
-                        // 监听图片加载完成事件，再次调整气泡
-                        if (!img.complete) {
-                            img.onload = () => {
-                                console.log('📷 图片加载完成，重新调整气泡');
-                                setTimeout(() => adjustImageBubbleSize(), 100);
-                            };
-                        }
-                        
-                        console.log('✅ 图片样式已调整');
-                    });
-                    
-                    console.log(`✅ 气泡 ${index} 调整完成，类名:`, bubble.className);
-                } else {
-                    bubble.classList.remove('has-image', 'image-bubble-adjusted', 'user-image-bubble', 'other-image-bubble');
-                }
-            });
-        }
-
-        /**
-         * 监听DOM变化，自动调整新添加消息的图片气泡
-         */
-        function observeMessageChanges() {
-            const chatMessages = document.getElementById('chatMessages');
-            if (!chatMessages) return;
-
-            const observer = new MutationObserver((mutations) => {
-                let shouldAdjust = false;
-                
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'childList') {
-                        mutation.addedNodes.forEach((node) => {
-                            if (node.nodeType === 1 && (node.classList.contains('message') || node.querySelector('.message'))) {
-                                shouldAdjust = true;
-                            }
-                        });
-                    }
-                });
-                
-                if (shouldAdjust) {
-                    // 延迟执行，确保图片元素已完全添加
-                    setTimeout(adjustImageBubbleSize, 100);
-                }
-            });
-
-            observer.observe(chatMessages, {
-                childList: true,
-                subtree: true
-            });
-
-            console.log('✅ 图片气泡自适应监听器已启动');
-        }
-
-        /**
-         * 响应式处理：窗口大小变化时重新调整
-         */
-        function handleResize() {
-            adjustImageBubbleSize();
-        }
-
-        // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 DOM加载完成，开始初始化图片气泡系统');
-            
-            // 初始调整现有消息
-            setTimeout(() => {
-                console.log('⏰ 开始初始调整');
-                adjustImageBubbleSize();
-            }, 500);
-            
-            // 启动变化监听
-            setTimeout(observeMessageChanges, 1000);
-            
-            // 监听窗口大小变化
-            window.addEventListener('resize', debounce(handleResize, 200));
-            
-            console.log('✅ 图片气泡自适应系统已初始化');
-        });
-
-        // 也在window.onload后再次尝试
-        window.addEventListener('load', function() {
-            console.log('🌟 页面完全加载完成，再次调整图片气泡');
-            setTimeout(adjustImageBubbleSize, 1000);
-        });
-
-        // 暴露到全局作用域用于调试
-        window.adjustImageBubbleSize = adjustImageBubbleSize;
-        window.debugImageBubbles = function() {
-            console.log('🔍 手动调试图片气泡:');
-            const bubbles = document.querySelectorAll('.message-bubble');
-            console.log(`总气泡数: ${bubbles.length}`);
-            
-            bubbles.forEach((bubble, i) => {
-                const hasImage = bubble.querySelector('.message-image');
-                console.log(`气泡 ${i}:`, {
-                    hasImage: !!hasImage,
-                    classes: bubble.className,
-                    computedStyle: {
-                        maxWidth: getComputedStyle(bubble).maxWidth,
-                        width: getComputedStyle(bubble).width,
-                        padding: getComputedStyle(bubble).padding
-                    }
-                });
-            });
-            
-            // 强制重新调整
-            adjustImageBubbleSize();
-        };
-
-        console.log('💡 提示: 如果图片气泡没有自动调整，请在控制台运行 window.debugImageBubbles() 进行调试');
-
-        // 图片模态框调试功能
-        window.debugImageModal = function() {
-            console.log('🔧 [调试] 测试图片模态框功能');
-            console.log('📊 [调试] 屏幕信息:', {
-                width: window.innerWidth,
-                height: window.innerHeight,
-                devicePixelRatio: window.devicePixelRatio
-            });
-            
-            // 测试URL（使用一个示例图片）
-            const testImageUrl = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600"><rect width="800" height="600" fill="%23f0f0f0"/><text x="400" y="250" font-family="Arial" font-size="32" text-anchor="middle" fill="%23333">测试图片 800x600</text><text x="400" y="300" font-family="Arial" font-size="20" text-anchor="middle" fill="%23666">屏幕尺寸: ' + window.innerWidth + 'x' + window.innerHeight + '</text><text x="400" y="350" font-family="Arial" font-size="16" text-anchor="middle" fill="%23999">使用鼠标滚轮缩放</text></svg>';
-            
-            if (window.chatroomController && window.chatroomController.showImageModal) {
-                console.log('✅ [调试] 调用ChatroomController的showImageModal方法');
-                window.chatroomController.showImageModal(testImageUrl, '测试图片');
-                
-                // 等待一下再打印提示
-                setTimeout(() => {
-                    console.log('💡 [调试] 测试提示:');
-                    console.log('  - 使用鼠标滚轮进行缩放');
-                    console.log('  - 缩放后可拖拽图片');
-                    console.log('  - 双击图片重置缩放');
-                    console.log('  - 点击背景或按ESC关闭');
-                }, 500);
-            } else {
-                console.error('❌ [调试] ChatroomController或showImageModal方法不存在');
-                console.log('可用的全局对象:', {
-                    chatroomController: !!window.chatroomController,
-                    showImageModal: !!(window.chatroomController && window.chatroomController.showImageModal)
-                });
-            }
-        };
-
-        console.log('💡 提示: 运行 window.debugImageModal() 测试图片模态框功能（已优化大屏幕显示和滚轮缩放）');
-
-        // 防抖函数
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
     </script>
-    
-    <!-- 图片显示修复脚本 v2.0 - 基于file-api.js标准 -->
-    <script src="./assets/js/image-display-fix.js" async></script>
-    
-    <!-- 强力上传修复脚本（移动端Action Sheet） -->
-    <script src="./assets/js/force-upload-fix.js"></script>
-    
-    <!-- 图片优化服务（提供 window.ImageOptimizationService 与 window.imageOptimizer） -->
-    <script src="js/services/image-optimization-service.js"></script>
-    
-    <!-- 已移除：图片优化测试脚本与可视化监控器（避免在生产环境显示调试面板） -->
 </body>
 </html>

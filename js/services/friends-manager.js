@@ -13,7 +13,10 @@ class FriendsManager {
         this.unreadCounts = {}; // 存储各好友的未读消息计数
         this.readStatusTimer = null; // 已读状态刷新定时器
         
-        // DOM 元素
+    // 回复状态（前端本地）
+    this.replyContext = null; // { messageId, senderName, contentSnippet }
+
+    // DOM 元素
         this.elements = {
             friendList: document.getElementById('friendList'),
             friendRequestsBadge: document.getElementById('friendRequestsBadge'),
@@ -29,6 +32,47 @@ class FriendsManager {
         
         // 监听窗口焦点变化，用于已读状态同步
         this.setupWindowFocusHandlers();
+    }
+
+    // =============================
+    // 引用/回复：工具方法
+    // =============================
+    setReplyContext(messageId, senderName, rawContent) {
+        const snippet = (rawContent || '').replace(/\s+/g, ' ').slice(0, 120);
+        this.replyContext = { messageId, senderName, contentSnippet: snippet };
+        this.showComposerReplyPreview();
+    }
+
+    clearReplyContext() {
+        this.replyContext = null;
+        const container = document.getElementById('composerReplyContainer');
+        if (container) container.remove();
+    }
+
+    showComposerReplyPreview() {
+        const inputArea = document.querySelector('.chat-input .input-group');
+        if (!inputArea || !this.replyContext) return;
+
+        // 如果已存在先移除
+        const existed = document.getElementById('composerReplyContainer');
+        if (existed) existed.remove();
+
+        const wrapper = document.createElement('div');
+        wrapper.id = 'composerReplyContainer';
+        wrapper.className = 'composer-reply';
+        wrapper.innerHTML = `
+            <div class="content">
+                <div class="meta">回复 ${this.escapeHtml(this.replyContext.senderName)}</div>
+                <div class="snippet">${this.escapeHtml(this.replyContext.contentSnippet || '')}</div>
+            </div>
+            <button class="close-btn" title="取消引用" aria-label="取消引用">×</button>
+        `;
+
+        // 插入到输入组前
+        const parent = document.querySelector('.chat-input');
+        if (parent) parent.insertBefore(wrapper, inputArea);
+
+        wrapper.querySelector('.close-btn')?.addEventListener('click', () => this.clearReplyContext());
     }
 
     /**
@@ -234,18 +278,12 @@ class FriendsManager {
                     ${avatarText}
                     <div class="${onlineClass}"></div>
                 </div>
-        <div class="friend-info">
-            <div class="friend-name">${displayName}${encryptionIcon}</div>
-            <div class="friend-status">${statusText}</div>
-            ${unreadBadge ? `<div class="friend-meta">${unreadBadge}</div>` : ''}
-        </div>
-                <div class="friend-actions">
-                    <button class="action-btn primary" onclick="event.stopPropagation(); chatroomController.friendsManager.startPrivateChat('${friend.id}', '${displayName}')" title="开始聊天">
-                        <i class="fas fa-comments"></i>
-                    </button>
-                    <button class="action-btn danger" onclick="event.stopPropagation(); chatroomController.friendsManager.deleteFriend('${friend.id}', '${displayName}')" title="删除好友">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                <div class="friend-info">
+                    <div class="friend-name">${displayName}${encryptionIcon}</div>
+                    <div class="friend-meta">
+                        <span class="friend-status">${statusText}</span>
+                        ${unreadBadge}
+                    </div>
                 </div>
             </div>
         `;
@@ -254,55 +292,11 @@ class FriendsManager {
     /**
      * 开始私聊
      */
-    async startPrivateChat(friendId, friendName) {
-        try {
-            console.log('开始与好友私聊:', friendId, friendName);
-            
-            // PIN验证检查 - 只有在超过锁定时间后才需要验证
-            if (window.pinVerificationService) {
-                try {
-                    const isPinEnabled = await window.pinVerificationService.isPinEnabledSync();
-                    if (isPinEnabled) {
-                        const lastVerification = localStorage.getItem('pin_last_verification');
-                        const verificationTimeout = window.pinVerificationService.getLockTimeout();
-                        const now = Date.now();
-
-                        // 只有在确实超过锁定时间时才需要验证
-                        if (!lastVerification || (now - parseInt(lastVerification)) > verificationTimeout) {
-                            try {
-                                const isValid = await window.pinVerificationService.showVerificationDialog('会话已过期，请输入PIN码继续');
-                                if (!isValid) {
-                                    showToast('PIN验证失败，无法开始私聊', 'warning');
-                                    return;
-                                }
-                                
-                                console.log('✅ 私聊PIN验证成功');
-                                
-                                // 记录验证时间
-                                localStorage.setItem('pin_last_verification', now.toString());
-                                if (this.chatroomController && typeof this.chatroomController.resetAutoLockTimer === 'function') {
-                                    this.chatroomController.resetAutoLockTimer();
-                                }
-                            } catch (error) {
-                                console.log('❌ 私聊PIN验证失败或取消:', error.message);
-                                showToast('PIN验证失败，无法开始私聊', 'warning');
-                                return; // 验证失败，不继续执行
-                            }
-                        } else {
-                            console.log('📋 PIN验证在有效期内，跳过验证');
-                            // 重置自动锁定定时器（表示用户有活动）
-                            if (this.chatroomController && typeof this.chatroomController.resetAutoLockTimer === 'function') {
-                                this.chatroomController.resetAutoLockTimer();
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.warn('检查PIN状态失败:', error);
-                }
-            }
-            
-            // 设置当前私聊状态
-            this.currentPrivateChat = {
+    startPrivateChat(friendId, friendName) {
+        console.log('开始与好友私聊:', friendId, friendName);
+        
+        // 设置当前私聊状态
+        this.currentPrivateChat = {
             friendId: friendId,
             friendName: friendName,
             type: 'private'
@@ -324,11 +318,6 @@ class FriendsManager {
         // 清空当前群聊房间状态
         this.chatroomController.currentRoom = null;
         
-        // 保存聊天状态
-        if (this.chatroomController.saveCurrentChatState) {
-            this.chatroomController.saveCurrentChatState();
-        }
-        
         // 更新房间列表中的活跃状态
         this.updateActiveStates();
 
@@ -340,13 +329,9 @@ class FriendsManager {
             this.markMessagesAsRead(friendId);
         }, 1500);
 
-            // 在移动设备上隐藏侧边栏
-            if (window.innerWidth <= 768) {
-                this.closeSidebar();
-            }
-        } catch (error) {
-            console.error('开始私聊失败:', error);
-            showToast('开始私聊失败: ' + error.message, 'error');
+        // 在移动设备上隐藏侧边栏
+        if (window.innerWidth <= 768) {
+            this.closeSidebar();
         }
     }
 
@@ -357,6 +342,11 @@ class FriendsManager {
         const chatMessages = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
+        // 标记聊天区域为私聊模式，便于CSS做专属布局优化
+        try {
+            const chatArea = document.querySelector('.chat-area');
+            if (chatArea) chatArea.classList.add('private-mode');
+        } catch (e) { /* noop */ }
         
         if (chatMessages) {
             // 清空消息区域
@@ -528,7 +518,7 @@ class FriendsManager {
         // 渲染消息
         chatMessages.innerHTML = '';
         
-        sortedMessages.forEach(message => {
+    sortedMessages.forEach(message => {
             const isCurrentUser = message.senderId === currentUserId;
             const messageClass = isCurrentUser ? 'message-user' : 'message-other';
             const senderName = isCurrentUser ? '我' : message.senderInfo?.username || this.currentPrivateChat.friendName;
@@ -567,6 +557,9 @@ class FriendsManager {
             messageElement.className = `message ${messageClass}`;
             messageElement.dataset.messageId = messageId;
             
+            // 解析前端回复元数据
+            const parsed = this.parseReplyMeta(message.content);
+
             let messageHTML = `
                 <div class="message-select-wrapper">
                     <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
@@ -582,9 +575,18 @@ class FriendsManager {
                             </div>
                         </div>`;
             
+            if (parsed?.reply) {
+                messageHTML += `
+                    <div class="reply-preview">
+                        <div class="small text-muted">回复 ${this.escapeHtml(parsed.reply.name || '消息')}</div>
+                        <div>${this.escapeHtml(parsed.reply.snippet || '')}</div>
+                    </div>`;
+            }
+
             // 如果有文本内容，显示文本
             if (contentToShow && contentToShow.trim()) {
-                messageHTML += `<div class="message-content">${this.escapeHtml(contentToShow)}</div>`;
+                const visible = parsed?.visibleText ?? contentToShow;
+                messageHTML += `<div class="message-content">${this.escapeHtml(visible)}</div>`;
             }
             
             messageHTML += `
@@ -639,96 +641,10 @@ class FriendsManager {
             this.loadMessageReadStatus(this.currentPrivateChat.friendId, sortedMessages);
         }
 
-        // 滚动到底部 - 使用更精确和强制的滚动策略
-        const forceScrollToBottom = () => {
-            if (chatMessages && chatMessages.scrollHeight > chatMessages.clientHeight) {
-                // 计算真正的最大滚动位置
-                const maxScrollTop = chatMessages.scrollHeight - chatMessages.clientHeight;
-                chatMessages.scrollTop = maxScrollTop;
-                
-                // 如果仍然没有到底部，使用更直接的方法
-                if (chatMessages.scrollTop < maxScrollTop) {
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                }
-                
-                // 使用最后一个消息元素的 scrollIntoView 作为最终保障
-                const lastMessage = chatMessages.lastElementChild;
-                if (lastMessage && !lastMessage.classList.contains('text-center')) {
-                    lastMessage.scrollIntoView({ 
-                        behavior: 'instant', 
-                        block: 'end',
-                        inline: 'nearest' 
-                    });
-                }
-                
-                console.log('🔄 [私聊滚动调试]', {
-                    scrollHeight: chatMessages.scrollHeight,
-                    clientHeight: chatMessages.clientHeight,
-                    scrollTop: chatMessages.scrollTop,
-                    maxScrollTop: maxScrollTop,
-                    isAtBottom: chatMessages.scrollTop >= maxScrollTop - 5
-                });
-            }
-        };
-        
-        // 立即滚动
-        forceScrollToBottom();
-        
-        // 使用双重 requestAnimationFrame 确保DOM完全更新
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                forceScrollToBottom();
-            });
-        });
-        
-        // 使用延时序列确保各种异步内容加载完成后也能正确滚动
+        // 滚动到底部
         setTimeout(() => {
-            forceScrollToBottom();
-            
-            // 检查是否真正到达底部
-            if (chatMessages) {
-                const maxScrollTop = chatMessages.scrollHeight - chatMessages.clientHeight;
-                const isAtBottom = chatMessages.scrollTop >= maxScrollTop - 10;
-                if (!isAtBottom) {
-                    console.log('🔄 [私聊滚动修正] 未完全到达底部，再次滚动');
-                    forceScrollToBottom();
-                }
-            }
-        }, 200);
-        
-        setTimeout(() => {
-            forceScrollToBottom();
-        }, 600);
-        
-        // 监听图片加载完成事件，确保图片加载后重新滚动
-        const images = chatMessages.querySelectorAll('img');
-        if (images.length > 0) {
-            let loadedImages = 0;
-            images.forEach(img => {
-                if (img.complete) {
-                    loadedImages++;
-                } else {
-                    img.addEventListener('load', () => {
-                        loadedImages++;
-                        if (loadedImages === images.length) {
-                            console.log('�️ 所有图片加载完成，重新滚动到底部');
-                            setTimeout(() => forceScrollToBottom(), 100);
-                        }
-                    });
-                    img.addEventListener('error', () => {
-                        loadedImages++;
-                        if (loadedImages === images.length) {
-                            setTimeout(() => forceScrollToBottom(), 100);
-                        }
-                    });
-                }
-            });
-            
-            // 如果所有图片都已加载，立即滚动
-            if (loadedImages === images.length) {
-                setTimeout(() => forceScrollToBottom(), 100);
-            }
-        }
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }, 100);
 
         console.log(`✅ 已渲染 ${messages.length} 条私聊消息`);
     }
@@ -1139,34 +1055,6 @@ class FriendsManager {
     }
 
     /**
-     * 删除好友
-     */
-    async deleteFriend(friendId, friendName) {
-        if (!confirm(`确定要删除好友"${friendName}"吗？\n\n删除后将无法再进行私聊，需要重新添加好友。`)) {
-            return;
-        }
-
-        try {
-            console.log('删除好友:', friendId, friendName);
-            await this.friendsApi.deleteFriend(friendId);
-            
-            showToast(`好友"${friendName}"已删除`, 'info');
-            
-            // 如果当前正在与此好友私聊，清除私聊状态
-            if (this.currentPrivateChat && this.currentPrivateChat.friendId === friendId) {
-                this.clearPrivateChat();
-            }
-            
-            // 重新加载好友列表
-            await this.loadFriendsList();
-            
-        } catch (error) {
-            console.error('删除好友失败:', error);
-            showToast('删除好友失败: ' + error.message, 'error');
-        }
-    }
-
-    /**
      * 获取状态文本
      */
     getStatusText(status) {
@@ -1203,6 +1091,14 @@ class FriendsManager {
     }
 
     /**
+     * 清除私聊状态
+     */
+    clearPrivateChat() {
+        this.currentPrivateChat = null;
+        this.updateActiveStates();
+    }
+
+    /**
      * 发送私聊消息（已优化：移除不必要的状态刷新）
      */
     /**
@@ -1216,29 +1112,6 @@ class FriendsManager {
 
         try {
             console.log('🖼️ 发送私聊图片消息:', { fileId, filename });
-            
-            // 防止重复发送同一图片
-            const messageKey = `private_img_${fileId}_${this.currentPrivateChat.friendId}`;
-            if (this.sentImageMessages && this.sentImageMessages.has(messageKey)) {
-                console.warn('⚠️ 检测到重复的私聊图片消息，跳过发送:', messageKey);
-                showToast('图片已发送，请勿重复操作', 'warning');
-                return;
-            }
-            
-            // 初始化已发送图片记录
-            if (!this.sentImageMessages) {
-                this.sentImageMessages = new Set();
-            }
-            
-            // 记录已发送的图片
-            this.sentImageMessages.add(messageKey);
-            
-            // 5秒后清除记录
-            setTimeout(() => {
-                if (this.sentImageMessages) {
-                    this.sentImageMessages.delete(messageKey);
-                }
-            }, 5000);
             
             // 先在界面显示带图片的发送中状态
             this.displaySendingImageMessage(fileId, filename);
@@ -1272,16 +1145,18 @@ class FriendsManager {
             console.log('💬 发送私聊消息:', content);
             
             // 先在界面显示发送中状态
-            this.displaySendingMessage(content);
+            this.displaySendingMessage(content, this.replyContext);
             
             // 调用API发送私聊消息
             const response = await this.friendsApi.sendPrivateMessage(
                 this.currentPrivateChat.friendId, 
-                content, 
+                this.buildContentWithReply(content, this.replyContext), 
                 'text'
             );
             
             console.log('✅ 私聊消息发送完成');
+            // 发送成功后清理引用状态
+            this.clearReplyContext();
             
             // WebSocket实时通知已修复，无需主动刷新已读状态
             // 新消息的已读状态将通过WebSocket实时更新（20-30ms延迟）
@@ -1293,6 +1168,20 @@ class FriendsManager {
             // 移除发送中的消息显示
             this.removeSendingMessage();
         }
+    }
+
+    buildContentWithReply(content, reply) {
+        if (!reply) return content;
+        // 前端协议：在文本开头嵌入一段不可见的JSON元数据，用于渲染引用
+        // 使用零宽空格包裹以降低用户可见概率
+        const meta = {
+            _reply: {
+                id: reply.messageId,
+                name: reply.senderName,
+                snippet: reply.contentSnippet
+            }
+        };
+        return `\u200b${JSON.stringify(meta)}\u200b\n${content}`;
     }
 
     /**
@@ -1364,11 +1253,7 @@ class FriendsManager {
         `;
 
         chatMessages.appendChild(messageElement);
-        
-        // 确保滚动到底部
-        requestAnimationFrame(() => {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        });
+        chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     /**
@@ -1381,7 +1266,7 @@ class FriendsManager {
     /**
      * 显示发送中的消息
      */
-    displaySendingMessage(content) {
+    displaySendingMessage(content, reply) {
         const chatMessages = document.getElementById('chatMessages');
         if (!chatMessages) return;
 
@@ -1392,12 +1277,22 @@ class FriendsManager {
         messageElement.className = 'message message-user sending';
         messageElement.id = 'sending-message';
         
+        let replyBlock = '';
+        if (reply) {
+            replyBlock = `
+                <div class="reply-preview">
+                    <div class="small text-muted">回复 ${this.escapeHtml(reply.senderName)}</div>
+                    <div>${this.escapeHtml(reply.contentSnippet)}</div>
+                </div>`;
+        }
+
         messageElement.innerHTML = `
             <div class="message-bubble">
                 <div class="message-header">
                     <span class="message-sender">我</span>
                     <span class="message-time">发送中...</span>
                 </div>
+                ${replyBlock}
                 <div class="message-content">${this.escapeHtml(content)}</div>
             </div>
         `;
@@ -1445,7 +1340,7 @@ class FriendsManager {
                          alt="${this.escapeHtml(filename)}" 
                          title="${this.escapeHtml(filename)}" 
                          class="message-image img-fluid" 
-                         style="border-radius: 8px; cursor: pointer; opacity: 0.8; max-width: 100%; height: auto; display: block;"
+                         style="max-width: 300px; max-height: 200px; border-radius: 8px; cursor: pointer; opacity: 0.8;"
                          onclick="window.chatroomController?.openImageModal?.('${imageUrl}', '${this.escapeHtml(filename)}')" />
                 </div>
             </div>
@@ -1515,6 +1410,9 @@ class FriendsManager {
             }
         }
         
+        // 尝试解析前端协议元数据
+        const parsed = this.parseReplyMeta(message.content);
+
         let messageHTML = `
             <div class="message-select-wrapper">
                 <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
@@ -1529,9 +1427,19 @@ class FriendsManager {
                         </div>
                     </div>`;
         
-        // 如果有文本内容，显示文本
+        // 如果包含引用，渲染引用块
+        if (parsed?.reply) {
+            messageHTML += `
+                <div class="reply-preview">
+                    <div class="small text-muted">回复 ${this.escapeHtml(parsed.reply.name || '消息')}</div>
+                    <div>${this.escapeHtml(parsed.reply.snippet || '')}</div>
+                </div>`;
+        }
+
+        // 如果有文本内容，显示文本（去掉元数据包裹）
         if (contentToShow && contentToShow.trim()) {
-            messageHTML += `<div class="message-content">${this.escapeHtml(contentToShow)}</div>`;
+            const visible = parsed?.visibleText ?? contentToShow;
+            messageHTML += `<div class="message-content">${this.escapeHtml(visible)}</div>`;
         }
         
         messageHTML += '</div></div>';
@@ -1615,6 +1523,8 @@ class FriendsManager {
             }
         }
         
+        const parsed = this.parseReplyMeta(data.content);
+
         let messageHTML = `
             <div class="message-select-wrapper">
                 <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
@@ -1629,9 +1539,18 @@ class FriendsManager {
                         </div>
                     </div>`;
         
+        if (parsed?.reply) {
+            messageHTML += `
+                <div class="reply-preview">
+                    <div class="small text-muted">回复 ${this.escapeHtml(parsed.reply.name || '消息')}</div>
+                    <div>${this.escapeHtml(parsed.reply.snippet || '')}</div>
+                </div>`;
+        }
+
         // 如果有文本内容，显示文本
         if (contentToShow && contentToShow.trim()) {
-            messageHTML += `<div class="message-content">${this.escapeHtml(contentToShow)}</div>`;
+            const visible = parsed?.visibleText ?? contentToShow;
+            messageHTML += `<div class="message-content">${this.escapeHtml(visible)}</div>`;
         }
         
         messageHTML += `
@@ -1814,20 +1733,6 @@ class FriendsManager {
     clearPrivateChat() {
         this.currentPrivateChat = null;
         
-        // 清除保存的聊天状态（如果当前是私聊状态）
-        try {
-            const savedState = localStorage.getItem('dify_last_chat_state');
-            if (savedState) {
-                const chatState = JSON.parse(savedState);
-                if (chatState.type === 'private') {
-                    localStorage.removeItem('dify_last_chat_state');
-                    console.log('🧹 已清除私聊状态');
-                }
-            }
-        } catch (error) {
-            console.warn('清除私聊状态时出错:', error);
-        }
-        
         // 隐藏私聊操作按钮，显示群聊元素
         const privateChatActions = document.getElementById('privateChatActions');
         const onlineMembers = document.getElementById('onlineMembers');
@@ -1843,34 +1748,7 @@ class FriendsManager {
             this.exitSelectionMode();
         }
         
-        // 更新活跃状态
-        this.updateActiveStates();
-        
-        // 清空聊天区域，回到群聊模式
-        const chatMessages = document.getElementById('chatMessages');
-        const messageInput = document.getElementById('messageInput');
-        const currentRoomName = document.getElementById('currentRoomName');
-        
-        if (chatMessages) {
-            chatMessages.innerHTML = `
-                <div class="text-center text-muted mt-5">
-                    <i class="fas fa-comments fa-3x mb-3"></i>
-                    <h5>欢迎回到群聊</h5>
-                    <p>选择一个房间开始聊天吧！</p>
-                </div>
-            `;
-        }
-        
-        if (messageInput) {
-            messageInput.disabled = true;
-            messageInput.placeholder = '选择房间或好友开始聊天...';
-        }
-        
-        if (currentRoomName) {
-            currentRoomName.innerHTML = '选择房间或好友';
-        }
-        
-        console.log('✅ 已清除私聊状态，切换回群聊模式');
+        console.log('✅ 已清除私聊状态');
     }
 
     /**
@@ -1893,6 +1771,22 @@ class FriendsManager {
                 this.showMessageContextMenu(e, messageElement);
             }
         });
+
+        // 移动端长按：替换原先的按压进入选择删除，改为弹出菜单
+        let touchTimer = null;
+        chatMessages.addEventListener('touchstart', (e) => {
+            const messageElement = e.target.closest('.message');
+            if (!messageElement) return;
+            touchTimer = setTimeout(() => {
+                // 模拟在触点位置显示菜单
+                const touch = e.touches[0];
+                const fakeEvent = { clientX: touch.clientX, clientY: touch.clientY };
+                this.closeAllContextMenus();
+                this.showMessageContextMenu(fakeEvent, messageElement);
+            }, 450);
+        }, { passive: true });
+        chatMessages.addEventListener('touchend', () => { if (touchTimer) clearTimeout(touchTimer); }, { passive: true });
+        chatMessages.addEventListener('touchmove', () => { if (touchTimer) clearTimeout(touchTimer); }, { passive: true });
 
         // 全局点击事件：点击其他地方关闭右键菜单
         if (!this.globalClickAttached) {
@@ -1949,6 +1843,9 @@ class FriendsManager {
         contextMenu.className = 'message-context-menu';
         contextMenu.innerHTML = `
             <div class="dropdown-menu show" style="position: absolute; z-index: 1000;">
+                <button class="dropdown-item" data-action="reply" data-message-id="${messageId}">
+                    <i class="fas fa-reply"></i> 回复
+                </button>
                 <button class="dropdown-item" data-action="select" data-message-id="${messageId}">
                     <i class="fas fa-check-square"></i> 选择消息
                 </button>
@@ -1971,6 +1868,15 @@ class FriendsManager {
             const msgId = button.dataset.messageId;
 
             switch (action) {
+                case 'reply': {
+                    // 收集引用信息：消息ID、发送者名、文本片段
+                    const senderName = messageElement.querySelector('.message-sender')?.textContent || '';
+                    const rawText = messageElement.querySelector('.message-content')?.textContent || '';
+                    this.setReplyContext(msgId, senderName, rawText);
+                    // 聚焦输入框
+                    document.getElementById('messageInput')?.focus();
+                    break;
+                }
                 case 'select':
                     this.toggleMessageSelection(msgId);
                     break;
@@ -2013,6 +1919,75 @@ class FriendsManager {
         contextMenu.style.visibility = 'visible';
     }
 
+    // 解析前端协议元数据：提取_reply并返回可见文本
+    parseReplyMeta(content) {
+        if (!content || typeof content !== 'string') return null;
+
+        // 允许前导 BOM / 空白字符（Chrome 安卓可能注入）
+        const LEADING_JUNK = /^[\uFEFF\u200D\u2060\s]*/; // BOM、ZWJ、WORD JOINER、空白
+        const cleaned = content.replace(LEADING_JUNK, '');
+
+        // 尝试 1：实际零宽空格分隔（\u200bJSON\u200b）
+        const REAL_ZWS = '\u200b';
+        const realFirst = cleaned.indexOf(REAL_ZWS);
+        if (realFirst === 0) {
+            const realSecond = cleaned.indexOf(REAL_ZWS, 1);
+            if (realSecond > 1) {
+                const jsonStr = cleaned.slice(1, realSecond);
+                try {
+                    const meta = JSON.parse(jsonStr);
+                    const visibleText = cleaned.slice(realSecond + 1).replace(/^\n/, '');
+                    if (meta && meta._reply) return { reply: meta._reply, visibleText };
+                } catch (_) { /* fallthrough */ }
+            }
+        }
+
+        // 尝试 2：转义形式 "\\u200b" 包裹（某些路径可能把字符转义为字面量）
+        const ESC_ZWS = '\\u200b'; // 6字符：\ u 2 0 0 b
+        const escFirst = cleaned.indexOf(ESC_ZWS);
+        if (escFirst === 0) {
+            const escSecond = cleaned.indexOf(ESC_ZWS, ESC_ZWS.length);
+            if (escSecond > ESC_ZWS.length) {
+                const jsonStr = cleaned.slice(ESC_ZWS.length, escSecond);
+                try {
+                    const meta = JSON.parse(jsonStr);
+                    const visibleText = cleaned.slice(escSecond + ESC_ZWS.length).replace(/^\n/, '');
+                    if (meta && meta._reply) return { reply: meta._reply, visibleText };
+                } catch (_) { /* fallthrough */ }
+            }
+        }
+
+        // 尝试 3：宽松查找（首个ZWS不在0位，但很靠前），防止偶发前导字符
+        const nearFirst = cleaned.indexOf(REAL_ZWS);
+        if (nearFirst > -1 && nearFirst < 5) {
+            const nearSecond = cleaned.indexOf(REAL_ZWS, nearFirst + 1);
+            if (nearSecond > nearFirst + 1) {
+                const jsonStr = cleaned.slice(nearFirst + 1, nearSecond);
+                try {
+                    const meta = JSON.parse(jsonStr);
+                    const visibleText = cleaned.slice(nearSecond + 1).replace(/^\n/, '');
+                    if (meta && meta._reply) return { reply: meta._reply, visibleText };
+                } catch (_) { /* fallthrough */ }
+            }
+        }
+
+        // 尝试 4：后备方案——零宽已被剥离，仅剩首行 JSON（{"_reply":...}\n正文）
+        // 仅当第一行是一个仅包含 _reply 的对象时生效，避免误伤用户正常以 { 开头的消息
+        const firstNewline = cleaned.indexOf('\n');
+        const head = firstNewline === -1 ? cleaned : cleaned.slice(0, firstNewline);
+        if (head.startsWith('{') && head.endsWith('}')) {
+            try {
+                const meta = JSON.parse(head);
+                if (meta && typeof meta === 'object' && meta._reply && Object.keys(meta).length === 1) {
+                    const visibleText = firstNewline === -1 ? '' : cleaned.slice(firstNewline + 1);
+                    return { reply: meta._reply, visibleText };
+                }
+            } catch (_) { /* ignore */ }
+        }
+
+        return null;
+    }
+
     /**
      * 关闭所有右键菜单
      */
@@ -2044,29 +2019,7 @@ class FriendsManager {
         const checkbox = document.querySelector(`input[data-message-id="${messageId}"]`);
         if (checkbox) {
             checkbox.checked = !checkbox.checked;
-            
-            // 触发 change 事件以确保工具栏更新
-            checkbox.dispatchEvent(new Event('change'));
-            
-            // 添加视觉反馈
-            const messageElement = checkbox.closest('.message');
-            if (messageElement) {
-                if (checkbox.checked) {
-                    messageElement.classList.add('message-selected');
-                    // 选中时的动画效果
-                    messageElement.style.transform = 'scale(1.02)';
-                    setTimeout(() => {
-                        messageElement.style.transform = '';
-                    }, 150);
-                } else {
-                    messageElement.classList.remove('message-selected');
-                    // 取消选中时的动画效果
-                    messageElement.style.transform = 'scale(0.98)';
-                    setTimeout(() => {
-                        messageElement.style.transform = '';
-                    }, 150);
-                }
-            }
+            this.updateDeleteToolbar();
         }
     }
 
@@ -2079,23 +2032,12 @@ class FriendsManager {
         // 关闭右键菜单
         this.closeAllContextMenus();
         
-        // 为聊天容器添加选择模式类
-        const chatContainer = document.querySelector('.chat-container') || document.querySelector('.chat-area');
-        if (chatContainer) {
-            chatContainer.classList.add('selection-mode');
-        }
-        
         // 显示所有复选框，允许选择所有消息
-        document.querySelectorAll('.message-checkbox').forEach((checkbox, index) => {
+        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
             checkbox.style.display = 'block';
             checkbox.disabled = false;
             checkbox.style.opacity = '1';
-            checkbox.title = '选择此消息';
-            
-            // 添加淡入动画效果
-            setTimeout(() => {
-                checkbox.style.transform = 'scale(1.2)';
-            }, index * 20);
+            checkbox.title = '';
         });
 
         // 显示工具栏
@@ -2110,7 +2052,6 @@ class FriendsManager {
         }
         if (exitSelectionBtn) exitSelectionBtn.style.display = 'inline-block';
         
-        showToast('已进入消息选择模式，点击消息前的复选框来选择', 'info');
         console.log('✅ 进入多选模式');
     }
 
@@ -2123,29 +2064,10 @@ class FriendsManager {
         // 关闭右键菜单
         this.closeAllContextMenus();
         
-        // 移除选择模式类
-        const chatContainer = document.querySelector('.chat-container') || document.querySelector('.chat-area');
-        if (chatContainer) {
-            chatContainer.classList.remove('selection-mode');
-        }
-        
-        // 隐藏所有复选框并清除选中状态
-        document.querySelectorAll('.message-checkbox').forEach((checkbox, index) => {
+        // 隐藏所有复选框
+        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
+            checkbox.style.display = 'none';
             checkbox.checked = false;
-            checkbox.style.opacity = '0';
-            
-            // 添加淡出动画效果
-            setTimeout(() => {
-                checkbox.style.display = 'none';
-                checkbox.style.transform = 'scale(1)';
-            }, index * 10);
-            
-            // 清除消息选中状态样式
-            const messageElement = checkbox.closest('.message');
-            if (messageElement) {
-                messageElement.classList.remove('message-selected');
-                messageElement.style.background = '';
-            }
         });
 
         // 隐藏工具栏
@@ -2157,7 +2079,6 @@ class FriendsManager {
         if (quickDeleteBtn) quickDeleteBtn.style.display = 'none';
         if (exitSelectionBtn) exitSelectionBtn.style.display = 'none';
         
-        showToast('已退出消息选择模式', 'info');
         console.log('✅ 退出多选模式');
     }
 
@@ -2171,23 +2092,22 @@ class FriendsManager {
             toolbar.id = 'messageSelectionToolbar';
             toolbar.className = 'message-selection-toolbar';
             toolbar.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center p-3 bg-gradient">
-                    <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-sm btn-outline-primary" onclick="window.friendsManager.selectAllMessages()" title="选择所有消息">
+                <div class="d-flex justify-content-between align-items-center p-2 bg-light border">
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="window.friendsManager.selectAllMessages()">
                             <i class="fas fa-check-double"></i> 全选
                         </button>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="window.friendsManager.clearSelection()" title="清除所有选择">
-                            <i class="fas fa-square"></i> 取消
+                        <button class="btn btn-sm btn-outline-secondary" onclick="window.friendsManager.clearSelection()">
+                            <i class="fas fa-times"></i> 清除
                         </button>
-                        <div class="vr"></div>
-                        <span id="selectedCount" class="selection-count">已选择: 0 条</span>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-sm btn-danger" onclick="window.friendsManager.deleteSelectedMessages()" disabled title="删除选中的消息">
-                            <i class="fas fa-trash-alt"></i> 删除选中
+                    <div>
+                        <span id="selectedCount" class="me-3">已选择: 0 条</span>
+                        <button class="btn btn-sm btn-danger" onclick="window.friendsManager.deleteSelectedMessages()" disabled>
+                            <i class="fas fa-trash"></i> 删除选中
                         </button>
-                        <button class="btn btn-sm btn-secondary" onclick="window.friendsManager.exitSelectionMode()" title="退出选择模式">
-                            <i class="fas fa-times-circle"></i> 退出
+                        <button class="btn btn-sm btn-secondary" onclick="window.friendsManager.exitSelectionMode()">
+                            <i class="fas fa-times"></i> 取消
                         </button>
                     </div>
                 </div>
@@ -2222,141 +2142,37 @@ class FriendsManager {
      */
     updateDeleteToolbar() {
         const selectedCheckboxes = document.querySelectorAll('.message-checkbox:checked');
-        const totalCheckboxes = document.querySelectorAll('.message-checkbox[style*="block"]');
         const selectedCount = selectedCheckboxes.length;
-        const totalCount = totalCheckboxes.length;
         
         const countElement = document.getElementById('selectedCount');
         const deleteButton = document.querySelector('#messageSelectionToolbar .btn-danger');
         const quickDeleteBtn = document.getElementById('quickDeleteBtn');
-        const selectAllBtn = document.querySelector('#messageSelectionToolbar .btn-outline-primary');
-        const clearBtn = document.querySelector('#messageSelectionToolbar .btn-outline-secondary');
         
-        // 更新选择计数显示
         if (countElement) {
-            countElement.innerHTML = selectedCount > 0 
-                ? `已选择: <strong>${selectedCount}</strong> / ${totalCount} 条`
-                : `已选择: 0 条`;
-            
-            // 添加视觉状态指示
-            countElement.className = selectedCount > 0 
-                ? 'selection-count selected' 
-                : 'selection-count';
+            countElement.textContent = `已选择: ${selectedCount} 条`;
         }
         
-        // 更新删除按钮状态
         if (deleteButton) {
             deleteButton.disabled = selectedCount === 0;
-            deleteButton.innerHTML = selectedCount > 0 
-                ? `<i class="fas fa-trash-alt"></i> 删除选中 (${selectedCount})`
-                : `<i class="fas fa-trash-alt"></i> 删除选中`;
         }
         
-        // 更新快捷删除按钮
+        // 同时更新快捷删除按钮
         if (quickDeleteBtn) {
             quickDeleteBtn.disabled = selectedCount === 0;
+            quickDeleteBtn.textContent = selectedCount > 0 ? ` 删除 (${selectedCount})` : ' 删除';
             quickDeleteBtn.innerHTML = selectedCount > 0 
                 ? `<i class="fas fa-trash"></i> 删除 (${selectedCount})`
                 : `<i class="fas fa-trash"></i> 删除`;
         }
-        
-        // 更新全选按钮状态
-        if (selectAllBtn) {
-            if (selectedCount === totalCount && totalCount > 0) {
-                // 完全全选状态 - 显示可点击取消全选
-                selectAllBtn.innerHTML = '<i class="fas fa-check-double"></i> 已全选 <small>(点击取消)</small>';
-                selectAllBtn.classList.add('btn-success');
-                selectAllBtn.classList.remove('btn-outline-primary');
-                selectAllBtn.disabled = false; // 仍然可以点击
-                selectAllBtn.title = '点击取消全选';
-            } else if (selectedCount > 0) {
-                // 部分选择状态
-                selectAllBtn.innerHTML = `<i class="fas fa-check-double"></i> 全选 <small>(${selectedCount}/${totalCount})</small>`;
-                selectAllBtn.classList.remove('btn-success');
-                selectAllBtn.classList.add('btn-outline-primary');
-                selectAllBtn.disabled = false;
-                selectAllBtn.title = '选择所有消息';
-            } else {
-                // 未选择状态
-                selectAllBtn.innerHTML = '<i class="fas fa-check-double"></i> 全选';
-                selectAllBtn.classList.remove('btn-success');
-                selectAllBtn.classList.add('btn-outline-primary');
-                selectAllBtn.disabled = totalCount === 0; // 没有消息时禁用
-                selectAllBtn.title = totalCount > 0 ? '选择所有消息' : '没有可选择的消息';
-            }
-        }
-        
-        // 更新清除按钮状态
-        if (clearBtn) {
-            clearBtn.disabled = selectedCount === 0;
-            if (selectedCount > 0) {
-                clearBtn.classList.remove('btn-outline-secondary');
-                clearBtn.classList.add('btn-outline-warning');
-            } else {
-                clearBtn.classList.add('btn-outline-secondary');
-                clearBtn.classList.remove('btn-outline-warning');
-            }
-        }
     }
 
     /**
-     * 全选消息（智能切换）
+     * 全选消息
      */
     selectAllMessages() {
-        const checkboxes = document.querySelectorAll('.message-checkbox');
-        const visibleCheckboxes = Array.from(checkboxes).filter(checkbox => 
-            checkbox.style.display !== 'none' && !checkbox.disabled
-        );
-        
-        if (visibleCheckboxes.length === 0) {
-            showToast('没有可选择的消息', 'warning');
-            return;
-        }
-        
-        // 检查是否已经全选
-        const selectedCount = visibleCheckboxes.filter(checkbox => checkbox.checked).length;
-        const isAllSelected = selectedCount === visibleCheckboxes.length;
-        
-        if (isAllSelected) {
-            // 如果已经全选，则取消全选
-            visibleCheckboxes.forEach(checkbox => {
-                checkbox.checked = false;
-                // 移除选中状态样式
-                const messageElement = checkbox.closest('.message');
-                if (messageElement) {
-                    messageElement.classList.remove('message-selected');
-                    // 短暂动画效果
-                    messageElement.style.background = 'rgba(108, 117, 125, 0.1)';
-                    setTimeout(() => {
-                        messageElement.style.background = '';
-                    }, 200);
-                }
-            });
-            showToast(`已取消全选 ${visibleCheckboxes.length} 条消息`, 'info');
-            console.log(`✅ 取消全选了 ${visibleCheckboxes.length} 条消息`);
-        } else {
-            // 如果未全选，则全选
-            visibleCheckboxes.forEach((checkbox, index) => {
-                if (!checkbox.checked) {
-                    checkbox.checked = true;
-                    // 添加选中动画效果
-                    const messageElement = checkbox.closest('.message');
-                    if (messageElement) {
-                        messageElement.classList.add('message-selected');
-                        // 短暂高亮效果，加延迟产生波浪效果
-                        setTimeout(() => {
-                            messageElement.style.background = 'rgba(40, 167, 69, 0.1)';
-                            setTimeout(() => {
-                                messageElement.style.background = '';
-                            }, 300);
-                        }, index * 30);
-                    }
-                }
-            });
-            showToast(`已选择 ${visibleCheckboxes.length} 条消息`, 'success');
-            console.log(`✅ 全选了 ${visibleCheckboxes.length} 条消息`);
-        }
-        
+        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
+            checkbox.checked = true;
+        });
         this.updateDeleteToolbar();
     }
 
@@ -2364,33 +2180,10 @@ class FriendsManager {
      * 清除选择
      */
     clearSelection() {
-        const checkedCheckboxes = document.querySelectorAll('.message-checkbox:checked');
-        
-        if (checkedCheckboxes.length === 0) {
-            showToast('没有已选择的消息', 'info');
-            return;
-        }
-        
-        const clearedCount = checkedCheckboxes.length;
-        
-        checkedCheckboxes.forEach(checkbox => {
+        document.querySelectorAll('.message-checkbox').forEach(checkbox => {
             checkbox.checked = false;
-            // 移除选中状态样式
-            const messageElement = checkbox.closest('.message');
-            if (messageElement) {
-                messageElement.classList.remove('message-selected');
-                // 短暂闪烁效果
-                messageElement.style.background = 'rgba(108, 117, 125, 0.1)';
-                setTimeout(() => {
-                    messageElement.style.background = '';
-                }, 200);
-            }
         });
-        
-        // 更新工具栏状态，这将重置全选按钮状态
         this.updateDeleteToolbar();
-        showToast(`已取消选择 ${clearedCount} 条消息`, 'info');
-        console.log(`✅ 清除了 ${clearedCount} 条消息的选择`);
     }
 
     /**
@@ -3143,8 +2936,7 @@ class FriendsManager {
         img.className = 'message-image img-fluid';
         img.alt = fileName;
         img.title = fileName;
-        // 移除固定的max-width和max-height，让CSS自适应控制
-        img.style.cssText = 'border-radius: 8px; cursor: pointer; max-width: 100%; height: auto; display: block;';
+        img.style.cssText = 'max-width: 300px; max-height: 200px; border-radius: 8px; cursor: pointer;';
         
         // 处理图片加载错误
         img.onerror = () => {
@@ -3159,20 +2951,6 @@ class FriendsManager {
         // 成功加载时的处理
         img.onload = () => {
             console.log('✅ 私聊图片加载成功:', imageUrl);
-            
-            // 图片加载完成后重新滚动到底部
-            setTimeout(() => {
-                const chatMessages = document.getElementById('chatMessages');
-                if (chatMessages) {
-                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                    
-                    // 使用最后一个消息的 scrollIntoView 作为备用
-                    const lastMessage = chatMessages.lastElementChild;
-                    if (lastMessage && !lastMessage.classList.contains('text-center')) {
-                        lastMessage.scrollIntoView({ behavior: 'instant', block: 'end' });
-                    }
-                }
-            }, 100);
         };
         
         // 点击放大功能 - 使用与群聊相同的模态框逻辑
