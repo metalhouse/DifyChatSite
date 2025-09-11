@@ -12,11 +12,9 @@ class FriendsManager {
         this.currentPrivateChat = null;
         this.unreadCounts = {}; // 存储各好友的未读消息计数
         this.readStatusTimer = null; // 已读状态刷新定时器
+    this.replyTarget = null; // 当前引用目标 { id, senderName, snippet }
         
-    // 回复状态（前端本地）
-    this.replyContext = null; // { messageId, senderName, contentSnippet }
-
-    // DOM 元素
+        // DOM 元素
         this.elements = {
             friendList: document.getElementById('friendList'),
             friendRequestsBadge: document.getElementById('friendRequestsBadge'),
@@ -32,47 +30,6 @@ class FriendsManager {
         
         // 监听窗口焦点变化，用于已读状态同步
         this.setupWindowFocusHandlers();
-    }
-
-    // =============================
-    // 引用/回复：工具方法
-    // =============================
-    setReplyContext(messageId, senderName, rawContent) {
-        const snippet = (rawContent || '').replace(/\s+/g, ' ').slice(0, 120);
-        this.replyContext = { messageId, senderName, contentSnippet: snippet };
-        this.showComposerReplyPreview();
-    }
-
-    clearReplyContext() {
-        this.replyContext = null;
-        const container = document.getElementById('composerReplyContainer');
-        if (container) container.remove();
-    }
-
-    showComposerReplyPreview() {
-        const inputArea = document.querySelector('.chat-input .input-group');
-        if (!inputArea || !this.replyContext) return;
-
-        // 如果已存在先移除
-        const existed = document.getElementById('composerReplyContainer');
-        if (existed) existed.remove();
-
-        const wrapper = document.createElement('div');
-        wrapper.id = 'composerReplyContainer';
-        wrapper.className = 'composer-reply';
-        wrapper.innerHTML = `
-            <div class="content">
-                <div class="meta">回复 ${this.escapeHtml(this.replyContext.senderName)}</div>
-                <div class="snippet">${this.escapeHtml(this.replyContext.contentSnippet || '')}</div>
-            </div>
-            <button class="close-btn" title="取消引用" aria-label="取消引用">×</button>
-        `;
-
-        // 插入到输入组前
-        const parent = document.querySelector('.chat-input');
-        if (parent) parent.insertBefore(wrapper, inputArea);
-
-        wrapper.querySelector('.close-btn')?.addEventListener('click', () => this.clearReplyContext());
     }
 
     /**
@@ -342,11 +299,10 @@ class FriendsManager {
         const chatMessages = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
-        // 标记聊天区域为私聊模式，便于CSS做专属布局优化
-        try {
-            const chatArea = document.querySelector('.chat-area');
-            if (chatArea) chatArea.classList.add('private-mode');
-        } catch (e) { /* noop */ }
+    const plusButton = document.getElementById('plusButton');
+    const emojiButton = document.getElementById('emojiButton');
+    const mentionButton = document.getElementById('mentionButton');
+    const cameraButton = document.getElementById('cameraButton');
         
         if (chatMessages) {
             // 清空消息区域
@@ -371,6 +327,19 @@ class FriendsManager {
         if (sendButton) {
             sendButton.disabled = false;
         }
+        if (plusButton) {
+            plusButton.disabled = false;
+        }
+        if (emojiButton) {
+            emojiButton.disabled = false;
+        }
+        if (mentionButton) {
+            // 私聊模式是否允许@智能体：当前保持启用
+            mentionButton.disabled = false;
+        }
+        if (cameraButton) {
+            cameraButton.disabled = false;
+        }
         
         // 启用图片上传按钮
         const imageUploadButton = document.getElementById('imageUploadButton');
@@ -379,10 +348,10 @@ class FriendsManager {
         }
         
         // 启用@智能体按钮（如果需要的话）
-        const mentionButton = document.getElementById('mentionButton');
-        if (mentionButton) {
-            // 私聊模式可能不需要@智能体，可以选择禁用或保持启用
-            // mentionButton.disabled = true;
+        // 兼容旧的 emojiToggle id（如果存在）
+        const emojiToggle = document.getElementById('emojiToggle');
+        if (emojiToggle) {
+            emojiToggle.disabled = false;
         }
 
         // 显示私聊操作按钮，隐藏群聊元素
@@ -518,7 +487,7 @@ class FriendsManager {
         // 渲染消息
         chatMessages.innerHTML = '';
         
-    sortedMessages.forEach(message => {
+        sortedMessages.forEach(message => {
             const isCurrentUser = message.senderId === currentUserId;
             const messageClass = isCurrentUser ? 'message-user' : 'message-other';
             const senderName = isCurrentUser ? '我' : message.senderInfo?.username || this.currentPrivateChat.friendName;
@@ -534,7 +503,14 @@ class FriendsManager {
             const readStatusContainer = isCurrentUser ? 
                 '<div class="message-read-container" data-message-id="' + messageId + '"></div>' : '';
             
-            // 处理消息内容 - 对于图片消息，不显示加密文本
+            // 处理消息内容 - 优先解析引用元数据；对于图片消息，不显示加密文本
+            let parsedReply = null;
+            if (typeof message.content === 'string') {
+                parsedReply = this.parseReplyFromContent(message.content);
+                if (parsedReply) {
+                    message.content = parsedReply.text;
+                }
+            }
             let contentToShow = message.content;
             if (message.attachments && message.attachments.length > 0) {
                 // 检查内容是否像加密字符串或系统提示
@@ -557,9 +533,6 @@ class FriendsManager {
             messageElement.className = `message ${messageClass}`;
             messageElement.dataset.messageId = messageId;
             
-            // 解析前端回复元数据
-            const parsed = this.parseReplyMeta(message.content);
-
             let messageHTML = `
                 <div class="message-select-wrapper">
                     <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
@@ -574,19 +547,16 @@ class FriendsManager {
                                 </button>
                             </div>
                         </div>`;
-            
-            if (parsed?.reply) {
-                messageHTML += `
-                    <div class="reply-preview">
-                        <div class="small text-muted">回复 ${this.escapeHtml(parsed.reply.name || '消息')}</div>
-                        <div>${this.escapeHtml(parsed.reply.snippet || '')}</div>
-                    </div>`;
+            // 引用块（如果解析到）
+            if (parsedReply && parsedReply.replyMeta) {
+                const s = this.escapeHtml(parsedReply.replyMeta.senderName || '消息');
+                const t = this.escapeHtml(parsedReply.replyMeta.snippet || '');
+                messageHTML += `<div class="reply-block small text-muted mb-1"><i class=\"fas fa-reply me-1\"></i><span class=\"fw-semibold\">${s}</span><span class=\"ms-1\">${t}</span></div>`;
             }
-
+            
             // 如果有文本内容，显示文本
             if (contentToShow && contentToShow.trim()) {
-                const visible = parsed?.visibleText ?? contentToShow;
-                messageHTML += `<div class="message-content">${this.escapeHtml(visible)}</div>`;
+                messageHTML += `<div class="message-content">${this.escapeHtml(contentToShow)}</div>`;
             }
             
             messageHTML += `
@@ -1117,14 +1087,22 @@ class FriendsManager {
             this.displaySendingImageMessage(fileId, filename);
             
             // 调用API发送私聊图片消息
+            // 构造内容，若存在引用，使用JSON前缀
+            let content = `发送了图片: ${filename}`;
+            if (this.replyTarget) {
+                const metaLine = JSON.stringify({ _reply: { id: this.replyTarget.id, name: this.replyTarget.senderName, snippet: this.replyTarget.snippet } });
+                content = `${metaLine}\n${content}`;
+            }
+
             const response = await this.friendsApi.sendPrivateMessage(
                 this.currentPrivateChat.friendId, 
-                `发送了图片: ${filename}`, 
+                content, 
                 'image',
                 [fileId]  // 附件数组
             );
             
             console.log('✅ 私聊图片消息发送完成');
+            this.clearReplyTarget();
             
         } catch (error) {
             console.error('❌ 发送私聊图片消息失败:', error);
@@ -1145,18 +1123,27 @@ class FriendsManager {
             console.log('💬 发送私聊消息:', content);
             
             // 先在界面显示发送中状态
-            this.displaySendingMessage(content, this.replyContext);
+            this.displaySendingMessage(content);
             
+            // 如有引用，拼接轻量级前缀，供无后端支持时也能还原显示
+            let payloadContent = content;
+            if (this.replyTarget) {
+                const replyMeta = { id: this.replyTarget.id, name: this.replyTarget.senderName, snippet: this.replyTarget.snippet };
+                const metaLine = JSON.stringify({ _reply: replyMeta });
+                payloadContent = `${metaLine}\n${content}`;
+            }
+
             // 调用API发送私聊消息
             const response = await this.friendsApi.sendPrivateMessage(
                 this.currentPrivateChat.friendId, 
-                this.buildContentWithReply(content, this.replyContext), 
+                payloadContent, 
                 'text'
             );
             
             console.log('✅ 私聊消息发送完成');
-            // 发送成功后清理引用状态
-            this.clearReplyContext();
+
+            // 清除引用状态（不等回执）
+            this.clearReplyTarget();
             
             // WebSocket实时通知已修复，无需主动刷新已读状态
             // 新消息的已读状态将通过WebSocket实时更新（20-30ms延迟）
@@ -1168,20 +1155,6 @@ class FriendsManager {
             // 移除发送中的消息显示
             this.removeSendingMessage();
         }
-    }
-
-    buildContentWithReply(content, reply) {
-        if (!reply) return content;
-        // 前端协议：在文本开头嵌入一段不可见的JSON元数据，用于渲染引用
-        // 使用零宽空格包裹以降低用户可见概率
-        const meta = {
-            _reply: {
-                id: reply.messageId,
-                name: reply.senderName,
-                snippet: reply.contentSnippet
-            }
-        };
-        return `\u200b${JSON.stringify(meta)}\u200b\n${content}`;
     }
 
     /**
@@ -1266,7 +1239,7 @@ class FriendsManager {
     /**
      * 显示发送中的消息
      */
-    displaySendingMessage(content, reply) {
+    displaySendingMessage(content) {
         const chatMessages = document.getElementById('chatMessages');
         if (!chatMessages) return;
 
@@ -1277,14 +1250,12 @@ class FriendsManager {
         messageElement.className = 'message message-user sending';
         messageElement.id = 'sending-message';
         
-        let replyBlock = '';
-        if (reply) {
-            replyBlock = `
-                <div class="reply-preview">
-                    <div class="small text-muted">回复 ${this.escapeHtml(reply.senderName)}</div>
-                    <div>${this.escapeHtml(reply.contentSnippet)}</div>
-                </div>`;
-        }
+        const replyBlock = this.replyTarget ? `
+            <div class="reply-block small text-muted mb-1">
+                <i class="fas fa-reply me-1"></i>
+                <span class="fw-semibold">${this.escapeHtml(this.replyTarget.senderName)}</span>
+                <span class="ms-1">${this.escapeHtml(this.replyTarget.snippet)}</span>
+            </div>` : '';
 
         messageElement.innerHTML = `
             <div class="message-bubble">
@@ -1329,12 +1300,20 @@ class FriendsManager {
             `${backendUrl}/api/files/${fileId}/view?token=${token}` : 
             `${backendUrl}/api/files/${fileId}/view`;
         
+        const replyBlock = this.replyTarget ? `
+            <div class="reply-block small text-muted mb-1">
+                <i class="fas fa-reply me-1"></i>
+                <span class="fw-semibold">${this.escapeHtml(this.replyTarget.senderName)}</span>
+                <span class="ms-1">${this.escapeHtml(this.replyTarget.snippet)}</span>
+            </div>` : '';
+
         messageElement.innerHTML = `
             <div class="message-bubble">
                 <div class="message-header">
                     <span class="message-sender">我</span>
                     <span class="message-time">发送中...</span>
                 </div>
+                ${replyBlock}
                 <div class="message-attachments mt-2">
                     <img src="${imageUrl}" 
                          alt="${this.escapeHtml(filename)}" 
@@ -1367,6 +1346,13 @@ class FriendsManager {
         const chatMessages = document.getElementById('chatMessages');
         if (!chatMessages || !this.currentPrivateChat) return;
 
+        // 解析前端内嵌的引用信息
+        const parsedReply = this.parseReplyFromContent(message.content);
+        if (parsedReply) {
+            message._parsedReply = parsedReply; // { replyMeta, text }
+            message.content = parsedReply.text; // 替换为纯文本
+        }
+
         // 解析attachments JSON字符串 - 参考群聊控制器的处理方式
         if (message.attachments && typeof message.attachments === 'string') {
             try {
@@ -1391,8 +1377,8 @@ class FriendsManager {
         const senderName = message.senderInfo?.nickname || message.senderInfo?.username || '好友';
         const time = this.formatTime(new Date(message.createdAt));
         
-        // 处理消息内容 - 对于图片消息，不显示加密文本
-        let contentToShow = message.content;
+    // 处理消息内容 - 对于图片消息，不显示加密文本
+    let contentToShow = message.content;
         if (message.attachments && message.attachments.length > 0) {
             // 检查内容是否像加密字符串或系统提示
             const isEncryptedContent = contentToShow && 
@@ -1410,9 +1396,6 @@ class FriendsManager {
             }
         }
         
-        // 尝试解析前端协议元数据
-        const parsed = this.parseReplyMeta(message.content);
-
         let messageHTML = `
             <div class="message-select-wrapper">
                 <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
@@ -1427,19 +1410,19 @@ class FriendsManager {
                         </div>
                     </div>`;
         
-        // 如果包含引用，渲染引用块
-        if (parsed?.reply) {
-            messageHTML += `
-                <div class="reply-preview">
-                    <div class="small text-muted">回复 ${this.escapeHtml(parsed.reply.name || '消息')}</div>
-                    <div>${this.escapeHtml(parsed.reply.snippet || '')}</div>
-                </div>`;
+        // 引用块（优先使用解析结果 _parsedReply）
+        let replyHTML = '';
+        if (message._parsedReply && message._parsedReply.replyMeta) {
+            const s = this.escapeHtml(message._parsedReply.replyMeta.senderName || '消息');
+            const t = this.escapeHtml(message._parsedReply.replyMeta.snippet || '');
+            replyHTML = `<div class="reply-block small text-muted mb-1"><i class=\"fas fa-reply me-1\"></i><span class=\"fw-semibold\">${s}</span><span class=\"ms-1\">${t}</span></div>`;
         }
 
-        // 如果有文本内容，显示文本（去掉元数据包裹）
+        // 如果有文本内容，显示文本
         if (contentToShow && contentToShow.trim()) {
-            const visible = parsed?.visibleText ?? contentToShow;
-            messageHTML += `<div class="message-content">${this.escapeHtml(visible)}</div>`;
+            messageHTML += `${replyHTML}<div class="message-content">${this.escapeHtml(contentToShow)}</div>`;
+        } else if (replyHTML) {
+            messageHTML += replyHTML;
         }
         
         messageHTML += '</div></div>';
@@ -1479,6 +1462,15 @@ class FriendsManager {
 
         // 先移除发送中的消息
         this.removeSendingMessage();
+
+        // 解析前端内嵌的引用信息（发送成功回执也可能包含我们嵌入的内容）
+        if (typeof data.content === 'string') {
+            const parsedReply = this.parseReplyFromContent(data.content);
+            if (parsedReply) {
+                data._parsedReply = parsedReply; // { replyMeta, text }
+                data.content = parsedReply.text;
+            }
+        }
 
         // 解析attachments JSON字符串 - 参考群聊控制器的处理方式
         if (data.attachments && typeof data.attachments === 'string') {
@@ -1523,8 +1515,6 @@ class FriendsManager {
             }
         }
         
-        const parsed = this.parseReplyMeta(data.content);
-
         let messageHTML = `
             <div class="message-select-wrapper">
                 <input type="checkbox" class="message-checkbox" data-message-id="${messageId}" style="display: none;">
@@ -1539,18 +1529,15 @@ class FriendsManager {
                         </div>
                     </div>`;
         
-        if (parsed?.reply) {
-            messageHTML += `
-                <div class="reply-preview">
-                    <div class="small text-muted">回复 ${this.escapeHtml(parsed.reply.name || '消息')}</div>
-                    <div>${this.escapeHtml(parsed.reply.snippet || '')}</div>
-                </div>`;
+        // 引用块
+        if (data._parsedReply && data._parsedReply.replyMeta) {
+            const s = this.escapeHtml(data._parsedReply.replyMeta.senderName || '消息');
+            const t = this.escapeHtml(data._parsedReply.replyMeta.snippet || '');
+            messageHTML += `<div class="reply-block small text-muted mb-1"><i class=\"fas fa-reply me-1\"></i><span class=\"fw-semibold\">${s}</span><span class=\"ms-1\">${t}</span></div>`;
         }
-
         // 如果有文本内容，显示文本
         if (contentToShow && contentToShow.trim()) {
-            const visible = parsed?.visibleText ?? contentToShow;
-            messageHTML += `<div class="message-content">${this.escapeHtml(visible)}</div>`;
+            messageHTML += `<div class="message-content">${this.escapeHtml(contentToShow)}</div>`;
         }
         
         messageHTML += `
@@ -1728,6 +1715,56 @@ class FriendsManager {
     }
 
     /**
+     * 解析内嵌在内容中的引用信息
+     * 支持两种格式：
+     * 1) JSON前缀：{"_reply":{id,name,snippet}}\n正文
+     * 2) 简单前缀：[reply:name|snippet]\n正文
+     * 返回 { replyMeta: {senderName, snippet, id?}, text }
+     */
+    parseReplyFromContent(content) {
+        if (!content || typeof content !== 'string') return null;
+
+        // 尝试JSON行
+        try {
+            const firstNewline = content.indexOf('\n');
+            const firstLine = firstNewline >= 0 ? content.substring(0, firstNewline) : content;
+            if (firstLine.trim().startsWith('{') && firstLine.includes('"_reply"')) {
+                const metaObj = JSON.parse(firstLine);
+                if (metaObj && metaObj._reply) {
+                    const text = firstNewline >= 0 ? content.substring(firstNewline + 1) : '';
+                    return {
+                        replyMeta: {
+                            senderName: metaObj._reply.name || metaObj._reply.senderName || '消息',
+                            snippet: metaObj._reply.snippet || '',
+                            id: metaObj._reply.id
+                        },
+                        text
+                    };
+                }
+            }
+        } catch (e) {
+            // 忽略，继续尝试第二种格式
+        }
+
+        // 尝试 [reply:name|snippet]\n
+        if (content.startsWith('[reply:')) {
+            const end = content.indexOf(']\n');
+            if (end > 7) {
+                const meta = content.substring(7, end);
+                const sep = meta.indexOf('|');
+                if (sep > -1) {
+                    const senderName = meta.substring(0, sep);
+                    const snippet = meta.substring(sep + 1);
+                    const text = content.substring(end + 2);
+                    return { replyMeta: { senderName, snippet }, text };
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * 清除私聊状态，切换回群聊模式
      */
     clearPrivateChat() {
@@ -1761,7 +1798,7 @@ class FriendsManager {
         // 标记事件已附加，避免重复绑定
         this.eventsAttached = true;
 
-        // 消息右键菜单
+        // 消息右键菜单（PC）
         chatMessages.addEventListener('contextmenu', (e) => {
             const messageElement = e.target.closest('.message');
             if (messageElement) {
@@ -1772,21 +1809,22 @@ class FriendsManager {
             }
         });
 
-        // 移动端长按：替换原先的按压进入选择删除，改为弹出菜单
-        let touchTimer = null;
+        // 长按弹出菜单（移动端） - 替换原按压选择删除的流程
+        let pressTimer = null;
         chatMessages.addEventListener('touchstart', (e) => {
             const messageElement = e.target.closest('.message');
             if (!messageElement) return;
-            touchTimer = setTimeout(() => {
-                // 模拟在触点位置显示菜单
+            pressTimer = setTimeout(() => {
+                this.closeAllContextMenus();
+                // 模拟在触点位置弹出
                 const touch = e.touches[0];
                 const fakeEvent = { clientX: touch.clientX, clientY: touch.clientY };
-                this.closeAllContextMenus();
                 this.showMessageContextMenu(fakeEvent, messageElement);
-            }, 450);
+            }, 500);
         }, { passive: true });
-        chatMessages.addEventListener('touchend', () => { if (touchTimer) clearTimeout(touchTimer); }, { passive: true });
-        chatMessages.addEventListener('touchmove', () => { if (touchTimer) clearTimeout(touchTimer); }, { passive: true });
+        ['touchend','touchmove','touchcancel'].forEach(evt => {
+            chatMessages.addEventListener(evt, () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }, { passive: true });
+        });
 
         // 全局点击事件：点击其他地方关闭右键菜单
         if (!this.globalClickAttached) {
@@ -1868,15 +1906,9 @@ class FriendsManager {
             const msgId = button.dataset.messageId;
 
             switch (action) {
-                case 'reply': {
-                    // 收集引用信息：消息ID、发送者名、文本片段
-                    const senderName = messageElement.querySelector('.message-sender')?.textContent || '';
-                    const rawText = messageElement.querySelector('.message-content')?.textContent || '';
-                    this.setReplyContext(msgId, senderName, rawText);
-                    // 聚焦输入框
-                    document.getElementById('messageInput')?.focus();
+                case 'reply':
+                    this.setReplyTarget(msgId, messageElement);
                     break;
-                }
                 case 'select':
                     this.toggleMessageSelection(msgId);
                     break;
@@ -1919,73 +1951,48 @@ class FriendsManager {
         contextMenu.style.visibility = 'visible';
     }
 
-    // 解析前端协议元数据：提取_reply并返回可见文本
-    parseReplyMeta(content) {
-        if (!content || typeof content !== 'string') return null;
+    /**
+     * 设定引用目标并显示预览条
+     */
+    setReplyTarget(messageId, messageElement) {
+        // 抽取发件人和内容片段
+        const senderEl = messageElement.querySelector('.message-sender');
+        const contentEl = messageElement.querySelector('.message-content');
+        const senderName = senderEl ? senderEl.textContent.trim() : '消息';
+        let snippet = contentEl ? contentEl.textContent.trim() : '';
+        if (!snippet || snippet.length === 0) {
+            // 尝试附件占位
+            const hasImage = !!messageElement.querySelector('.message-attachments img');
+            snippet = hasImage ? '[图片]' : '[消息]';
+        }
+        if (snippet.length > 60) snippet = snippet.slice(0, 60) + '…';
 
-        // 允许前导 BOM / 空白字符（Chrome 安卓可能注入）
-        const LEADING_JUNK = /^[\uFEFF\u200D\u2060\s]*/; // BOM、ZWJ、WORD JOINER、空白
-        const cleaned = content.replace(LEADING_JUNK, '');
+        this.replyTarget = { id: messageId, senderName, snippet };
 
-        // 尝试 1：实际零宽空格分隔（\u200bJSON\u200b）
-        const REAL_ZWS = '\u200b';
-        const realFirst = cleaned.indexOf(REAL_ZWS);
-        if (realFirst === 0) {
-            const realSecond = cleaned.indexOf(REAL_ZWS, 1);
-            if (realSecond > 1) {
-                const jsonStr = cleaned.slice(1, realSecond);
-                try {
-                    const meta = JSON.parse(jsonStr);
-                    const visibleText = cleaned.slice(realSecond + 1).replace(/^\n/, '');
-                    if (meta && meta._reply) return { reply: meta._reply, visibleText };
-                } catch (_) { /* fallthrough */ }
-            }
+        // 显示到输入框上方的预览
+        const bar = document.getElementById('replyPreview');
+        const meta = document.getElementById('replyMeta');
+        if (bar && meta) {
+            meta.textContent = `${senderName}：${snippet}`;
+            bar.classList.remove('d-none');
         }
 
-        // 尝试 2：转义形式 "\\u200b" 包裹（某些路径可能把字符转义为字面量）
-        const ESC_ZWS = '\\u200b'; // 6字符：\ u 2 0 0 b
-        const escFirst = cleaned.indexOf(ESC_ZWS);
-        if (escFirst === 0) {
-            const escSecond = cleaned.indexOf(ESC_ZWS, ESC_ZWS.length);
-            if (escSecond > ESC_ZWS.length) {
-                const jsonStr = cleaned.slice(ESC_ZWS.length, escSecond);
-                try {
-                    const meta = JSON.parse(jsonStr);
-                    const visibleText = cleaned.slice(escSecond + ESC_ZWS.length).replace(/^\n/, '');
-                    if (meta && meta._reply) return { reply: meta._reply, visibleText };
-                } catch (_) { /* fallthrough */ }
-            }
+        // 绑定取消
+        const cancelBtn = document.getElementById('replyCancelBtn');
+        if (cancelBtn && !cancelBtn.dataset.bound) {
+            cancelBtn.addEventListener('click', () => this.clearReplyTarget());
+            cancelBtn.dataset.bound = '1';
         }
 
-        // 尝试 3：宽松查找（首个ZWS不在0位，但很靠前），防止偶发前导字符
-        const nearFirst = cleaned.indexOf(REAL_ZWS);
-        if (nearFirst > -1 && nearFirst < 5) {
-            const nearSecond = cleaned.indexOf(REAL_ZWS, nearFirst + 1);
-            if (nearSecond > nearFirst + 1) {
-                const jsonStr = cleaned.slice(nearFirst + 1, nearSecond);
-                try {
-                    const meta = JSON.parse(jsonStr);
-                    const visibleText = cleaned.slice(nearSecond + 1).replace(/^\n/, '');
-                    if (meta && meta._reply) return { reply: meta._reply, visibleText };
-                } catch (_) { /* fallthrough */ }
-            }
-        }
+        // 聚焦输入
+        document.getElementById('messageInput')?.focus();
+    }
 
-        // 尝试 4：后备方案——零宽已被剥离，仅剩首行 JSON（{"_reply":...}\n正文）
-        // 仅当第一行是一个仅包含 _reply 的对象时生效，避免误伤用户正常以 { 开头的消息
-        const firstNewline = cleaned.indexOf('\n');
-        const head = firstNewline === -1 ? cleaned : cleaned.slice(0, firstNewline);
-        if (head.startsWith('{') && head.endsWith('}')) {
-            try {
-                const meta = JSON.parse(head);
-                if (meta && typeof meta === 'object' && meta._reply && Object.keys(meta).length === 1) {
-                    const visibleText = firstNewline === -1 ? '' : cleaned.slice(firstNewline + 1);
-                    return { reply: meta._reply, visibleText };
-                }
-            } catch (_) { /* ignore */ }
-        }
-
-        return null;
+    /** 清除引用状态 */
+    clearReplyTarget() {
+        this.replyTarget = null;
+        const bar = document.getElementById('replyPreview');
+        if (bar) bar.classList.add('d-none');
     }
 
     /**
