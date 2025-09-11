@@ -1078,9 +1078,9 @@
             background: rgba(255, 255, 255, 0.9);
             border: 1px solid rgba(0, 0, 0, 0.2);
             border-radius: 50px;
-            padding: 0.5rem;
-            gap: 0.5rem;
-            min-height: 50px;
+            padding: 0.4rem;
+            gap: 0.4rem;
+            min-height: 45px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
         }
@@ -1124,8 +1124,8 @@
         }
 
         .action-button {
-            width: 36px;
-            height: 36px;
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
             border: none;
             display: flex;
@@ -1133,7 +1133,7 @@
             justify-content: center;
             cursor: pointer;
             transition: all 0.2s ease;
-            font-size: 0.9rem;
+            font-size: 0.75rem;
         }
 
         .plus-btn {
@@ -1593,7 +1593,7 @@
             }
 
             /* 移动端输入框样式调整 */
-            .input-group textarea {
+            .input-text-container textarea {
                 /* 确保输入框有足够的点击区域 */
                 min-height: 48px;
                 font-size: 16px; /* 防止iOS自动缩放 */
@@ -1601,19 +1601,24 @@
                 padding: 0.75rem 1rem;
             }
 
-            /* 移动端发送按钮优化 */
-            .send-button {
-                width: 48px;
-                height: 48px;
+            /* 移动端按钮样式调整 */
+            .action-button {
+                width: 40px;
+                height: 40px;
                 border-radius: 50%;
                 flex-shrink: 0;
+                font-size: 0.85rem;
             }
 
-            .mention-button {
-                width: 48px;
-                height: 48px;
-                border-radius: 50%;
-                flex-shrink: 0;
+            /* 移动端二级菜单调整 */
+            .plus-menu {
+                min-width: 140px;
+                font-size: 0.9rem;
+            }
+
+            .menu-item {
+                padding: 0.6rem 1rem;
+                font-size: 0.85rem;
             }
 
             /* 确保在虚拟键盘弹出时页面不会被推上去 */
@@ -2010,11 +2015,6 @@
             /* 图片上传移动端优化 */
             .image-upload-group {
                 position: relative;
-            }
-
-            .action-button.image-button {
-                padding: 8px 10px;
-                font-size: 16px;
             }
 
             /* 移动端图片来源选择模态框样式 */
