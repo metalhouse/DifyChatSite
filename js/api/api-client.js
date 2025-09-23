@@ -191,6 +191,26 @@ class HttpClient {
                 if (response.status === 401) {
                     console.log('🔐 API客户端检测到401错误');
                     
+                    // 触发全局认证失败事件
+                    if (typeof window !== 'undefined') {
+                        // 发送自定义事件，让页面可以监听并处理
+                        window.dispatchEvent(new CustomEvent('authFailed', { 
+                            detail: { 
+                                status: 401, 
+                                message: errorData?.message || 'Authentication failed',
+                                url: fullUrl 
+                            } 
+                        }));
+                        
+                        // 如果页面有showLoginTimeoutModal函数，优先使用模态框
+                        if (typeof window.showLoginTimeoutModal === 'function') {
+                            setTimeout(() => {
+                                window.showLoginTimeoutModal();
+                            }, 100);
+                            return errorResponse; // 不执行默认跳转
+                        }
+                    }
+                    
                     // 简单的处理：在下一个事件循环中清理并跳转
                     setTimeout(() => {
                         // 清除认证信息

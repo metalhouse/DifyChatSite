@@ -640,7 +640,16 @@
                         console.log('🔐 检测到有效认证，准备跳转...');
                         this.errorHandler.showInfo('您已登录，正在跳转...');
                         setTimeout(() => {
-                            window.location.href = './chat.html';
+                            // 检查是否有重定向参数
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const redirectUrl = urlParams.get('redirect') || urlParams.get('return');
+                            
+                            if (redirectUrl) {
+                                console.log('🔄 重定向到指定页面:', redirectUrl);
+                                window.location.href = decodeURIComponent(redirectUrl);
+                            } else {
+                                window.location.href = './chat.html';
+                            }
                         }, 1000);
                     }
                     
@@ -812,7 +821,16 @@
                             
                             // 延迟跳转确保用户看到成功提示
                             setTimeout(() => {
-                                window.location.href = './chat.html';
+                                // 检查是否有重定向参数
+                                const urlParams = new URLSearchParams(window.location.search);
+                                const redirectUrl = urlParams.get('redirect') || urlParams.get('return');
+                                
+                                if (redirectUrl) {
+                                    console.log('🔄 重定向到指定页面:', redirectUrl);
+                                    window.location.href = decodeURIComponent(redirectUrl);
+                                } else {
+                                    window.location.href = './chat.html';
+                                }
                             }, 1500);
                         } else {
                             console.error('❌ 登录失败:', result.message);

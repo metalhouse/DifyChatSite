@@ -22,6 +22,14 @@
     
     <!-- 自定义样式 -->
     <style>
+        /* 按钮统一宽度 */
+        #start-chat-btn,
+        #start-chatroom-btn,
+        #learn-more-btn {
+            width: 220px !important;
+            text-align: center !important;
+        }
+        
         /* 响应式调整 */
         @media (max-width: 768px) {
             .display-4 {
@@ -34,7 +42,26 @@
                 padding: 10px 20px !important;
                 font-size: 0.95rem !important;
             }
+            
+            /* 移动端按钮宽度 */
+            #start-chat-btn,
+            #start-chatroom-btn,
+            #learn-more-btn {
+                width: 180px !important;
+                margin-bottom: 10px !important;
+            }
         }
+        
+        @media (max-width: 480px) {
+            /* 超小屏幕全宽按钮 */
+            #start-chat-btn,
+            #start-chatroom-btn,
+            #learn-more-btn {
+                width: 100% !important;
+                max-width: 280px !important;
+            }
+        }
+    </style>
     </style>
     
     <!-- 暂时注释掉可能冲突的CSS -->
@@ -137,15 +164,15 @@
                                 您的智能对话助手 - 基于先进AI技术，为您提供智能、高效的对话体验
                             </p>
                             <div class="d-flex justify-content-center gap-3 flex-wrap">
-                                <button class="btn btn-primary btn-lg" id="start-chat-btn" style="font-weight: 600; padding: 12px 30px; border-radius: 8px;">
+                                <button class="btn btn-primary btn-lg" id="start-chat-btn" style="font-weight: 600; padding: 12px 30px; border-radius: 8px; width: 220px;">
                                     <i class="fas fa-comments me-2"></i>
                                     开始聊天
                                 </button>
-                                <button class="btn btn-outline-primary btn-lg" id="start-chatroom-btn" style="font-weight: 600; padding: 12px 30px; border-radius: 8px;">
+                                <button class="btn btn-outline-primary btn-lg" id="start-chatroom-btn" style="font-weight: 600; padding: 12px 30px; border-radius: 8px; width: 220px;">
                                     <i class="fas fa-users me-2"></i>
                                     进入聊天室
                                 </button>
-                                <button class="btn btn-outline-secondary btn-lg" id="learn-more-btn" style="font-weight: 600; padding: 12px 30px; border-radius: 8px;">
+                                <button class="btn btn-outline-secondary btn-lg" id="learn-more-btn" style="font-weight: 600; padding: 12px 30px; border-radius: 8px; width: 220px;">
                                     <i class="fas fa-info-circle me-2"></i>
                                     了解更多
                                 </button>

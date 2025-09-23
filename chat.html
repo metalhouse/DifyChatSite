@@ -1508,6 +1508,35 @@
         </div>
     </div>
 
+    <!-- 登录超时模态框 -->
+    <div class="modal fade" id="loginTimeoutModal" tabindex="-1" aria-labelledby="loginTimeoutModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="loginTimeoutModalLabel">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        登录已过期
+                    </h5>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-clock text-warning" style="font-size: 3rem;"></i>
+                    </div>
+                    <h6 class="mb-3">您的登录状态已过期，请重新登录</h6>
+                    <p class="text-muted mb-0">为了保护您的账户安全，系统会在一段时间后自动退出登录</p>
+                </div>
+                <div class="modal-footer">
+                    <div class="d-grid w-100">
+                        <button type="button" class="btn btn-primary" onclick="redirectToLogin()">
+                            <i class="fas fa-sign-in-alt me-2"></i>
+                            重新登录
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="./vendor/bootstrap/bootstrap.bundle.min.js"></script>
     
@@ -1546,7 +1575,12 @@
                 await window.chatController.init();
                 
                 // 绑定sendMessage到全局作用域
-                window.sendMessage = function() {
+                window.sendMessage = async function() {
+                    // 首先检查登录状态
+                    if (!(await checkAuthBeforeAction())) {
+                        return; // 如果认证失败，不继续执行
+                    }
+                    
                     if (window.chatController && typeof window.chatController.sendMessage === 'function') {
                         return window.chatController.sendMessage();
                     } else {
@@ -1620,8 +1654,83 @@
             }
         }
 
+        // ========================================
+        // 🔐 认证检查和登录超时处理
+        // ========================================
+        
+        /**
+         * 在执行需要认证的操作前检查登录状态
+         * @returns {Promise<boolean>} 是否通过认证检查
+         */
+        window.checkAuthBeforeAction = async function() {
+            try {
+                // 导入认证服务
+                const { default: authService } = await import('./js/services/auth-service.js');
+                
+                // 检查是否已登录
+                if (!authService.isAuthenticated()) {
+                    console.warn('⚠️ 用户未登录或登录已过期');
+                    showLoginTimeoutModal();
+                    return false;
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('❌ 认证检查失败:', error);
+                showLoginTimeoutModal();
+                return false;
+            }
+        };
+
+        /**
+         * 显示登录超时模态框
+         */
+        window.showLoginTimeoutModal = function() {
+            const modal = new bootstrap.Modal(document.getElementById('loginTimeoutModal'));
+            modal.show();
+            
+            // 记录事件
+            console.log('🔐 显示登录超时模态框');
+            
+            // 可选：清除当前聊天内容以保护隐私
+            if (window.chatController) {
+                window.chatController.clearMessages();
+            }
+        };
+
+        /**
+         * 重定向到登录页面
+         */
+        window.redirectToLogin = function() {
+            console.log('🔐 重定向到登录页面');
+            
+            // 清理本地存储（可选）
+            try {
+                const { default: storageManager } = import('./js/utils/storage.js');
+                storageManager.then(storage => {
+                    if (storage && typeof storage.clearAuth === 'function') {
+                        storage.clearAuth();
+                    }
+                });
+            } catch (error) {
+                console.warn('⚠️ 清理存储失败:', error);
+            }
+            
+            // 保存当前页面URL作为登录成功后的跳转地址
+            const currentUrl = window.location.href;
+            const loginUrl = `./login.html?redirect=${encodeURIComponent(currentUrl)}`;
+            
+            // 跳转到登录页面
+            window.location.href = loginUrl;
+        };
+
         // 全局函数
-        window.clearChat = function() {
+        window.clearChat = async function() {
+            // 检查登录状态
+            if (!(await checkAuthBeforeAction())) {
+                return;
+            }
+            
             if (window.chatController) {
                 window.chatController.clearMessages();
             }
@@ -1842,6 +1951,11 @@
         
         // 显示聊天记录模态框
         window.showChatHistory = async function() {
+            // 检查登录状态
+            if (!(await checkAuthBeforeAction())) {
+                return;
+            }
+            
             try {
                 const modal = new bootstrap.Modal(document.getElementById('chatHistoryModal'));
                 modal.show();
@@ -2343,6 +2457,21 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🔧 页面DOM加载完成，开始初始化...');
             
+            // 设置认证失败监听器
+            window.addEventListener('authFailed', function(event) {
+                console.log('🔐 监听到认证失败事件:', event.detail);
+                
+                // 显示登录超时提示而不是直接跳转
+                if (typeof showLoginTimeoutModal === 'function') {
+                    showLoginTimeoutModal();
+                } else {
+                    // 降级处理：显示提示并跳转
+                    alert('登录已过期，请重新登录');
+                    const returnUrl = encodeURIComponent(window.location.href);
+                    window.location.href = `./login.html?return=${returnUrl}`;
+                }
+            });
+            
             initChatSystem();
             setupLogout();
             checkAdminPermission();
@@ -2715,6 +2844,11 @@
             
             // 显示选择会话模态框
             window.showSelectConversationModal = async function() {
+                // 检查登录状态
+                if (!(await checkAuthBeforeAction())) {
+                    return;
+                }
+                
                 console.log('📋 显示选择会话模态框');
                 const modal = new bootstrap.Modal(document.getElementById('selectConversationModal'));
                 modal.show();
