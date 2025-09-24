@@ -72,27 +72,36 @@ class AuthService {
             return;
         }
 
-        // 检查Token是否过期
-        if (storageManager.isTokenExpired()) {
-            // 尝试刷新Token
-            try {
-                await this.refreshToken();
-            } catch (error) {
-                console.warn('⚠️ Token刷新失败，需要重新登录');
-                this.logout();
-                return;
-            }
-        }
-
-        // 验证用户信息
+        // 简化逻辑：直接尝试验证用户信息，让后端判断token是否有效
         try {
             const currentUserInfo = await difySdk.getCurrentUserInfo();
             this.currentUser = currentUserInfo;
             this.authState = 'authenticated';
             this._emitAuthEvent('login', this.currentUser);
+            
+            if (ENV_CONFIG.isDebug()) {
+                console.log('✅ 现有认证状态验证成功:', currentUserInfo.username || currentUserInfo.email);
+            }
         } catch (error) {
-            console.warn('⚠️ 用户信息验证失败，需要重新登录');
-            this.logout();
+            if (ENV_CONFIG.isDebug()) {
+                console.warn('⚠️ 现有认证状态验证失败，可能需要重新登录:', error.message);
+            }
+            
+            // 如果是401错误，清除认证状态和存储数据
+            if (error.response?.status === 401) {
+                this.authState = 'unauthenticated';
+                this.currentUser = null;
+                // 清除存储中的认证数据，保持状态一致性
+                storageManager.clearTokens();
+                storageManager.clearUserInfo();
+                
+                if (ENV_CONFIG.isDebug()) {
+                    console.log('🗑️ 由于401错误清除了存储中的认证数据');
+                }
+            } else {
+                // 其他错误可能是网络问题，暂时保持状态
+                console.error('❌ 验证现有认证状态时发生错误:', error);
+            }
         }
     }
 
@@ -326,6 +335,19 @@ class AuthService {
     async _handleLoginSuccess(authData) {
         const { accessToken, refreshToken, expiresIn, user } = authData;
         
+        if (ENV_CONFIG.isDebug()) {
+            console.log('🔐 处理登录成功数据:', {
+                hasAccessToken: !!accessToken,
+                hasRefreshToken: !!refreshToken,
+                expiresIn: expiresIn,
+                userInfo: user?.username || user?.email
+            });
+        }
+        
+        if (!accessToken || !user) {
+            throw new Error('登录响应数据不完整：缺少accessToken或用户信息');
+        }
+        
         // 存储Token和用户信息
         storageManager.setTokens(accessToken, refreshToken, expiresIn);
         storageManager.setUserInfo(user);
@@ -334,14 +356,11 @@ class AuthService {
         this.currentUser = user;
         this.authState = 'authenticated';
         
-        // 设置自动刷新
-        this._setupTokenRefresh();
-        
         // 触发登录事件
         this._emitAuthEvent('login', user);
         
         if (ENV_CONFIG.isDebug()) {
-            console.log('✅ 登录成功:', user.username);
+            console.log('✅ 登录成功:', user.username || user.email);
         }
     }
 
@@ -394,33 +413,19 @@ class AuthService {
     }
 
     /**
-     * 设置自动Token刷新
+     * 设置自动Token刷新（已简化：依赖HTTP拦截器处理）
      * @private
      */
     _setupTokenRefresh() {
+        // 简化逻辑：移除主动定时刷新，完全依赖HTTP拦截器在401时自动刷新
         // 清除现有定时器
         if (this.refreshTokenTimer) {
             clearTimeout(this.refreshTokenTimer);
+            this.refreshTokenTimer = null;
         }
 
-        const expiresAtStr = storageManager._getItem(storageManager.constructor.name === 'StorageManager' ? 
-            'dify_token_expires_at' : null);
-        
-        if (!expiresAtStr) return;
-
-        const expiresAt = parseInt(expiresAtStr);
-        const now = Date.now();
-        const refreshTime = expiresAt - (5 * 60 * 1000); // 提前5分钟刷新
-
-        if (refreshTime > now) {
-            const delay = refreshTime - now;
-            this.refreshTokenTimer = setTimeout(() => {
-                this.refreshToken().catch(console.error);
-            }, delay);
-
-            if (ENV_CONFIG.isDebug()) {
-                console.log('⏰ 设置Token自动刷新，延迟:', Math.round(delay / 1000) + '秒');
-            }
+        if (ENV_CONFIG.isDebug()) {
+            console.log('🔄 Token刷新策略：依赖HTTP拦截器在收到401响应时自动处理');
         }
     }
 
@@ -503,12 +508,9 @@ class AuthService {
     _setupVisibilityHandlers() {
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && this.authState === 'authenticated') {
-                // 页面变为可见时，检查Token是否需要刷新
-                if (storageManager.isTokenExpired()) {
-                    this.refreshToken().catch(() => {
-                        // Token刷新失败，自动登出
-                        this.logout();
-                    });
+                // 简化逻辑：页面恢复可见时不主动检查Token，依赖HTTP拦截器处理401响应
+                if (ENV_CONFIG.isDebug()) {
+                    console.log('📱 页面恢复可见，认证状态:', this.authState);
                 }
             }
         });
@@ -570,9 +572,25 @@ class AuthService {
      * @returns {boolean} 是否已登录
      */
     isAuthenticated() {
-        return this.authState === 'authenticated' && 
-               this.currentUser !== null && 
-               !storageManager.isTokenExpired();
+        const hasValidState = this.authState === 'authenticated';
+        const hasUser = this.currentUser !== null;
+        const hasToken = storageManager.getAccessToken() !== null;
+        
+        // 简化逻辑：只检查基本状态，让后端通过401响应来判断token是否过期
+        const isAuth = hasValidState && hasUser && hasToken;
+        
+        if (ENV_CONFIG.isDebug()) {
+            console.log('🔐 认证状态检查:', {
+                authState: this.authState,
+                hasUser: hasUser,
+                hasToken: hasToken,
+                userInfo: this.currentUser ? (this.currentUser.username || this.currentUser.email || 'unknown') : null,
+                tokenLength: hasToken ? storageManager.getAccessToken().length : 0,
+                isAuthenticated: isAuth
+            });
+        }
+        
+        return isAuth;
     }
 
     /**

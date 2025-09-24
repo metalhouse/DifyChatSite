@@ -1548,9 +1548,11 @@
         import { ENV_CONFIG } from './config/env.js';
         import { SimpleChatController } from './js/controllers/chat-controller-v2.js';
         import apiClient from './js/api/api-client.js';
+        import authService from './js/services/auth-service.js';
 
         // 全局变量
         window.chatController = null;
+        window.authService = authService; // 将 authService 添加到全局作用域
         window.ENV_CONFIG = ENV_CONFIG; // 将 ENV_CONFIG 添加到全局作用域
         ENV_CONFIG.apiClient = apiClient; // 将 apiClient 添加到 ENV_CONFIG 中
 
@@ -1576,11 +1578,7 @@
                 
                 // 绑定sendMessage到全局作用域
                 window.sendMessage = async function() {
-                    // 首先检查登录状态
-                    if (!(await checkAuthBeforeAction())) {
-                        return; // 如果认证失败，不继续执行
-                    }
-                    
+                    // 移除前置认证检查，让后端通过401响应来判断token是否有效
                     if (window.chatController && typeof window.chatController.sendMessage === 'function') {
                         return window.chatController.sendMessage();
                     } else {
@@ -1664,11 +1662,26 @@
          */
         window.checkAuthBeforeAction = async function() {
             try {
-                // 导入认证服务
-                const { default: authService } = await import('./js/services/auth-service.js');
+                // 使用全局 authService 实例，避免重新导入导致状态不一致
+                if (!window.authService) {
+                    console.error('❌ authService 未初始化');
+                    showLoginTimeoutModal();
+                    return false;
+                }
                 
                 // 检查是否已登录
-                if (!authService.isAuthenticated()) {
+                const isAuth = window.authService.isAuthenticated();
+                
+                if (ENV_CONFIG.isDebug()) {
+                    console.log('🔐 checkAuthBeforeAction 检查结果:', {
+                        isAuthenticated: isAuth,
+                        authState: window.authService.getAuthState(),
+                        hasUser: !!window.authService.getCurrentUser(),
+                        hasToken: !!window.authService.getAuthHeaders().Authorization
+                    });
+                }
+                
+                if (!isAuth) {
                     console.warn('⚠️ 用户未登录或登录已过期');
                     showLoginTimeoutModal();
                     return false;
@@ -1724,17 +1737,7 @@
             window.location.href = loginUrl;
         };
 
-        // 全局函数
-        window.clearChat = async function() {
-            // 检查登录状态
-            if (!(await checkAuthBeforeAction())) {
-                return;
-            }
-            
-            if (window.chatController) {
-                window.chatController.clearMessages();
-            }
-        };
+        // 全局函数已在后面定义
 
         window.toggleSidebar = function() {
             const sidebar = document.getElementById('sidebar');
@@ -1951,19 +1954,26 @@
         
         // 显示聊天记录模态框
         window.showChatHistory = async function() {
-            // 检查登录状态
-            if (!(await checkAuthBeforeAction())) {
-                return;
-            }
-            
             try {
                 const modal = new bootstrap.Modal(document.getElementById('chatHistoryModal'));
                 modal.show();
                 
-                // 加载对话列表
+                // 加载对话列表，如果token过期会由API调用自动处理401响应
                 await window.loadConversationList();
             } catch (error) {
                 console.error('显示聊天记录失败:', error);
+                
+                // 检查是否是401认证错误，如果是则由API客户端自动处理
+                if (error.response && error.response.status === 401) {
+                    console.log('🔐 聊天记录加载遇到401错误，由API客户端自动处理');
+                    // 关闭聊天记录模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('chatHistoryModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    return;
+                }
+                
                 alert('加载聊天记录失败: ' + error.message);
             }
         };
@@ -1980,39 +1990,36 @@
                     </div>
                 `;
                 
-                // 添加时间戳防止缓存
-                const timestamp = new Date().getTime();
-                const response = await fetch(`${ENV_CONFIG.getApiUrl('/conversations')}?limit=100&sort=-updated_at&_t=${timestamp}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('dify_access_token')}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
+                // 使用统一的API客户端，这样可以自动处理401错误
+                const response = await ENV_CONFIG.apiClient.get('/conversations?limit=100&sort=-updated_at');
                 
                 // 调试：打印API响应数据
-                console.log('🔍 对话列表API响应:', data);
-                console.log('🔍 响应状态:', response.status);
-                console.log('🔍 响应头:', Object.fromEntries(response.headers.entries()));
+                console.log('🔍 对话列表API响应:', response);
                 
-                if (data.success) {
+                if (response.success) {
                     // 根据API文档，数据在 data.conversations 中
-                    window.currentConversations = data.data?.conversations || [];
+                    window.currentConversations = response.data?.conversations || [];
                     console.log('✅ 成功获取对话列表，数量:', window.currentConversations.length);
                     console.log('📋 对话数据示例:', window.currentConversations[0]);
                     window.renderConversationList();
                 } else {
-                    throw new Error(data.message || '加载对话列表失败');
+                    throw new Error(response.message || '加载对话列表失败');
                 }
                 
             } catch (error) {
                 console.error('加载对话列表失败:', error);
+                
+                // 检查是否是401认证错误，如果是则由API客户端自动处理
+                if (error.response && error.response.status === 401) {
+                    console.log('🔐 对话列表加载遇到401错误，由API客户端自动处理');
+                    // 关闭聊天记录模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('chatHistoryModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    return;
+                }
+                
                 conversationListElement.innerHTML = `
                     <div class="text-center text-muted py-4">
                         <i class="fas fa-exclamation-triangle text-warning fa-2x mb-2"></i>
@@ -2159,19 +2166,8 @@
                     `;
                 }
                 
-                const response = await fetch(`${ENV_CONFIG.getApiUrl(`/conversations/${conversationId}/messages`)}?page=${page}&limit=${messagePageSize}&sort=-created_at`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('dify_access_token')}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const data = await response.json();
+                // 使用统一的API客户端，这样可以自动处理401错误
+                const data = await ENV_CONFIG.apiClient.get(`/conversations/${conversationId}/messages?page=${page}&limit=${messagePageSize}&sort=-created_at`);
                 
                 if (data.success) {
                     // 根据API文档，消息数据在 data.messages 中
@@ -2218,6 +2214,18 @@
                 
             } catch (error) {
                 console.error('加载消息历史失败:', error);
+                
+                // 检查是否是401认证错误，如果是则由API客户端自动处理
+                if (error.response && error.response.status === 401) {
+                    console.log('🔐 消息历史加载遇到401错误，由API客户端自动处理');
+                    // 关闭聊天记录模态框
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('chatHistoryModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    return;
+                }
+                
                 if (page === 1) {
                     messageHistoryElement.innerHTML = `
                         <div class="text-center text-muted py-4">
@@ -2704,23 +2712,14 @@
                     
                     console.log('✏️ 重命名对话请求:', conversationId, newTitle);
                     
-                    const response = await fetch(`${ENV_CONFIG.getApiUrl(`/conversations/${conversationId}`)}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('dify_access_token')}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            title: newTitle  // 更新对话使用title字段
-                        })
+                    // 使用统一的API客户端，这样可以自动处理401错误
+                    const data = await ENV_CONFIG.apiClient.put(`/conversations/${conversationId}`, {
+                        title: newTitle  // 更新对话使用title字段
                     });
                     
-                    const data = await response.json();
-                    
                     console.log('🔍 重命名API响应:', data);
-                    console.log('🔍 响应状态:', response.status);
                     
-                    if (response.ok && data.success) {
+                    if (data.success) {
                         console.log('✅ 对话重命名成功');
                         
                         // 关闭模态框
@@ -2756,6 +2755,18 @@
                     
                 } catch (error) {
                     console.error('重命名对话失败:', error);
+                    
+                    // 检查是否是401认证错误，如果是则由API客户端自动处理
+                    if (error.response && error.response.status === 401) {
+                        console.log('🔐 重命名对话遇到401错误，由API客户端自动处理');
+                        // 关闭重命名模态框
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('renameConversationModal'));
+                        if (modal) {
+                            modal.hide();
+                        }
+                        return;
+                    }
+                    
                     alert(`重命名失败：${error.message}`);
                 } finally {
                     // 恢复按钮状态
@@ -2781,17 +2792,10 @@
                 try {
                     console.log('🗑️ 执行删除对话:', conversationId);
                     
-                    const response = await fetch(`${ENV_CONFIG.getApiUrl(`/conversations/${conversationId}`)}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `Bearer ${localStorage.getItem('dify_access_token')}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
+                    // 使用统一的API客户端，这样可以自动处理401错误
+                    const data = await ENV_CONFIG.apiClient.delete(`/conversations/${conversationId}`);
                     
-                    const data = await response.json();
-                    
-                    if (response.ok && data.success) {
+                    if (data.success) {
                         console.log('✅ 对话删除成功');
                         
                         // 如果删除的是当前选中的对话，清空选择
@@ -2826,6 +2830,13 @@
                     
                 } catch (error) {
                     console.error('删除对话失败:', error);
+                    
+                    // 检查是否是401认证错误，如果是则由API客户端自动处理
+                    if (error.response && error.response.status === 401) {
+                        console.log('🔐 删除对话遇到401错误，由API客户端自动处理');
+                        return;
+                    }
+                    
                     alert(`删除对话失败：${error.message}`);
                 }
             }
@@ -2844,16 +2855,11 @@
             
             // 显示选择会话模态框
             window.showSelectConversationModal = async function() {
-                // 检查登录状态
-                if (!(await checkAuthBeforeAction())) {
-                    return;
-                }
-                
                 console.log('📋 显示选择会话模态框');
                 const modal = new bootstrap.Modal(document.getElementById('selectConversationModal'));
                 modal.show();
                 
-                // 加载会话列表
+                // 加载会话列表，如果token过期会由API调用自动处理401响应
                 await loadSelectConversationList();
             };
             
@@ -2916,6 +2922,18 @@
                     
                 } catch (error) {
                     console.error('加载选择会话列表失败:', error);
+                    
+                    // 检查是否是401认证错误，如果是则由API客户端自动处理
+                    if (error.response && error.response.status === 401) {
+                        console.log('🔐 选择会话列表加载遇到401错误，由API客户端自动处理');
+                        // 关闭选择会话模态框
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('selectConversationModal'));
+                        if (modal) {
+                            modal.hide();
+                        }
+                        return;
+                    }
+                    
                     listElement.innerHTML = `
                         <div class="text-center text-danger py-4">
                             <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>

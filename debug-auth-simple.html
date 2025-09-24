@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证状态检查工具</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .status-item.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        .status-item.success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 认证状态检查工具</h1>
+        
+        <div class="actions">
+            <button class="btn" onclick="checkAuthStatus()">检查认证状态</button>
+            <button class="btn" onclick="clearStorage()">清除存储</button>
+        </div>
+        
+        <div id="statusDisplay">
+            <p>点击"检查认证状态"按钮开始检查...</p>
+        </div>
+    </div>
+
+    <script>
+        // 检查认证状态
+        window.checkAuthStatus = async function() {
+            const display = document.getElementById('statusDisplay');
+            display.innerHTML = '<p>正在检查认证状态...</p>';
+            
+            try {
+                // 1. 检查本地存储
+                const accessToken = localStorage.getItem('dify_access_token');
+                const userInfo = localStorage.getItem('dify_user_info');
+                const expiresAt = localStorage.getItem('dify_token_expires_at');
+                
+                let html = '<h3>📦 本地存储状态</h3>';
+                
+                html += `<div class="status-item ${accessToken ? 'success' : 'error'}">
+                    <span>Access Token:</span>
+                    <span>${accessToken ? '✅ 存在' : '❌ 不存在'}</span>
+                </div>`;
+                
+                html += `<div class="status-item ${userInfo ? 'success' : 'error'}">
+                    <span>用户信息:</span>
+                    <span>${userInfo ? '✅ 存在' : '❌ 不存在'}</span>
+                </div>`;
+                
+                if (expiresAt) {
+                    const expireDate = new Date(parseInt(expiresAt));
+                    const now = new Date();
+                    const isExpired = now > expireDate;
+                    const remainingTime = Math.round((expireDate - now) / 1000 / 60);
+                    
+                    html += `<div class="status-item ${isExpired ? 'error' : 'success'}">
+                        <span>Token过期时间:</span>
+                        <span>${expireDate.toLocaleString()} ${isExpired ? '❌ 已过期' : '✅ 有效 (剩余' + remainingTime + '分钟)'}</span>
+                    </div>`;
+                } else {
+                    html += `<div class="status-item error">
+                        <span>Token过期时间:</span>
+                        <span>❌ 未设置</span>
+                    </div>`;
+                }
+                
+                // 2. 显示用户信息
+                if (userInfo) {
+                    try {
+                        const user = JSON.parse(userInfo);
+                        html += '<h3>👤 用户信息</h3>';
+                        html += `<div class="status-item success">
+                            <span>用户名:</span>
+                            <span>${user.username || '未知'}</span>
+                        </div>`;
+                        html += `<div class="status-item success">
+                            <span>邮箱:</span>
+                            <span>${user.email || '未知'}</span>
+                        </div>`;
+                        html += `<div class="status-item success">
+                            <span>角色:</span>
+                            <span>${user.role || '未知'}</span>
+                        </div>`;
+                    } catch (parseError) {
+                        html += `<div class="status-item error">
+                            <span>用户信息解析:</span>
+                            <span>❌ 解析失败</span>
+                        </div>`;
+                    }
+                }
+                
+                display.innerHTML = html;
+                
+            } catch (error) {
+                display.innerHTML = `<div class="status-item error">
+                    <span>检查失败:</span>
+                    <span>${error.message}</span>
+                </div>`;
+            }
+        };
+        
+        // 清除存储
+        window.clearStorage = function() {
+            if (confirm('确定要清除所有认证相关的存储数据吗？')) {
+                localStorage.removeItem('dify_access_token');
+                localStorage.removeItem('dify_refresh_token');
+                localStorage.removeItem('dify_token_expires_at');
+                localStorage.removeItem('dify_user_info');
+                
+                alert('存储已清除，请重新检查状态');
+                checkAuthStatus();
+            }
+        };
+    </script>
+</body>
+</html>

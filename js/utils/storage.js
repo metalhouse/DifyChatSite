@@ -78,19 +78,20 @@ class StorageManager {
     /**
      * 设置访问令牌
      * @param {string} accessToken 访问令牌
-     * @param {number} [expiresIn] 过期时间（秒）
+     * @param {number} [expiresIn] 过期时间（秒，仅用于记录）
      */
     setAccessToken(accessToken, expiresIn) {
         try {
             this._setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
             
+            // 可选：记录过期时间用于调试，但不用于验证
             if (expiresIn) {
                 const expiresAt = Date.now() + (expiresIn * 1000);
                 this._setItem(STORAGE_KEYS.TOKEN_EXPIRES_AT, expiresAt.toString());
             }
 
             if (ENV_CONFIG.isDebug()) {
-                console.log('🔑 设置访问令牌');
+                console.log('🔑 设置访问令牌', expiresIn ? `，预期${expiresIn}秒后过期` : '');
             }
         } catch (error) {
             console.error('❌ 设置访问令牌失败:', error.message);
@@ -103,15 +104,8 @@ class StorageManager {
      */
     getAccessToken() {
         try {
-            const token = this._getItem(STORAGE_KEYS.ACCESS_TOKEN);
-            
-            // 检查是否过期
-            if (token && this.isTokenExpired()) {
-                this.clearTokens();
-                return null;
-            }
-            
-            return token;
+            // 简化逻辑：直接返回token，让后端通过401响应判断是否过期
+            return this._getItem(STORAGE_KEYS.ACCESS_TOKEN);
         } catch (error) {
             console.error('❌ 获取访问令牌失败:', error.message);
             return null;
@@ -165,7 +159,8 @@ class StorageManager {
     isTokenExpired() {
         try {
             const expiresAt = this._getItem(STORAGE_KEYS.TOKEN_EXPIRES_AT);
-            if (!expiresAt) return false;
+            // 如果没有过期时间记录，认为Token无效（已过期）
+            if (!expiresAt) return true;
             
             return Date.now() > parseInt(expiresAt);
         } catch (error) {

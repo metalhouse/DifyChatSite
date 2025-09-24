@@ -506,26 +506,23 @@ export class SimpleChatController {
                 messageContent: error?.message
             });
             
-            // 最简单直接的方式：检测到"令牌已过期"立即跳转
-            if (error && error.message && error.message.includes('令牌已过期')) {
-                console.log('🔐 ✅ 检测到令牌已过期，立即跳转到登录页面');
+            // 检测token过期，弹出登录模态框
+            if (error && error.message && (
+                error.message.includes('令牌已过期') || 
+                error.message.includes('登录已过期') ||
+                error.message.includes('未授权') ||
+                (error.response && error.response.status === 401)
+            )) {
+                console.log('🔐 检测到令牌已过期，显示登录超时模态框');
                 
-                // 清除认证信息
-                localStorage.removeItem('dify_access_token');
-                localStorage.removeItem('dify_refresh_token');
-                localStorage.removeItem('userInfo');
-                localStorage.removeItem('currentUser');
-                console.log('🧹 localStorage已清理');
-                
-                // 显示跳转提示
-                this.addMessage('system', '登录已过期，即将跳转到登录页面...');
-                
-                // 1.5秒后跳转
-                setTimeout(() => {
+                // 显示登录超时模态框
+                if (typeof window.showLoginTimeoutModal === 'function') {
+                    window.showLoginTimeoutModal();
+                } else {
+                    // 兜底方案：直接跳转
                     const returnUrl = encodeURIComponent(window.location.href);
-                    console.log('🚀 执行跳转到登录页面:', `./login.html?return=${returnUrl}`);
                     window.location.href = `./login.html?return=${returnUrl}`;
-                }, 1500);
+                }
                 
                 return;
             } else {

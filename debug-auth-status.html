@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证状态检查调试工具</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover { background: #0056b3; }
+        .debug-output {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔐 认证状态检查调试工具</h1>
+    
+    <div class="card">
+        <h3>当前状态检查</h3>
+        <button class="btn" onclick="checkCurrentStatus()">检查当前认证状态</button>
+        <button class="btn" onclick="testAuthFlow()">测试认证流程</button>
+        <button class="btn" onclick="clearStorage()">清除存储</button>
+        <div id="currentStatus" class="debug-output"></div>
+    </div>
+
+    <div class="card">
+        <h3>模拟登录后检查</h3>
+        <button class="btn" onclick="simulateLogin()">模拟登录成功</button>
+        <button class="btn" onclick="testSelectConversation()">测试"选择会话"功能</button>
+        <div id="simulationResult" class="debug-output"></div>
+    </div>
+
+    <div class="card">
+        <h3>存储数据检查</h3>
+        <button class="btn" onclick="checkStorage()">检查存储数据</button>
+        <div id="storageData" class="debug-output"></div>
+    </div>
+
+    <script type="module">
+        // 导入必要的模块
+        let authService, storageManager;
+        
+        try {
+            const authModule = await import('./js/services/auth-service.js');
+            const storageModule = await import('./js/utils/storage.js');
+            authService = authModule.default;
+            storageManager = storageModule.default;
+            
+            console.log('✅ 模块加载成功');
+        } catch (error) {
+            console.error('❌ 模块加载失败:', error);
+            document.getElementById('currentStatus').textContent = '模块加载失败: ' + error.message;
+        }
+
+        // 检查当前认证状态
+        window.checkCurrentStatus = function() {
+            const output = document.getElementById('currentStatus');
+            const results = [];
+            
+            try {
+                // 1. 检查存储中的数据
+                const accessToken = localStorage.getItem('dify_access_token');
+                const refreshToken = localStorage.getItem('dify_refresh_token');
+                const userInfo = localStorage.getItem('dify_user_info');
+                const expiresAt = localStorage.getItem('dify_token_expires_at');
+                
+                results.push('=== 存储检查 ===');
+                results.push(`Access Token: ${accessToken ? '存在 (' + accessToken.length + ' 字符)' : '不存在'}`);
+                results.push(`Refresh Token: ${refreshToken ? '存在 (' + refreshToken.length + ' 字符)' : '不存在'}`);
+                results.push(`User Info: ${userInfo ? '存在' : '不存在'}`);
+                results.push(`Expires At: ${expiresAt ? new Date(parseInt(expiresAt)).toLocaleString() : '不存在'}`);
+                
+                if (expiresAt) {
+                    const now = Date.now();
+                    const expiry = parseInt(expiresAt);
+                    const isExpired = now > expiry;
+                    const timeLeft = isExpired ? 0 : Math.round((expiry - now) / 1000);
+                    results.push(`Token状态: ${isExpired ? '已过期' : '有效，剩余' + timeLeft + '秒'}`);
+                }
+                
+                // 2. 检查认证服务状态
+                if (authService) {
+                    results.push('\\n=== 认证服务状态 ===');
+                    results.push(`Auth State: ${authService.getAuthState()}`);
+                    results.push(`Current User: ${authService.getCurrentUser() ? '存在' : '不存在'}`);
+                    results.push(`Is Authenticated: ${authService.isAuthenticated()}`);
+                    
+                    const user = authService.getCurrentUser();
+                    if (user) {
+                        results.push(`用户信息:`);
+                        results.push(`  - ID: ${user.id || 'N/A'}`);
+                        results.push(`  - 用户名: ${user.username || 'N/A'}`);
+                        results.push(`  - 邮箱: ${user.email || 'N/A'}`);
+                    }
+                }
+                
+                // 3. 检查存储管理器
+                if (storageManager) {
+                    results.push('\\n=== 存储管理器状态 ===');
+                    results.push(`getAccessToken(): ${storageManager.getAccessToken() ? '有token' : '无token'}`);
+                    results.push(`getRefreshToken(): ${storageManager.getRefreshToken() ? '有token' : '无token'}`);
+                    results.push(`getUserInfo(): ${storageManager.getUserInfo() ? '有用户信息' : '无用户信息'}`);
+                    results.push(`isTokenExpired(): ${storageManager.isTokenExpired()}`);
+                }
+                
+            } catch (error) {
+                results.push('\\n❌ 检查过程中发生错误:');
+                results.push(error.message);
+                results.push(error.stack);
+            }
+            
+            output.textContent = results.join('\\n');
+        };
+
+        // 模拟登录
+        window.simulateLogin = function() {
+            const output = document.getElementById('simulationResult');
+            const results = [];
+            
+            try {
+                // 模拟登录成功的数据
+                const mockLoginData = {
+                    accessToken: 'mock_access_token_' + Date.now(),
+                    refreshToken: 'mock_refresh_token_' + Date.now(),
+                    expiresIn: 3600, // 1小时
+                    user: {
+                        id: 'user_123',
+                        username: 'testuser',
+                        email: 'test@example.com',
+                        nickname: '测试用户'
+                    }
+                };
+                
+                results.push('=== 模拟登录过程 ===');
+                results.push('1. 设置Token...');
+                
+                // 直接设置存储数据
+                if (storageManager) {
+                    storageManager.setTokens(
+                        mockLoginData.accessToken, 
+                        mockLoginData.refreshToken, 
+                        mockLoginData.expiresIn
+                    );
+                    storageManager.setUserInfo(mockLoginData.user);
+                }
+                
+                results.push('2. 更新认证服务状态...');
+                
+                // 更新认证服务状态
+                if (authService) {
+                    authService.currentUser = mockLoginData.user;
+                    authService.authState = 'authenticated';
+                }
+                
+                results.push('3. 验证设置结果...');
+                
+                // 验证结果
+                setTimeout(() => {
+                    const isAuth = authService ? authService.isAuthenticated() : false;
+                    results.push(`isAuthenticated(): ${isAuth}`);
+                    results.push('\\n✅ 模拟登录完成');
+                    output.textContent = results.join('\\n');
+                }, 100);
+                
+            } catch (error) {
+                results.push('\\n❌ 模拟登录失败:');
+                results.push(error.message);
+            }
+            
+            output.textContent = results.join('\\n');
+        };
+
+        // 测试选择会话功能
+        window.testSelectConversation = async function() {
+            const output = document.getElementById('simulationResult');
+            const results = [];
+            
+            try {
+                results.push('=== 测试选择会话功能 ===');
+                
+                // 模拟 checkAuthBeforeAction 函数的逻辑
+                results.push('1. 执行认证检查...');
+                
+                if (!authService) {
+                    throw new Error('认证服务未加载');
+                }
+                
+                const isAuthenticated = authService.isAuthenticated();
+                results.push(`认证检查结果: ${isAuthenticated}`);
+                
+                if (!isAuthenticated) {
+                    results.push('❌ 认证检查失败，会触发登录超时模态框');
+                    results.push('\\n详细状态:');
+                    results.push(`  - authState: ${authService.getAuthState()}`);
+                    results.push(`  - currentUser: ${authService.getCurrentUser() ? '存在' : '不存在'}`);
+                    results.push(`  - accessToken: ${storageManager.getAccessToken() ? '存在' : '不存在'}`);
+                } else {
+                    results.push('✅ 认证检查通过，可以正常执行选择会话功能');
+                }
+                
+            } catch (error) {
+                results.push('\\n❌ 测试过程中发生错误:');
+                results.push(error.message);
+            }
+            
+            output.textContent = results.join('\\n');
+        };
+
+        // 检查存储数据
+        window.checkStorage = function() {
+            const output = document.getElementById('storageData');
+            const results = [];
+            
+            results.push('=== localStorage 数据 ===');
+            
+            const keys = [
+                'dify_access_token',
+                'dify_refresh_token', 
+                'dify_token_expires_at',
+                'dify_user_info'
+            ];
+            
+            keys.forEach(key => {
+                const value = localStorage.getItem(key);
+                if (value) {
+                    if (key === 'dify_user_info') {
+                        try {
+                            const parsed = JSON.parse(value);
+                            results.push(`${key}: ${JSON.stringify(parsed, null, 2)}`);
+                        } catch (e) {
+                            results.push(`${key}: ${value}`);
+                        }
+                    } else if (key.includes('token')) {
+                        // 只显示token的前后几位
+                        const display = value.length > 20 ? 
+                            value.substring(0, 10) + '...' + value.substring(value.length - 10) :
+                            value;
+                        results.push(`${key}: ${display} (长度: ${value.length})`);
+                    } else {
+                        results.push(`${key}: ${value}`);
+                    }
+                } else {
+                    results.push(`${key}: (空)`);
+                }
+            });
+            
+            output.textContent = results.join('\\n');
+        };
+
+        // 清除存储
+        window.clearStorage = function() {
+            localStorage.removeItem('dify_access_token');
+            localStorage.removeItem('dify_refresh_token');
+            localStorage.removeItem('dify_token_expires_at');
+            localStorage.removeItem('dify_user_info');
+            
+            if (authService) {
+                authService.currentUser = null;
+                authService.authState = 'unauthenticated';
+            }
+            
+            alert('存储已清除');
+        };
+
+        // 页面加载完成后自动检查一次
+        window.addEventListener('load', () => {
+            setTimeout(checkCurrentStatus, 500);
+        });
+    </script>
+</body>
+</html>
