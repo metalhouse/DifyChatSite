@@ -2073,6 +2073,176 @@
                 border-radius: 6px !important;
             }
         }
+
+        /* PIN验证和锁屏样式 */
+        .lock-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.98));
+            backdrop-filter: blur(20px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: lockScreenFadeIn 0.5s ease-out;
+        }
+
+        @keyframes lockScreenFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .lock-content {
+            text-align: center;
+            color: white;
+            max-width: 400px;
+            padding: 2rem;
+        }
+
+        .lock-icon {
+            font-size: 4rem;
+            color: #28a745;
+            margin-bottom: 1.5rem;
+            animation: lockPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes lockPulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        .lock-title {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        .lock-message {
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .lock-submessage {
+            font-size: 0.9rem;
+            margin-bottom: 2rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .unlock-form {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .unlock-pin-input {
+            flex: 1;
+            padding: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1.2rem;
+            text-align: center;
+            letter-spacing: 0.3em;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .unlock-pin-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .unlock-pin-input:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.3);
+        }
+
+        .unlock-btn {
+            padding: 1rem 1.5rem;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .unlock-btn:hover {
+            background: #198754;
+            transform: translateY(-2px);
+        }
+
+        .unlock-btn:disabled {
+            background: rgba(255, 255, 255, 0.3);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .unlock-error {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* PIN验证模态框样式增强 */
+        #pinVerifyModal .modal-content {
+            border: 2px solid #28a745;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        #pinVerifyModal .modal-header {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+
+        #pinVerifyInput {
+            font-family: monospace;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        #pinVerifyInput:focus {
+            border-color: #28a745;
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.2);
+        }
+
+        /* 响应式锁屏 */
+        @media (max-width: 768px) {
+            .lock-content {
+                padding: 1.5rem;
+                max-width: 90%;
+            }
+
+            .lock-title {
+                font-size: 1.5rem;
+            }
+
+            .lock-icon {
+                font-size: 3rem;
+            }
+
+            .unlock-form {
+                flex-direction: column;
+            }
+
+            .unlock-pin-input {
+                margin-bottom: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -2710,6 +2880,76 @@
         </div>
     </div>
 
+    <!-- PIN验证模态框 -->
+    <div class="modal fade" id="pinVerifyModal" tabindex="-1" aria-labelledby="pinVerifyModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-primary">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="pinVerifyModalLabel">
+                        <i class="fas fa-shield-alt me-2"></i>
+                        PIN验证
+                    </h5>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-lock fa-3x text-primary mb-3"></i>
+                        <p class="mb-3" id="pinVerifyMessage">请输入PIN码以继续访问</p>
+                    </div>
+                    
+                    <div class="form-group">
+                        <input type="password" class="form-control form-control-lg text-center" id="pinVerifyInput" 
+                               placeholder="输入PIN码" maxlength="6" autocomplete="off" style="letter-spacing: 0.2em;">
+                    </div>
+                    
+                    <div id="pinErrorMessage" class="alert alert-danger mt-3" style="display: none;">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="pinErrorText">PIN码错误</span>
+                    </div>
+                    
+                    <div id="pinAttemptsWarning" class="alert alert-warning mt-3" style="display: none;">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="pinAttemptsText">剩余尝试次数</span>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-primary" id="pinVerifyConfirmBtn">
+                        <i class="fas fa-unlock me-2"></i>
+                        验证
+                    </button>
+                    <button type="button" class="btn btn-secondary ms-2" id="pinVerifyCancelBtn" style="display: none;">
+                        取消
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 锁屏界面 -->
+    <div id="lockScreen" class="lock-screen" style="display: none;">
+        <div class="lock-content">
+            <div class="lock-icon">
+                <i class="fas fa-lock"></i>
+            </div>
+            <h2 class="lock-title">聊天室已锁定</h2>
+            <p class="lock-message">由于长时间无活动，聊天室已自动锁定</p>
+            <p class="lock-submessage">请输入PIN码解锁继续使用</p>
+            
+            <div class="unlock-form">
+                <input type="password" class="unlock-pin-input" id="unlockPinInput" 
+                       placeholder="输入PIN码" maxlength="6" autocomplete="off">
+                <button class="unlock-btn" id="unlockBtn">
+                    <i class="fas fa-unlock"></i>
+                    解锁
+                </button>
+            </div>
+            
+            <div id="unlockErrorMessage" class="unlock-error" style="display: none;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="unlockErrorText">PIN码错误</span>
+            </div>
+        </div>
+    </div>
+
     <!-- 批量删除确认对话框 -->
     <div class="modal fade" id="confirmBatchDeleteModal" tabindex="-1" aria-labelledby="confirmBatchDeleteModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -2782,6 +3022,9 @@
     <!-- 好友管理器 -->
     <script src="js/services/friends-manager.js"></script>
     
+    <!-- PIN验证服务 -->
+    <script src="js/services/pin-verification-service.js"></script>
+    
     <!-- 聊天室页面控制器 -->
     <script src="js/controllers/chatroom-controller.js"></script>
 
@@ -2824,6 +3067,9 @@
             if (onlineMembers) {
                 onlineMembers.style.display = 'none';
             }
+            
+            // 初始化PIN验证服务
+            initializePinVerification();
             
             // 移动端输入框优化处理
             if (window.innerWidth <= 768) {
@@ -4460,6 +4706,342 @@
                 }
             }
         }
+
+        // ========================================
+        // 🔐 PIN验证和自动锁定功能
+        // ========================================
+        
+        let pinService = null;
+        let autoLockTimer = null;
+        let isLocked = false;
+        let lastActivityTime = Date.now();
+        
+        // 初始化PIN验证服务
+        async function initializePinVerification() {
+            try {
+                // 等待PIN验证服务加载
+                if (typeof PinVerificationService === 'undefined') {
+                    console.warn('PIN验证服务未加载');
+                    return;
+                }
+                
+                pinService = new PinVerificationService();
+                
+                // 检查PIN状态
+                const pinStatus = await pinService.checkPinStatus();
+                console.log('PIN状态:', pinStatus);
+                
+                // 只有在既设置了PIN又启用了PIN功能时才需要验证
+                const needPinVerification = pinStatus.hasPin && pinStatus.pinEnabled;
+                console.log('需要PIN验证:', needPinVerification);
+                
+                if (needPinVerification) {
+                    // 显示PIN验证对话框
+                    await showPinVerificationDialog();
+                    
+                    // 启动自动锁定监听
+                    startAutoLockMonitoring();
+                } else if (pinStatus.hasPin && !pinStatus.pinEnabled) {
+                    console.log('PIN已设置但未启用，跳过验证');
+                } else {
+                    console.log('PIN未设置，跳过验证');
+                }
+                
+            } catch (error) {
+                console.error('初始化PIN验证失败:', error);
+                // 如果PIN验证失败，允许用户继续使用，但不启动自动锁定
+                console.warn('PIN验证服务不可用，继续正常使用');
+            }
+        }
+        
+        // 显示PIN验证对话框
+        function showPinVerificationDialog() {
+            return new Promise((resolve, reject) => {
+                const modal = new bootstrap.Modal(document.getElementById('pinVerifyModal'), {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+                
+                const pinInput = document.getElementById('pinVerifyInput');
+                const confirmBtn = document.getElementById('pinVerifyConfirmBtn');
+                const errorDiv = document.getElementById('pinErrorMessage');
+                const errorText = document.getElementById('pinErrorText');
+                
+                let attempts = 0;
+                const maxAttempts = 5;
+                
+                // 清空输入框
+                pinInput.value = '';
+                errorDiv.style.display = 'none';
+                
+                // 确认按钮点击事件
+                const handleConfirm = async () => {
+                    const pin = pinInput.value.trim();
+                    
+                    if (!pin) {
+                        showPinError('请输入PIN码');
+                        return;
+                    }
+                    
+                    confirmBtn.disabled = true;
+                    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>验证中...';
+                    
+                    try {
+                        const isValid = await pinService.verifyPin(pin);
+                        
+                        if (isValid) {
+                            modal.hide();
+                            resolve();
+                        } else {
+                            attempts++;
+                            if (attempts >= maxAttempts) {
+                                showPinError('验证失败次数过多，请稍后再试');
+                                setTimeout(() => {
+                                    window.location.href = './login.html';
+                                }, 2000);
+                                return;
+                            }
+                            
+                            showPinError(`PIN码错误，剩余 ${maxAttempts - attempts} 次机会`);
+                            pinInput.value = '';
+                            pinInput.focus();
+                        }
+                    } catch (error) {
+                        console.error('PIN验证失败:', error);
+                        showPinError('验证失败，请重试');
+                    } finally {
+                        confirmBtn.disabled = false;
+                        confirmBtn.innerHTML = '<i class="fas fa-unlock me-2"></i>验证';
+                    }
+                };
+                
+                // 显示PIN错误
+                function showPinError(message) {
+                    errorText.textContent = message;
+                    errorDiv.style.display = 'block';
+                }
+                
+                // 绑定事件
+                confirmBtn.onclick = handleConfirm;
+                pinInput.onkeypress = (e) => {
+                    if (e.key === 'Enter') {
+                        handleConfirm();
+                    }
+                };
+                
+                // 显示模态框
+                modal.show();
+                
+                // 聚焦输入框
+                setTimeout(() => {
+                    pinInput.focus();
+                }, 300);
+            });
+        }
+        
+        // 启动自动锁定监听
+        function startAutoLockMonitoring() {
+            if (!pinService) return;
+            
+            const lockTimeout = pinService.getLockTimeout();
+            console.log('自动锁定超时时间:', lockTimeout / 1000, '秒');
+            
+            // 监听用户活动
+            const activityEvents = [
+                'click', 'keypress', 'mousemove', 'scroll',
+                'touchstart', 'touchmove'
+            ];
+            
+            activityEvents.forEach(event => {
+                document.addEventListener(event, updateLastActivity, true);
+            });
+            
+            // 监听聊天室特定活动
+            const messageInput = document.querySelector('#messageInput, .input-text-container textarea');
+            if (messageInput) {
+                messageInput.addEventListener('input', updateLastActivity);
+            }
+            
+            // 监听房间切换和好友切换
+            document.addEventListener('room-changed', updateLastActivity);
+            document.addEventListener('friend-selected', updateLastActivity);
+            
+            // 启动定时检查
+            startLockTimer(lockTimeout);
+        }
+        
+        // 更新最后活动时间
+        function updateLastActivity() {
+            if (isLocked) return;
+            
+            lastActivityTime = Date.now();
+            
+            // 重置锁定定时器
+            if (autoLockTimer) {
+                clearTimeout(autoLockTimer);
+            }
+            
+            if (pinService) {
+                const lockTimeout = pinService.getLockTimeout();
+                startLockTimer(lockTimeout);
+            }
+        }
+        
+        // 启动锁定定时器
+        function startLockTimer(timeout) {
+            autoLockTimer = setTimeout(() => {
+                if (!isLocked) {
+                    lockScreen();
+                }
+            }, timeout);
+        }
+        
+        // 锁定屏幕
+        function lockScreen() {
+            if (isLocked) return;
+            
+            console.log('🔒 自动锁定聊天室');
+            isLocked = true;
+            
+            // 显示锁屏界面
+            const lockScreenDiv = document.getElementById('lockScreen');
+            lockScreenDiv.style.display = 'flex';
+            
+            // 清空输入框
+            const unlockInput = document.getElementById('unlockPinInput');
+            unlockInput.value = '';
+            
+            // 绑定解锁事件
+            bindUnlockEvents();
+            
+            // 聚焦输入框
+            setTimeout(() => {
+                unlockInput.focus();
+            }, 300);
+        }
+        
+        // 绑定解锁事件
+        function bindUnlockEvents() {
+            const unlockBtn = document.getElementById('unlockBtn');
+            const unlockInput = document.getElementById('unlockPinInput');
+            const errorDiv = document.getElementById('unlockErrorMessage');
+            const errorText = document.getElementById('unlockErrorText');
+            
+            let attempts = 0;
+            const maxAttempts = 5;
+            
+            const handleUnlock = async () => {
+                const pin = unlockInput.value.trim();
+                
+                if (!pin) {
+                    showUnlockError('请输入PIN码');
+                    return;
+                }
+                
+                unlockBtn.disabled = true;
+                unlockBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 验证中...';
+                
+                try {
+                    const isValid = await pinService.verifyPin(pin);
+                    
+                    if (isValid) {
+                        unlockScreen();
+                    } else {
+                        attempts++;
+                        if (attempts >= maxAttempts) {
+                            showUnlockError('验证失败次数过多，返回登录页面');
+                            setTimeout(() => {
+                                window.location.href = './login.html';
+                            }, 2000);
+                            return;
+                        }
+                        
+                        showUnlockError(`PIN码错误，剩余 ${maxAttempts - attempts} 次机会`);
+                        unlockInput.value = '';
+                        unlockInput.focus();
+                    }
+                } catch (error) {
+                    console.error('解锁验证失败:', error);
+                    showUnlockError('验证失败，请重试');
+                } finally {
+                    unlockBtn.disabled = false;
+                    unlockBtn.innerHTML = '<i class="fas fa-unlock"></i> 解锁';
+                }
+            };
+            
+            function showUnlockError(message) {
+                errorText.textContent = message;
+                errorDiv.style.display = 'block';
+                setTimeout(() => {
+                    errorDiv.style.display = 'none';
+                }, 3000);
+            }
+            
+            unlockBtn.onclick = handleUnlock;
+            unlockInput.onkeypress = (e) => {
+                if (e.key === 'Enter') {
+                    handleUnlock();
+                }
+            };
+        }
+        
+        // 解锁屏幕
+        function unlockScreen() {
+            console.log('🔓 解锁聊天室');
+            isLocked = false;
+            
+            // 隐藏锁屏界面
+            const lockScreenDiv = document.getElementById('lockScreen');
+            lockScreenDiv.style.display = 'none';
+            
+            // 更新最后活动时间并重启监听
+            updateLastActivity();
+        }
+        
+        // 全局函数
+        window.initializePinVerification = initializePinVerification;
+        window.updateLastActivity = updateLastActivity;
+        window.lockScreen = lockScreen;
+        window.unlockScreen = unlockScreen;
+        
+        // 测试PIN验证功能
+        window.testPinVerification = async function() {
+            console.log('🔐 测试PIN验证功能...');
+            
+            try {
+                if (!pinService) {
+                    console.log('❌ PIN服务未初始化');
+                    return;
+                }
+                
+                // 检查PIN状态
+                const status = await pinService.checkPinStatus();
+                console.log('📊 PIN状态:', status);
+                
+                if (!status.hasPin) {
+                    console.log('⚠️ 用户未设置PIN码');
+                    return;
+                }
+                
+                if (!status.pinEnabled) {
+                    console.log('⚠️ PIN功能未启用');
+                    return;
+                }
+                
+                console.log('✅ PIN验证功能已启用，可以正常使用');
+                console.log('🔒 手动触发锁屏测试: lockScreen()');
+                console.log('⏰ 查看自动锁定时间:', pinService.getLockTimeout() / 1000, '秒');
+                
+            } catch (error) {
+                console.error('❌ 测试PIN验证功能失败:', error);
+            }
+        };
+        
+        // 手动锁屏测试
+        window.manualLockTest = function() {
+            console.log('🔒 手动锁屏测试');
+            lockScreen();
+        };
     </script>
 </body>
 </html>

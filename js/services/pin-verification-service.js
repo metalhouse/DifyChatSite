@@ -191,6 +191,11 @@ class PinVerificationService {
                 body: JSON.stringify({ pin })
             });
 
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'PIN设置失败');
+            }
+
             const data = await response.json();
             if (!data.success) {
                 throw new Error(data.message || 'PIN设置失败');
@@ -226,7 +231,8 @@ class PinVerificationService {
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP ${response.status}`);
             }
 
             const data = await response.json();
@@ -276,6 +282,11 @@ class PinVerificationService {
                 body: JSON.stringify({ oldPin, newPin })
             });
 
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'PIN修改失败');
+            }
+
             const data = await response.json();
             if (!data.success) {
                 throw new Error(data.message || 'PIN修改失败');
@@ -307,6 +318,13 @@ class PinVerificationService {
                 },
                 body: JSON.stringify({ pin })
             });
+
+            if (!response.ok) {
+                // 处理HTTP错误状态
+                const errorText = await response.text();
+                console.error(`PIN验证请求失败: ${response.status} ${errorText}`);
+                return false;
+            }
 
             const data = await response.json();
             return data.success === true;

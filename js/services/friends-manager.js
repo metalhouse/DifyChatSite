@@ -252,6 +252,11 @@ class FriendsManager {
     startPrivateChat(friendId, friendName) {
         console.log('开始与好友私聊:', friendId, friendName);
         
+        // 更新PIN验证活动时间
+        if (window.updateLastActivity) {
+            window.updateLastActivity();
+        }
+        
         // 设置当前私聊状态
         this.currentPrivateChat = {
             friendId: friendId,
@@ -274,6 +279,11 @@ class FriendsManager {
 
         // 清空当前群聊房间状态
         this.chatroomController.currentRoom = null;
+        
+        // 触发好友选择事件（用于PIN验证活动监听）
+        document.dispatchEvent(new CustomEvent('friend-selected', {
+            detail: { friendId: friendId, friendName: friendName }
+        }));
         
         // 更新房间列表中的活跃状态
         this.updateActiveStates();
@@ -1117,6 +1127,11 @@ class FriendsManager {
         if (!this.currentPrivateChat) {
             console.warn('当前不在私聊模式');
             return;
+        }
+
+        // 更新PIN验证活动时间
+        if (window.updateLastActivity) {
+            window.updateLastActivity();
         }
 
         try {

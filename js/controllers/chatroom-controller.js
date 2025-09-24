@@ -862,6 +862,11 @@ width: ${computedStyle.width}`;
             return; // 已在当前房间
         }
 
+        // 更新PIN验证活动时间
+        if (window.updateLastActivity) {
+            window.updateLastActivity();
+        }
+
         // 清除私聊状态
         if (this.friendsManager) {
             this.friendsManager.clearPrivateChat();
@@ -1034,6 +1039,11 @@ width: ${computedStyle.width}`;
             const chatArea = document.querySelector('.chat-area');
             if (chatArea) chatArea.classList.remove('private-mode');
         } catch (e) { /* noop */ }
+
+        // 触发房间切换事件（用于PIN验证活动监听）
+        document.dispatchEvent(new CustomEvent('room-changed', {
+            detail: { roomId: roomData.roomId || roomData.id, roomName: roomData.roomName }
+        }));
 
         // 启用输入控件
         this.elements.messageInput.disabled = false;
@@ -1268,6 +1278,11 @@ width: ${computedStyle.width}`;
         const content = this.elements.messageInput.value.trim();
         if (!content) {
             return;
+        }
+
+        // 更新PIN验证活动时间
+        if (window.updateLastActivity) {
+            window.updateLastActivity();
         }
 
         // 检查是否在私聊模式
