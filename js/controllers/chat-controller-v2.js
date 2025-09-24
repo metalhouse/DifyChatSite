@@ -8,6 +8,27 @@ import { conversationService } from '../services/conversation-service.js';
 import apiClient from '../api/api-client.js';
 
 export class SimpleChatController {
+    /**
+     * 格式化消息内容，处理换行和Markdown
+     */
+    static formatMessageContent(content) {
+        if (!content) return '';
+        
+        return content
+            // 处理换行符
+            .replace(/\n/g, '<br>')
+            // 处理加粗 **text**
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            // 处理斜体 *text*
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            // 处理行内代码 `code`
+            .replace(/`(.*?)`/g, '<code>$1</code>')
+            // 处理标题 ### title
+            .replace(/^### (.*$)/gim, '<h4>$1</h4>')
+            .replace(/^## (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^# (.*$)/gim, '<h2>$1</h2>');
+    }
+
     constructor() {
         this.isInitialized = false;
         this.currentAgent = null;
@@ -705,13 +726,16 @@ export class SimpleChatController {
 
         // 生成操作按钮
         let actionButtons = '';
+        // 确保原始内容用于复制和编辑，避免HTML转义问题
+        const escapedContent = content.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        
         if (type === 'user' && !isTemporary) {
             actionButtons = `
                 <div class="message-actions">
-                    <button class="message-action-btn" onclick="copyMessage(this)" title="复制" data-content="${content.replace(/"/g, '&quot;')}">
+                    <button class="message-action-btn" onclick="copyMessage(this)" title="复制" data-content="${escapedContent}">
                         <i class="fas fa-copy"></i>
                     </button>
-                    <button class="message-action-btn" onclick="editMessage(this)" title="编辑" data-content="${content.replace(/"/g, '&quot;')}">
+                    <button class="message-action-btn" onclick="editMessage(this)" title="编辑" data-content="${escapedContent}">
                         <i class="fas fa-edit"></i>
                     </button>
                 </div>
@@ -734,7 +758,7 @@ export class SimpleChatController {
                             <i class="fas fa-chevron-right"></i>
                         </button>
                     </div>
-                    <button class="message-action-btn" onclick="copyMessage(this)" title="复制" data-content="${content.replace(/"/g, '&quot;')}">
+                    <button class="message-action-btn" onclick="copyMessage(this)" title="复制" data-content="${escapedContent}">
                         <i class="fas fa-copy"></i>
                     </button>
                     <button class="message-action-btn" onclick="regenerateMessage(this)" title="重新生成">
@@ -744,13 +768,16 @@ export class SimpleChatController {
             `;
         }
 
+        // 格式化消息内容
+        const formattedContent = SimpleChatController.formatMessageContent(content);
+
         messageElement.innerHTML = `
             <div class="message-bubble">
                 <div class="message-header">
                     <span><i class="${icon} me-1"></i>${senderName}</span>
                     <span class="message-time">${timestamp}</span>
                 </div>
-                <div class="message-content">${content}</div>
+                <div class="message-content">${formattedContent}</div>
                 ${tokenUsageHtml}
                 ${actionButtons}
             </div>

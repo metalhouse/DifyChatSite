@@ -1169,6 +1169,76 @@
         .history-message.assistant .history-message-time {
             text-align: left;
         }
+
+        /* 聊天记录中的消息内容格式化样式 */
+        .history-message-content h2,
+        .history-message-content h3,
+        .history-message-content h4 {
+            margin: 0.3rem 0 0.2rem 0;
+            color: inherit;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .history-message-content h2 {
+            font-size: 0.9rem;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            padding-bottom: 0.1rem;
+        }
+
+        .history-message-content h3 {
+            font-size: 0.85rem;
+        }
+
+        .history-message-content h4 {
+            font-size: 0.8rem;
+        }
+
+        .history-message-content strong {
+            font-weight: 600;
+            color: inherit;
+        }
+
+        .history-message-content em {
+            font-style: italic;
+            color: inherit;
+        }
+
+        .history-message-content code {
+            background: rgba(0,0,0,0.1);
+            padding: 0.1rem 0.2rem;
+            border-radius: 2px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.75em;
+        }
+
+        /* 聊天记录中AI助手消息的格式化内容颜色 */
+        .history-message.assistant .history-message-content h2,
+        .history-message.assistant .history-message-content h3,
+        .history-message.assistant .history-message-content h4,
+        .history-message.assistant .history-message-content strong,
+        .history-message.assistant .history-message-content em {
+            color: #1565c0;
+        }
+
+        .history-message.assistant .history-message-content code {
+            background: rgba(21, 101, 192, 0.1);
+            color: #1565c0;
+        }
+
+        /* 聊天记录中用户消息的格式化内容颜色 */
+        .history-message.user .history-message-content h2,
+        .history-message.user .history-message-content h3,
+        .history-message.user .history-message-content h4,
+        .history-message.user .history-message-content strong,
+        .history-message.user .history-message-content em {
+            color: white;
+        }
+
+        .history-message.user .history-message-content code {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
         
         /* 聊天记录模态框滚动条样式 */
         .conversation-list::-webkit-scrollbar,
@@ -1253,6 +1323,76 @@
         .message-bubble:has(.message-image) {
             padding: 0.5rem;
             max-width: 400px;
+        }
+
+        /* 消息内容格式化样式 */
+        .message-content h2,
+        .message-content h3,
+        .message-content h4 {
+            margin: 0.5rem 0 0.3rem 0;
+            color: inherit;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .message-content h2 {
+            font-size: 1.1rem;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            padding-bottom: 0.2rem;
+        }
+
+        .message-content h3 {
+            font-size: 1rem;
+        }
+
+        .message-content h4 {
+            font-size: 0.9rem;
+        }
+
+        .message-content strong {
+            font-weight: 600;
+            color: inherit;
+        }
+
+        .message-content em {
+            font-style: italic;
+            color: inherit;
+        }
+
+        .message-content code {
+            background: rgba(0,0,0,0.1);
+            padding: 0.1rem 0.3rem;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+
+        /* 确保AI助手消息中的格式化内容使用正确的颜色 */
+        .message-assistant .message-content h2,
+        .message-assistant .message-content h3,
+        .message-assistant .message-content h4,
+        .message-assistant .message-content strong,
+        .message-assistant .message-content em {
+            color: #1565c0;
+        }
+
+        .message-assistant .message-content code {
+            background: rgba(21, 101, 192, 0.1);
+            color: #1565c0;
+        }
+
+        /* 用户消息中的格式化内容保持白色 */
+        .message-user .message-content h2,
+        .message-user .message-content h3,
+        .message-user .message-content h4,
+        .message-user .message-content strong,
+        .message-user .message-content em {
+            color: white;
+        }
+
+        .message-user .message-content code {
+            background: rgba(255,255,255,0.2);
+            color: white;
         }
     </style>
 </head>
@@ -2365,11 +2505,21 @@
         
         // 格式化消息内容
         function formatMessageContent(content) {
+            if (!content) return '';
+            
             return content
+                // 处理换行符
                 .replace(/\n/g, '<br>')
+                // 处理加粗 **text**
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                // 处理斜体 *text*
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`(.*?)`/g, '<code>$1</code>');
+                // 处理行内代码 `code`
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                // 处理标题 ### title
+                .replace(/^### (.*$)/gim, '<h4>$1</h4>')
+                .replace(/^## (.*$)/gim, '<h3>$1</h3>')
+                .replace(/^# (.*$)/gim, '<h2>$1</h2>');
         }
         
         // 展开/收起消息
