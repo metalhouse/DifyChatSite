@@ -1015,11 +1015,14 @@
         }
         
         .conversation-item {
+            display: flex;
+            align-items: center;
             padding: 12px 15px;
             border-bottom: 1px solid #e9ecef;
             cursor: pointer;
             transition: all 0.2s ease;
             background: white;
+            position: relative;
         }
         
         .conversation-item:last-child {
@@ -1034,6 +1037,73 @@
         .conversation-item.active {
             background: #007bff;
             color: white;
+        }
+        
+        /* 批量选择复选框样式 */
+        .conversation-checkbox {
+            margin-right: 10px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            transform: scale(1.1);
+        }
+        
+        .conversation-list.batch-mode .conversation-checkbox {
+            opacity: 1;
+        }
+        
+        .conversation-item.selected {
+            background: #e3f2fd !important;
+            border-left: 3px solid #2196f3;
+        }
+        
+        .conversation-item.selected .conversation-checkbox {
+            opacity: 1;
+        }
+        
+        /* 批量操作工具栏样式 */
+        #batchOperationToolbar {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+        }
+        
+        #batchOperationToolbar .btn {
+            transition: all 0.2s ease;
+        }
+        
+        #batchOperationToolbar .btn:hover {
+            transform: translateY(-1px);
+        }
+        
+        /* 移动端批量操作优化 */
+        @media (max-width: 768px) {
+            .conversation-checkbox {
+                margin-right: 8px;
+            }
+            
+            #batchOperationToolbar {
+                padding: 0.5rem;
+            }
+            
+            #batchOperationToolbar .form-check-label {
+                font-size: 0.8rem;
+            }
+            
+            #selectedCount {
+                font-size: 0.75rem;
+            }
+            
+            .conversation-item {
+                padding: 10px 12px;
+            }
+            
+            .conversation-title {
+                font-size: 0.85rem;
+            }
+            
+            .conversation-meta {
+                font-size: 0.7rem;
+            }
         }
         
         .conversation-item.active .conversation-meta {
@@ -1541,12 +1611,38 @@
                     <div class="row">
                         <!-- 左侧：对话列表 -->
                         <div class="col-md-4">
-                            <h6 class="mb-3">
-                                <i class="fas fa-list me-1"></i>对话列表
-                                <button class="btn btn-sm btn-outline-primary float-end" onclick="refreshConversationList()" title="刷新列表">
-                                    <i class="fas fa-refresh"></i>
-                                </button>
-                            </h6>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="mb-0">
+                                    <i class="fas fa-list me-1"></i>对话列表
+                                </h6>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-secondary" onclick="toggleBatchMode()" title="批量操作" id="batchModeToggle">
+                                        <i class="fas fa-check-square"></i>
+                                    </button>
+                                    <button class="btn btn-outline-primary" onclick="refreshConversationList()" title="刷新列表">
+                                        <i class="fas fa-refresh"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- 批量操作工具栏 -->
+                            <div id="batchOperationToolbar" class="mb-2" style="display: none;">
+                                <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="selectAllConversations" onchange="toggleSelectAll()">
+                                        <label class="form-check-label" for="selectAllConversations">
+                                            <small>全选</small>
+                                        </label>
+                                    </div>
+                                    <div>
+                                        <span id="selectedCount" class="text-muted small me-2">已选择 0 项</span>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="batchDeleteUsingOriginalLogic()" id="batchDeleteBtn" disabled>
+                                            <i class="fas fa-trash me-1"></i>删除(测试)
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div id="conversationList" class="conversation-list">
                                 <div class="text-center text-muted py-4">
                                     <i class="fas fa-spinner fa-spin"></i>
@@ -2214,7 +2310,14 @@
                 return `
                     <div class="conversation-item ${conversation.id === selectedConversationId ? 'active' : ''}" 
                          onclick="selectConversation('${conversation.id}')">
-                        <div class="d-flex justify-content-between align-items-start">
+                        <!-- 批量选择复选框 -->
+                        <div class="form-check conversation-checkbox">
+                            <input class="form-check-input" type="checkbox" value="${conversation.id}" 
+                                   id="conv-${conversation.id}" 
+                                   onclick="event.stopPropagation(); toggleConversationSelection('${conversation.id}')">
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-start flex-grow-1">
                             <div class="conversation-content flex-grow-1">
                                 <div class="conversation-title">${conversationTitle}</div>
                                 <div class="conversation-meta">
@@ -2252,6 +2355,11 @@
             }).join('');
             
             conversationListElement.innerHTML = conversationHtml;
+            
+            // 清空之前的选择状态
+            if (typeof window.clearSelection === 'function') {
+                window.clearSelection();
+            }
         }
         
         // 选择对话
@@ -2610,6 +2718,342 @@
                 });
             }
         }
+
+        // ========================================
+        // 📋 批量操作功能
+        // ========================================
+        
+        // 选中的对话ID集合
+        window.selectedConversations = new Set();
+        
+        // 切换单个对话的选择状态
+        window.toggleConversationSelection = function(conversationId) {
+            const checkbox = document.getElementById(`conv-${conversationId}`);
+            const conversationItem = checkbox.closest('.conversation-item');
+            
+            if (checkbox.checked) {
+                window.selectedConversations.add(conversationId);
+                conversationItem.classList.add('selected');
+            } else {
+                window.selectedConversations.delete(conversationId);
+                conversationItem.classList.remove('selected');
+            }
+            
+            updateBatchOperationUI();
+        };
+        
+        // 全选/取消全选
+        window.toggleSelectAll = function() {
+            const selectAllCheckbox = document.getElementById('selectAllConversations');
+            const conversationCheckboxes = document.querySelectorAll('.conversation-checkbox input[type="checkbox"]');
+            
+            conversationCheckboxes.forEach(checkbox => {
+                const conversationId = checkbox.value;
+                const conversationItem = checkbox.closest('.conversation-item');
+                
+                if (selectAllCheckbox.checked) {
+                    checkbox.checked = true;
+                    window.selectedConversations.add(conversationId);
+                    conversationItem.classList.add('selected');
+                } else {
+                    checkbox.checked = false;
+                    window.selectedConversations.delete(conversationId);
+                    conversationItem.classList.remove('selected');
+                }
+            });
+            
+            updateBatchOperationUI();
+        };
+        
+        // 更新批量操作UI
+        function updateBatchOperationUI() {
+            const selectedCount = window.selectedConversations.size;
+            const batchToolbar = document.getElementById('batchOperationToolbar');
+            const conversationList = document.getElementById('conversationList');
+            const selectedCountLabel = document.getElementById('selectedCount');
+            const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+            const selectAllCheckbox = document.getElementById('selectAllConversations');
+            
+            // 更新选择计数
+            selectedCountLabel.textContent = `已选择 ${selectedCount} 项`;
+            
+            // 启用/禁用删除按钮
+            batchDeleteBtn.disabled = selectedCount === 0;
+            
+            // 只有在批量模式下才显示工具栏
+            if (conversationList.classList.contains('batch-mode')) {
+                batchToolbar.style.display = 'block';
+            } else {
+                batchToolbar.style.display = 'none';
+            }
+            
+            // 更新全选复选框状态
+            const totalConversations = document.querySelectorAll('.conversation-checkbox input[type="checkbox"]').length;
+            if (selectedCount === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (selectedCount === totalConversations) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+        
+        // 批量删除对话
+        window.batchDeleteConversations = async function() {
+            const selectedCount = window.selectedConversations.size;
+            if (selectedCount === 0) {
+                showToast('请先选择要删除的对话', 'warning');
+                return;
+            }
+            
+            // 确认删除
+            const confirmMessage = `确定要删除选中的 ${selectedCount} 个对话吗？此操作不可撤销。`;
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            try {
+                showToast('正在删除选中的对话...', 'info');
+                
+                // 批量删除API调用 - 参考单个删除的成功实现
+                const deletePromises = Array.from(window.selectedConversations).map(async (conversationId) => {
+                    try {
+                        console.log(`🗑️ 开始删除对话: ${conversationId}`);
+                        
+                        // 使用与单个删除相同的方式调用API
+                        const data = await ENV_CONFIG.apiClient.delete(`/conversations/${conversationId}`);
+                        console.log(`🔍 删除对话 ${conversationId} 的完整响应:`, data);
+                        console.log(`🔍 响应类型:`, typeof data);
+                        console.log(`🔍 响应的success字段:`, data?.success);
+                        console.log(`🔍 响应的success字段类型:`, typeof data?.success);
+                        
+                        // 更严格的成功判断
+                        if (data && data.success === true) {
+                            console.log(`✅ 对话 ${conversationId} 删除成功`);
+                            return { id: conversationId, success: true };
+                        } else {
+                            console.log(`❌ 对话 ${conversationId} 删除失败:`, data?.message || '未知原因');
+                            console.log(`❌ 失败详情 - success:`, data?.success, ', message:', data?.message);
+                            return { id: conversationId, success: false, error: data?.message || '删除失败' };
+                        }
+                    } catch (error) {
+                        console.error(`❌ 删除对话 ${conversationId} 出现异常:`, error);
+                        return { id: conversationId, success: false, error: error.message || '删除异常' };
+                    }
+                });
+                
+                const results = await Promise.all(deletePromises);
+                console.log('🔍 批量删除结果汇总:', results);
+                
+                // 统计结果
+                const successCount = results.filter(r => r.success).length;
+                const failCount = results.filter(r => !r.success).length;
+                
+                console.log(`📊 删除统计: 成功 ${successCount} 个，失败 ${failCount} 个`);
+                
+                if (failCount === 0) {
+                    showToast(`成功删除 ${successCount} 个对话`, 'success');
+                } else {
+                    const failedIds = results.filter(r => !r.success).map(r => r.id);
+                    console.log('❌ 删除失败的对话ID:', failedIds);
+                    showToast(`删除完成：成功 ${successCount} 个，失败 ${failCount} 个`, 'warning');
+                }
+                
+                // 清空选择
+                window.selectedConversations.clear();
+                updateBatchOperationUI();
+                
+                // 刷新对话列表
+                await loadConversationList();
+                
+            } catch (error) {
+                console.error('批量删除对话失败:', error);
+                showToast('批量删除失败，请重试', 'error');
+            }
+        };
+        
+        // 简化版批量删除（逐个删除，用于调试）
+        window.simpleTestBatchDelete = async function() {
+            const selectedIds = Array.from(window.selectedConversations);
+            console.log('🧪 开始简化版批量删除测试:', selectedIds);
+            
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (let i = 0; i < selectedIds.length; i++) {
+                const conversationId = selectedIds[i];
+                console.log(`🗑️ [${i+1}/${selectedIds.length}] 删除对话: ${conversationId}`);
+                
+                try {
+                    const data = await ENV_CONFIG.apiClient.delete(`/conversations/${conversationId}`);
+                    console.log(`📋 响应:`, data);
+                    
+                    if (data && data.success === true) {
+                        console.log(`✅ [${i+1}] 删除成功: ${conversationId}`);
+                        successCount++;
+                    } else {
+                        console.log(`❌ [${i+1}] 删除失败: ${conversationId}, 原因:`, data?.message || '未知错误');
+                        failCount++;
+                    }
+                } catch (error) {
+                    console.log(`💥 [${i+1}] 删除异常: ${conversationId}, 错误:`, error.message);
+                    failCount++;
+                }
+                
+                // 每次删除后暂停一下
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            console.log(`📊 简化版删除结果: 成功 ${successCount}, 失败 ${failCount}`);
+            return { successCount, failCount };
+        };
+        
+        // 清空选择
+        window.clearSelection = function() {
+            window.selectedConversations.clear();
+            document.querySelectorAll('.conversation-checkbox input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            document.querySelectorAll('.conversation-item.selected').forEach(item => {
+                item.classList.remove('selected');
+            });
+            updateBatchOperationUI();
+        };
+        
+        // 测试单个删除API调用（调试用）
+        window.testDeleteConversation = async function(conversationId) {
+            console.log('🧪 测试删除对话API:', conversationId);
+            try {
+                const data = await ENV_CONFIG.apiClient.delete(`/conversations/${conversationId}`);
+                console.log('🔍 API响应:', data);
+                console.log('🔍 响应类型:', typeof data);
+                console.log('🔍 响应键:', Object.keys(data || {}));
+                console.log('✅ success字段:', data?.success);
+                console.log('✅ success字段类型:', typeof data?.success);
+                console.log('📝 message字段:', data?.message);
+                console.log('🌐 status字段:', data?.status);
+                
+                // 检查success字段的各种可能值
+                console.log('🔍 success === true:', data?.success === true);
+                console.log('🔍 success == true:', data?.success == true);
+                console.log('🔍 success truthy:', !!data?.success);
+                
+                return data;
+            } catch (error) {
+                console.error('❌ API调用出错:', error);
+                return error;
+            }
+        };
+        
+        // 最简单的批量删除测试
+        window.debugBatchDelete = function() {
+            console.log('🔍 当前选中的对话:', Array.from(window.selectedConversations));
+            console.log('🔍 选中数量:', window.selectedConversations.size);
+            
+            if (window.selectedConversations.size === 0) {
+                console.log('❌ 请先选择一些对话进行测试');
+                return;
+            }
+            
+            // 只删除第一个选中的对话作为测试
+            const firstId = Array.from(window.selectedConversations)[0];
+            console.log('🧪 测试删除第一个选中的对话:', firstId);
+            return window.testDeleteConversation(firstId);
+        };
+        
+        // 使用与单个删除完全相同的逻辑进行批量删除
+        window.batchDeleteUsingOriginalLogic = async function() {
+            const selectedIds = Array.from(window.selectedConversations);
+            console.log('🧪 使用原始单个删除逻辑进行批量删除:', selectedIds);
+            
+            if (selectedIds.length === 0) {
+                showToast('请先选择要删除的对话', 'warning');
+                return;
+            }
+            
+            // 确认删除
+            const confirmMessage = `确定要删除选中的 ${selectedIds.length} 个对话吗？此操作不可撤销。`;
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            let successCount = 0;
+            let failCount = 0;
+            
+            showToast('正在删除选中的对话...', 'info');
+            
+            // 逐个使用原始删除逻辑
+            for (const conversationId of selectedIds) {
+                try {
+                    console.log('🗑️ 执行删除对话 (原始逻辑):', conversationId);
+                    
+                    // 完全复制单个删除的逻辑
+                    const data = await ENV_CONFIG.apiClient.delete(`/conversations/${conversationId}`);
+                    console.log('🔍 删除响应 (原始逻辑):', data);
+                    
+                    if (data.success) {
+                        console.log('✅ 对话删除成功 (原始逻辑)');
+                        successCount++;
+                    } else {
+                        console.log('❌ 对话删除失败 (原始逻辑):', data.message);
+                        failCount++;
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ 删除对话失败 (原始逻辑):', error);
+                    failCount++;
+                }
+                
+                // 添加小延迟，避免请求过快
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            
+            console.log(`📊 原始逻辑删除结果: 成功 ${successCount}, 失败 ${failCount}`);
+            
+            if (failCount === 0) {
+                showToast(`成功删除 ${successCount} 个对话`, 'success');
+            } else {
+                showToast(`删除完成：成功 ${successCount} 个，失败 ${failCount} 个`, 'warning');
+            }
+            
+            // 清空选择并刷新列表
+            window.selectedConversations.clear();
+            updateBatchOperationUI();
+            await loadConversationList();
+        };
+        
+        // 切换批量操作模式
+        window.toggleBatchMode = function() {
+            const conversationList = document.getElementById('conversationList');
+            const batchModeToggle = document.getElementById('batchModeToggle');
+            const batchToolbar = document.getElementById('batchOperationToolbar');
+            
+            if (conversationList.classList.contains('batch-mode')) {
+                // 退出批量模式
+                conversationList.classList.remove('batch-mode');
+                batchModeToggle.classList.remove('btn-warning');
+                batchModeToggle.classList.add('btn-outline-secondary');
+                batchModeToggle.innerHTML = '<i class="fas fa-check-square"></i>';
+                batchModeToggle.title = '批量操作';
+                
+                // 清空选择并隐藏工具栏
+                window.clearSelection();
+                batchToolbar.style.display = 'none';
+            } else {
+                // 进入批量模式
+                conversationList.classList.add('batch-mode');
+                batchModeToggle.classList.remove('btn-outline-secondary');
+                batchModeToggle.classList.add('btn-warning');
+                batchModeToggle.innerHTML = '<i class="fas fa-times"></i>';
+                batchModeToggle.title = '退出批量模式';
+                
+                // 显示工具栏（即使没有选择项）
+                batchToolbar.style.display = 'block';
+            }
+        };
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -3316,6 +3760,15 @@
             };
             
             console.log('✅ 页面初始化完成');
+            
+            // 调试信息：在控制台显示可用的测试函数
+            console.log('🔧 调试工具已就绪，可在控制台使用以下函数进行测试:');
+            console.log('  - testDeleteConversation(conversationId) : 测试单个对话删除');
+            console.log('  - debugBatchDelete() : 测试删除第一个选中的对话');
+            console.log('  - batchDeleteUsingOriginalLogic() : 使用原始逻辑的批量删除');
+            console.log('  - simpleTestBatchDelete() : 简化版批量删除测试');
+            console.log('  - window.selectedConversations : 查看当前选中的对话');
+            console.log('  - window.currentConversations : 查看所有对话列表');
         });
 
         // ========================================
