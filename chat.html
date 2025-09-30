@@ -527,6 +527,14 @@
         .prompt-toolbar button:active { transform:translateY(0); }
         .prompt-empty { font-size:12px; color:#888; font-style:italic; padding:4px 0 0 2px; }
 
+        /* 移动端：只显示图标，隐藏按钮文字与编辑提示 */
+        @media (max-width: 768px) {
+            .prompt-toolbar button { padding:4px 8px; font-size:0; }
+            .prompt-toolbar button i { font-size:16px; margin-right:0 !important; }
+            .prompt-toolbar button span { display:none !important; }
+            .prompt-edit-hint { display:none !important; }
+        }
+
         @media (max-width: 768px) {
             .prompt-palette { gap:4px; row-gap:6px; }
             .prompt-chip { font-size:11px; padding:5px 9px; }
@@ -1667,7 +1675,7 @@
                 </div>
                 <div class="input-group">
                     <div class="input-wrapper">
-                        <textarea id="messageInput" placeholder="输入您的消息... (Shift+Enter换行，Enter发送)"></textarea>
+                        <textarea id="messageInput" placeholder="输入您的消息... "></textarea>
                         <button id="sendButton" class="send-button" type="button" aria-label="发送">
                             <i class="fas fa-paper-plane"></i>
                         </button>
