@@ -3867,7 +3867,8 @@
             // 🎨 预设提示词功能初始化
             // ===============================
             // 版本化默认提示词，方便未来强制刷新
-            const PROMPT_VERSION = 'v2-20250930-4tags';
+            // 当修改默认标签（增删或顺序改变）时，务必更新 PROMPT_VERSION
+            const PROMPT_VERSION = 'v3-20250930-6tags';
             const DEFAULT_PROMPTS = ['记录','标记','查询','标签','已完成','#'];
             const promptPaletteEl = document.getElementById('promptPalette');
             const addPromptBtn = document.getElementById('addPromptBtn');
@@ -3879,30 +3880,28 @@
                 try {
                     const storedVersion = localStorage.getItem('dify_prompt_palette_version');
                     const raw = localStorage.getItem('dify_prompt_palette');
+                    // 初次或无存储
                     if (!raw) {
-                        // 初次或无存储
                         renderPrompts(DEFAULT_PROMPTS);
                         localStorage.setItem('dify_prompt_palette', JSON.stringify(DEFAULT_PROMPTS));
                         localStorage.setItem('dify_prompt_palette_version', PROMPT_VERSION);
                         return;
                     }
-                    // 如果版本不一致，覆盖为新默认
-                    if (storedVersion !== PROMPT_VERSION) {
+                    let arr;
+                    try { arr = JSON.parse(raw); } catch { arr = null; }
+                    const needsUpgrade = storedVersion !== PROMPT_VERSION ||
+                        !Array.isArray(arr) ||
+                        arr.length !== DEFAULT_PROMPTS.length ||
+                        DEFAULT_PROMPTS.some(d => !arr.includes(d));
+                    if (needsUpgrade) {
                         renderPrompts(DEFAULT_PROMPTS);
                         localStorage.setItem('dify_prompt_palette', JSON.stringify(DEFAULT_PROMPTS));
                         localStorage.setItem('dify_prompt_palette_version', PROMPT_VERSION);
                         return;
                     }
-                    const arr = JSON.parse(raw);
-                    // 若存储为空数组则显示默认
-                    if (!Array.isArray(arr) || arr.length === 0) {
-                        renderPrompts(DEFAULT_PROMPTS);
-                        localStorage.setItem('dify_prompt_palette', JSON.stringify(DEFAULT_PROMPTS));
-                    } else {
-                        renderPrompts(arr);
-                    }
+                    renderPrompts(arr);
                 } catch(e) {
-                    console.warn('加载提示词失败', e);
+                    console.warn('加载提示词失败，将重置为默认。', e);
                     renderPrompts(DEFAULT_PROMPTS);
                     localStorage.setItem('dify_prompt_palette', JSON.stringify(DEFAULT_PROMPTS));
                     localStorage.setItem('dify_prompt_palette_version', PROMPT_VERSION);
@@ -3986,7 +3985,8 @@
             addPromptBtn?.addEventListener('click', () => addPrompt());
             savePromptsBtn?.addEventListener('click', () => savePrompts());
             resetPromptsBtn?.addEventListener('click', () => {
-                if(confirm('确定恢复默认标签（记录 / 查询 / 标签 / #）？当前修改将丢失')) {
+                const defaultsPreview = DEFAULT_PROMPTS.join(' / ');
+                if (confirm(`确定恢复默认标签（${defaultsPreview}）？当前修改将丢失`)) {
                     renderPrompts(DEFAULT_PROMPTS);
                     localStorage.setItem('dify_prompt_palette', JSON.stringify(DEFAULT_PROMPTS));
                     localStorage.setItem('dify_prompt_palette_version', PROMPT_VERSION);
