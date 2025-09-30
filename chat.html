@@ -440,23 +440,99 @@
             align-items: flex-end;
         }
 
-        .input-group textarea {
-            flex: 1;
-            min-width: 0; /* 允许收缩 */
-            border-radius: 20px;
-            border: 1px solid rgba(0, 0, 0, 0.2);
-            padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(0.75rem, 2vw, 1rem);
-            resize: none;
-            font-size: clamp(0.8rem, 2vw, 0.9rem);
-            max-width: 100%; /* 防止溢出 */
-            box-sizing: border-box;
-            min-height: 60px; /* 增加到约2行的高度 */
-            max-height: 120px;
+        /* 新的统一输入容器（胶囊形） */
+        .input-wrapper {
+            display: flex;
+            align-items: center; /* 垂直居中单行 */
+            width: 100%;
+            background: linear-gradient(135deg, #ffffff, #f3f7f4);
+            border: 1px solid rgba(0,0,0,0.12);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.08) inset;
+            border-radius: 40px; /* 胶囊 */
+            padding: 4px 8px 4px 16px; /* 减小上下内边距 */
+            position: relative;
+            transition: border-color .25s ease, box-shadow .25s ease, background .3s ease;
         }
-
-        .input-group textarea:focus {
+        .input-wrapper:focus-within {
             border-color: #28a745;
-            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+            box-shadow: 0 0 0 3px rgba(40,167,69,0.15), 0 2px 6px rgba(40,167,69,0.15);
+            background: #ffffff;
+        }
+        .input-wrapper textarea {
+            flex: 1;
+            min-width: 0;
+            border: none;
+            outline: none;
+            background: transparent;
+            resize: none;
+            padding: 6px 6px 6px 0; /* 减小内边距实现更紧凑初始高度 */
+            font-size: clamp(0.85rem, 1.6vw, 0.93rem);
+            line-height: 1.32; /* 控制单行高度 */
+            max-height: 180px; /* 自动扩展上限 */
+            overflow-y: hidden; /* 初始隐藏滚动，避免占位符被裁切 */
+            scrollbar-width: thin;
+        }
+        .input-wrapper textarea::-webkit-scrollbar { width: 6px; }
+        .input-wrapper textarea::-webkit-scrollbar-track { background: transparent; }
+        .input-wrapper textarea::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 3px; }
+        .input-wrapper textarea::placeholder { color: #999; }
+        .input-wrapper .send-button {
+            width: 38px; /* 调小按钮尺寸 */
+            height: 38px;
+            flex-shrink: 0;
+            margin-left: 4px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: #fff;
+            font-size: 1.05rem;
+            cursor: pointer;
+            transition: transform .25s ease, box-shadow .25s ease;
+            position: relative;
+        }
+        .input-wrapper .send-button:hover:not(:disabled) { transform: scale(1.07); box-shadow: 0 6px 16px rgba(40,167,69,0.35); }
+        .input-wrapper .send-button:active:not(:disabled) { transform: scale(0.95); }
+        .input-wrapper .send-button:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+
+        /* 预设提示词区域 */
+        .prompt-palette-divider { height: 1px; background: linear-gradient(90deg, rgba(0,0,0,0), rgba(40,167,69,0.35), rgba(0,0,0,0)); margin: 2px 0 10px; }
+        .prompt-palette { display: flex; flex-wrap: wrap; gap: 6px; row-gap: 8px; padding: 4px 2px 0; }
+    /* 与输入框拉开距离 */
+    #promptPaletteContainer { margin-bottom: 12px; }
+    /* 如果只想在有标签时增加距离，可在渲染后动态控制，这里统一留出空间 */
+        .prompt-chip {
+            --chip-bg: linear-gradient(135deg, #eef9f1, #e6f7ef);
+            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 20px;
+            background: var(--chip-bg);
+            border: 1px solid rgba(40,167,69,0.25);
+            color: #137b3e;
+            cursor: pointer;
+            user-select: none;
+            line-height: 1.1;
+            position: relative;
+            transition: background .25s ease, transform .18s ease, box-shadow .25s ease;
+        }
+        .prompt-chip:hover { background: linear-gradient(135deg,#e3f6ea,#d9f4e5); transform: translateY(-1px); box-shadow: 0 3px 6px rgba(40,167,69,0.25); }
+        .prompt-chip:active { transform: translateY(0); box-shadow: 0 1px 2px rgba(0,0,0,0.15); }
+        .prompt-chip[contenteditable="true"]:focus { outline: 2px solid rgba(40,167,69,0.35); background: #fff; }
+        .prompt-edit-hint { font-size: 10px; color: #6c757d; margin-left: auto; padding: 0 4px 4px; font-style: italic; }
+        .prompt-toolbar { display:flex; align-items:center; gap:8px; margin-top:4px; }
+        .prompt-toolbar button { border:none; background: linear-gradient(135deg,#28a745,#20c997); color:#fff; font-size:11px; padding:4px 10px; border-radius:6px; cursor:pointer; line-height:1.1; display:flex; align-items:center; gap:4px; box-shadow:0 2px 6px rgba(0,0,0,0.15); transition:box-shadow .25s ease, transform .2s ease; }
+        .prompt-toolbar button:hover { box-shadow:0 4px 10px rgba(40,167,69,0.35); transform:translateY(-2px); }
+        .prompt-toolbar button:active { transform:translateY(0); }
+        .prompt-empty { font-size:12px; color:#888; font-style:italic; padding:4px 0 0 2px; }
+
+        @media (max-width: 768px) {
+            .prompt-palette { gap:4px; row-gap:6px; }
+            .prompt-chip { font-size:11px; padding:5px 9px; }
+            .input-wrapper { border-radius:28px; padding:3px 6px 3px 14px; }
+            .input-wrapper textarea { font-size:0.82rem; padding:5px 4px 5px 0; line-height:1.3; }
+            .input-wrapper .send-button { width:42px; height:42px; }
         }
 
         .send-button {
@@ -1578,15 +1654,24 @@
 
             <!-- 输入区域 -->
             <div class="chat-input">
+                <!-- 预设提示词（可编辑） -->
+                <div id="promptPaletteContainer">
+                    <div class="prompt-palette-divider"></div>
+                    <div class="prompt-toolbar" id="promptToolbar">
+                        <span class="prompt-edit-hint">点击标签插入；双击编辑；回车保存。</span>
+                        <button type="button" id="addPromptBtn" title="新增标签"><i class="fas fa-plus"></i> 新增</button>
+                        <button type="button" id="savePromptsBtn" title="保存到本地"><i class="fas fa-save"></i> 保存</button>
+                        <button type="button" id="resetPromptsBtn" title="恢复默认"><i class="fas fa-undo"></i> 重置</button>
+                    </div>
+                    <div class="prompt-palette" id="promptPalette"></div>
+                </div>
                 <div class="input-group">
-                    <textarea 
-                        id="messageInput" 
-                        placeholder="输入您的消息... (Shift+Enter换行，Enter发送)"
-                        rows="2"
-                    ></textarea>
-                    <button id="sendButton" class="send-button" type="button">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
+                    <div class="input-wrapper">
+                        <textarea id="messageInput" placeholder="输入您的消息... (Shift+Enter换行，Enter发送)"></textarea>
+                        <button id="sendButton" class="send-button" type="button" aria-label="发送">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -3769,6 +3854,182 @@
             console.log('  - simpleTestBatchDelete() : 简化版批量删除测试');
             console.log('  - window.selectedConversations : 查看当前选中的对话');
             console.log('  - window.currentConversations : 查看所有对话列表');
+
+            // ===============================
+            // 🎨 预设提示词功能初始化
+            // ===============================
+            // 版本化默认提示词，方便未来强制刷新
+            const PROMPT_VERSION = 'v2-20250930-4tags';
+            const DEFAULT_PROMPTS = ['记录','查询','标签','#'];
+            const promptPaletteEl = document.getElementById('promptPalette');
+            const addPromptBtn = document.getElementById('addPromptBtn');
+            const savePromptsBtn = document.getElementById('savePromptsBtn');
+            const resetPromptsBtn = document.getElementById('resetPromptsBtn');
+            const messageInput = document.getElementById('messageInput');
+
+            function loadPrompts() {
+                try {
+                    const storedVersion = localStorage.getItem('dify_prompt_palette_version');
+                    const raw = localStorage.getItem('dify_prompt_palette');
+                    if (!raw) {
+                        // 初次或无存储
+                        renderPrompts(DEFAULT_PROMPTS);
+                        localStorage.setItem('dify_prompt_palette', JSON.stringify(DEFAULT_PROMPTS));
+                        localStorage.setItem('dify_prompt_palette_version', PROMPT_VERSION);
+                        return;
+                    }
+                    // 如果版本不一致，覆盖为新默认
+                    if (storedVersion !== PROMPT_VERSION) {
+                        renderPrompts(DEFAULT_PROMPTS);
+                        localStorage.setItem('dify_prompt_palette', JSON.stringify(DEFAULT_PROMPTS));
+                        localStorage.setItem('dify_prompt_palette_version', PROMPT_VERSION);
+                        return;
+                    }
+                    const arr = JSON.parse(raw);
+                    // 若存储为空数组则显示默认
+                    if (!Array.isArray(arr) || arr.length === 0) {
+                        renderPrompts(DEFAULT_PROMPTS);
+                        localStorage.setItem('dify_prompt_palette', JSON.stringify(DEFAULT_PROMPTS));
+                    } else {
+                        renderPrompts(arr);
+                    }
+                } catch(e) {
+                    console.warn('加载提示词失败', e);
+                    renderPrompts(DEFAULT_PROMPTS);
+                    localStorage.setItem('dify_prompt_palette', JSON.stringify(DEFAULT_PROMPTS));
+                    localStorage.setItem('dify_prompt_palette_version', PROMPT_VERSION);
+                }
+            }
+            function savePrompts() {
+                const chips = Array.from(promptPaletteEl.querySelectorAll('.prompt-chip'))
+                    .map(ch => ch.textContent.trim())
+                    .filter(t => t.length>0);
+                localStorage.setItem('dify_prompt_palette', JSON.stringify(chips));
+                showToast('标签已保存', 'success');
+            }
+            function renderPrompts(list) {
+                if (!list || list.length === 0) {
+                    promptPaletteEl.innerHTML = '<div class="prompt-empty">暂无标签，点击“新增”创建。</div>';
+                    return;
+                }
+                promptPaletteEl.innerHTML = list.map(text => `<span class="prompt-chip" data-insert="${encodeURIComponent(text)}" title="点击插入，双击编辑">${text}</span>`).join('');
+            }
+            function addPrompt(text='新标签') {
+                // 如果之前是空状态，清空
+                if (promptPaletteEl.querySelector('.prompt-empty')) promptPaletteEl.innerHTML='';
+                const span = document.createElement('span');
+                span.className='prompt-chip';
+                span.textContent=text;
+                span.dataset.insert=encodeURIComponent(text);
+                promptPaletteEl.appendChild(span);
+                enterEdit(span); // 新增后直接编辑
+            }
+            function enterEdit(chip) {
+                chip.setAttribute('contenteditable', 'true');
+                chip.dataset.original = chip.textContent.trim();
+                chip.focus();
+                // 将光标移到末尾
+                const range = document.createRange();
+                range.selectNodeContents(chip);
+                range.collapse(false);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+            function exitEdit(chip, cancel=false) {
+                if (!chip.isContentEditable) return;
+                if (cancel) {
+                    chip.textContent = chip.dataset.original || chip.textContent;
+                }
+                chip.removeAttribute('contenteditable');
+                const txt = chip.textContent.trim();
+                chip.dataset.insert = encodeURIComponent(txt);
+            }
+            // 插入逻辑
+            promptPaletteEl?.addEventListener('click', e => {
+                const chip = e.target.closest('.prompt-chip');
+                if (!chip || chip.isContentEditable) return;
+                const val = decodeURIComponent(chip.dataset.insert||'');
+                if (messageInput) {
+                    const prefix = messageInput.value && !/\s$/.test(messageInput.value) ? ' ' : '';
+                    messageInput.value += prefix + val;
+                    autoResize();
+                    messageInput.focus();
+                }
+            });
+            // 编辑逻辑：双击进入编辑
+            promptPaletteEl?.addEventListener('dblclick', e => {
+                const chip = e.target.closest('.prompt-chip');
+                if (!chip) return;
+                enterEdit(chip);
+            });
+            // 处理编辑键盘
+            promptPaletteEl?.addEventListener('keydown', e => {
+                const chip = e.target.closest('.prompt-chip');
+                if (!chip || !chip.isContentEditable) return;
+                if (e.key === 'Enter') { e.preventDefault(); exitEdit(chip); savePrompts(); }
+                if (e.key === 'Escape') { e.preventDefault(); exitEdit(chip, true); }
+            });
+            // 失焦保存
+            promptPaletteEl?.addEventListener('focusout', e => {
+                const chip = e.target.closest('.prompt-chip');
+                if (chip && chip.isContentEditable) { exitEdit(chip); savePrompts(); }
+            });
+            addPromptBtn?.addEventListener('click', () => addPrompt());
+            savePromptsBtn?.addEventListener('click', () => savePrompts());
+            resetPromptsBtn?.addEventListener('click', () => {
+                if(confirm('确定恢复默认标签（记录 / 查询 / 标签 / #）？当前修改将丢失')) {
+                    renderPrompts(DEFAULT_PROMPTS);
+                    localStorage.setItem('dify_prompt_palette', JSON.stringify(DEFAULT_PROMPTS));
+                    localStorage.setItem('dify_prompt_palette_version', PROMPT_VERSION);
+                    showToast('已恢复默认标签', 'success');
+                }
+            });
+            loadPrompts();
+
+            // ===============================
+            // ✨ 输入框自动高度 (初始单行)
+            // ===============================
+            function autoResize() {
+                if (!messageInput) return;
+                const computed = getComputedStyle(messageInput);
+                const lineHeight = parseFloat(computed.lineHeight) || 20;
+                const verticalPadding = parseFloat(computed.paddingTop) + parseFloat(computed.paddingBottom);
+                const baseMin = lineHeight + verticalPadding - 2; // 减2防止多余空隙
+                messageInput.style.height = 'auto';
+                const max = parseInt(computed.maxHeight || '180',10);
+                let newH = messageInput.scrollHeight;
+                // 有些浏览器 scrollHeight 不含边框，做一次最小保障
+                if (newH < baseMin) newH = baseMin;
+                if (newH > max) {
+                    newH = max;
+                    messageInput.style.overflowY = 'auto';
+                } else {
+                    messageInput.style.overflowY = 'hidden';
+                }
+                messageInput.style.height = newH + 'px';
+            }
+            if (messageInput) {
+                // 初始设为单行高度（基于行高）
+                const cs = getComputedStyle(messageInput);
+                const lh = parseFloat(cs.lineHeight) || 20;
+                const vp = (parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)) || 8;
+                messageInput.style.height = (lh + vp - 2) + 'px';
+                messageInput.addEventListener('input', autoResize);
+                // 粘贴后异步调整
+                messageInput.addEventListener('paste', () => setTimeout(autoResize, 30));
+            }
+            // 在发送后重置高度 (如果外部已有发送逻辑，可在发送完成后调用 window.resetInputHeight())
+            window.resetInputHeight = function() {
+                if (messageInput) {
+                    messageInput.value='';
+                    const cs = getComputedStyle(messageInput);
+                    const lh = parseFloat(cs.lineHeight) || 20;
+                    const vp = (parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom)) || 8;
+                    messageInput.style.height=(lh+vp-2)+'px';
+                    messageInput.style.overflowY='hidden';
+                }
+            };
         });
 
         // ========================================
