@@ -158,7 +158,7 @@ export class SimpleChatController {
                 }
                 
                 // 选择智能体（优先使用上次选择的，否则使用第一个）
-                this.selectAgent(selectedAgent || result.agents[0]);
+                await this.selectAgent(selectedAgent || result.agents[0]);
                 
                 console.log(`✅ 智能体加载成功: ${result.agents.length} 个`);
             } else {
@@ -211,12 +211,12 @@ export class SimpleChatController {
             if (agent) {
                 // 创建全局处理函数
                 const globalFunctionName = `selectAgent_${agentId.replace(/[^a-zA-Z0-9]/g, '_')}`;
-                window[globalFunctionName] = () => {
+                window[globalFunctionName] = async () => {
                     console.log('📱 全局函数调用 - 选择智能体:', agent.name);
                     console.log('📱 当前屏幕宽度:', window.innerWidth);
                     
                     // 调用选择智能体
-                    this.selectAgent.call(this, agent);
+                    await this.selectAgent.call(this, agent);
                     
                     // 移动端关闭侧边栏
                     if (window.innerWidth <= 768) {
@@ -391,8 +391,9 @@ export class SimpleChatController {
     /**
      * 选择智能体
      */
-    selectAgent(agent) {
+    async selectAgent(agent) {
         console.log('🎯 选择智能体:', agent.name);
+        console.log('🎯 智能体详情:', agent);
 
         // 更新当前智能体
         this.currentAgent = agent;
@@ -406,7 +407,23 @@ export class SimpleChatController {
         this.updateAgentSelection(agent.id);
         this.updateChatHeader(agent);
         this.clearMessages();
-        this.showWelcomeMessage(agent);
+
+        // 尝试加载该智能体的最近会话
+        console.log('🔄 开始加载智能体的最近会话...');
+        try {
+            const hasConversation = await this.loadLastConversationForAgent(agent.id);
+            console.log('🔄 加载最近会话结果:', hasConversation);
+
+            // 如果没有找到最近会话，显示欢迎消息
+            if (!hasConversation) {
+                console.log('💫 没有找到最近会话，显示欢迎消息');
+                this.showWelcomeMessage(agent);
+            }
+        } catch (error) {
+            console.error('❌ 加载最近会话时出错:', error);
+            console.log('💫 出错后显示欢迎消息作为后备方案');
+            this.showWelcomeMessage(agent);
+        }
 
         // 移动端自动关闭侧边栏（由触摸事件直接处理，这里不再重复）
         // 保留这个逻辑作为备用方案
@@ -571,6 +588,15 @@ export class SimpleChatController {
         if (result && result.success) {
             this.conversationId = result.conversation.id;
             console.log('✅ 对话创建成功:', this.conversationId);
+            
+            // 保存新会话与智能体的关联关系
+            if (this.currentAgent && this.currentAgent.id) {
+                localStorage.setItem(`lastConversation_${this.currentAgent.id}`, this.conversationId);
+                console.log('💾 已保存新会话与智能体的关联:', {
+                    agentId: this.currentAgent.id,
+                    conversationId: this.conversationId
+                });
+            }
         } else {
             const errorMsg = result ? result.error : '创建对话失败';
             throw new Error(errorMsg);
@@ -1282,6 +1308,15 @@ export class SimpleChatController {
             // 设置新的会话ID
             this.conversationId = conversationId;
             
+            // 保存会话与当前智能体的关联关系
+            if (this.currentAgent && this.currentAgent.id) {
+                localStorage.setItem(`lastConversation_${this.currentAgent.id}`, conversationId);
+                console.log('💾 已保存会话与智能体的关联:', {
+                    agentId: this.currentAgent.id,
+                    conversationId: conversationId
+                });
+            }
+            
             // 加载会话历史消息
             await this.loadConversationHistory(conversationId);
             
@@ -1408,6 +1443,86 @@ export class SimpleChatController {
         }, 200);
         
         console.log('✅ 历史消息渲染完成');
+    }
+
+    /**
+     * 加载智能体的最近会话
+     */
+    async loadLastConversationForAgent(agentId) {
+        try {
+            console.log('🔍 查找智能体的最近会话:', agentId);
+            
+            // 从localStorage获取该智能体的最近会话ID
+            const lastConversationId = localStorage.getItem(`lastConversation_${agentId}`);
+            console.log('💾 从本地存储获取的最近会话ID:', lastConversationId);
+            
+            // 如果有保存的会话ID，直接尝试切换到该会话
+            if (lastConversationId) {
+                try {
+                    console.log('🎯 尝试恢复保存的会话:', lastConversationId);
+                    await this.switchConversation(lastConversationId);
+                    this.addSystemMessage(`已恢复到最近的会话`);
+                    return true;
+                } catch (error) {
+                    console.warn('⚠️ 保存的会话无法访问，可能已被删除:', error);
+                    // 清除无效的会话ID
+                    localStorage.removeItem(`lastConversation_${agentId}`);
+                }
+            }
+            
+            // 如果没有保存的会话ID或保存的会话无效，获取所有会话并筛选
+            console.log('📋 获取所有会话列表进行筛选...');
+            const response = await conversationService.getConversations({
+                page: 1,
+                limit: 100, // 获取更多会话以便筛选
+                sort: '-updated_at' // 按更新时间倒序，最新的在前
+            });
+            
+            console.log('📋 获取会话列表响应:', response);
+            
+            if (response.success && response.conversations && response.conversations.length > 0) {
+                console.log('🔍 开始筛选智能体相关会话，总数:', response.conversations.length);
+                
+                // 筛选属于当前智能体的会话
+                // 根据API文档和现有代码，使用 agent_id 字段
+                const agentConversations = response.conversations.filter(conv => {
+                    return conv.agent_id === agentId;
+                });
+                
+                console.log('🎯 找到智能体相关会话:', agentConversations.length, '个');
+                console.log('📊 会话详情:', agentConversations.map(conv => ({
+                    id: conv.id,
+                    name: conv.name,
+                    agent_id: conv.agent_id,
+                    updated_at: conv.updated_at,
+                    message_count: conv.message_count
+                })));
+                
+                if (agentConversations.length > 0) {
+                    const targetConversation = agentConversations[0]; // 使用最新的会话（已按更新时间倒序）
+                    console.log('🔄 切换到最新的智能体会话:', targetConversation.id);
+                    
+                    // 保存会话关联到localStorage
+                    localStorage.setItem(`lastConversation_${agentId}`, targetConversation.id);
+                    
+                    // 切换到该会话
+                    await this.switchConversation(targetConversation.id);
+                    
+                    // 添加系统消息提示
+                    this.addSystemMessage(`已恢复到最近的会话: ${targetConversation.name || '未命名会话'}`);
+                    
+                    return true;
+                }
+            }
+            
+            console.log('💭 该智能体暂无历史会话');
+            return false;
+            
+        } catch (error) {
+            console.error('❌ 加载智能体最近会话失败:', error);
+            console.log('💫 将显示欢迎消息作为后备方案');
+            return false;
+        }
     }
 
     /**
