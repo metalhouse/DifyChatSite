@@ -242,8 +242,42 @@ class FriendsManager {
                         ${unreadBadge}
                     </div>
                 </div>
+                <div class="friend-delete-btn" onclick="event.stopPropagation(); chatroomController.friendsManager.deleteFriend('${friend.id}', '${displayName}')">
+                    <i class="fas fa-trash"></i>
+                </div>
             </div>
         `;
+    }
+
+    /**
+     * 删除好友
+     */
+    async deleteFriend(friendId, friendName) {
+        if (!confirm(`确定要删除好友"${friendName}"吗？`)) {
+            return;
+        }
+
+        try {
+            await this.friendsApi.deleteFriend(friendId);
+            
+            // 刷新好友列表
+            await this.loadFriendsList();
+            
+            // Show toast (if available)
+            if (window.showToast) {
+                window.showToast('好友删除成功', 'success');
+            } else {
+                console.log('好友删除成功');
+            }
+            
+        } catch (error) {
+            console.error('❌ 删除好友失败:', error);
+            if (window.showToast) {
+                window.showToast(`删除失败: ${error.message}`, 'error');
+            } else {
+                alert(`删除失败: ${error.message}`);
+            }
+        }
     }
 
     /**

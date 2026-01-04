@@ -307,6 +307,45 @@
             text-overflow: ellipsis;
         }
 
+        /* Friend Delete Mode */
+        .friend-delete-mode .friend-item {
+            padding-right: 45px; /* Make space for delete button */
+        }
+        
+        .friend-delete-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 30px;
+            background: #dc3545;
+            color: white;
+            border-radius: 50%;
+            display: none; /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 5px rgba(220, 53, 69, 0.3);
+        }
+        
+        .friend-delete-btn:hover {
+            background: #c82333;
+            transform: translateY(-50%) scale(1.1);
+        }
+        
+        .friend-delete-mode .friend-delete-btn {
+            display: flex;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        @keyframes popIn {
+            0% { transform: translateY(-50%) scale(0); }
+            100% { transform: translateY(-50%) scale(1); }
+        }
+
         .friend-item.active .friend-name {
             color: white !important;
         }
@@ -2349,6 +2388,12 @@
                     <button class="create-btn delete-mode-btn" id="deleteModeBtn" onclick="toggleDeleteMode()" title="删除房间模式" style="display: block; background: #dc3545;">
                         <i class="fas fa-minus"></i>
                     </button>
+                    <button class="create-btn delete-mode-btn" id="deleteFriendModeBtn" onclick="toggleFriendDeleteMode()" title="删除好友模式" style="display:none; background: #dc3545;">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    <button class="create-btn" id="cancelFriendDeleteBtn" onclick="toggleFriendDeleteMode()" title="退出删除模式" style="display: none; background: #6c757d;">
+                        <i class="fas fa-times"></i>
+                    </button>
                     <button class="create-btn" id="cancelDeleteBtn" onclick="toggleDeleteMode()" title="取消删除" style="display: none; background: #6c757d;">
                         <i class="fas fa-times"></i>
                     </button>
@@ -3226,10 +3271,33 @@
             const createRoomBtn = document.getElementById('createRoomBtn');
             const addFriendBtn = document.getElementById('addFriendBtn');
             
+            // 房间删除相关按钮
+            const deleteModeBtn = document.getElementById('deleteModeBtn');
+            const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            
+            // 好友删除相关按钮
+            const deleteFriendModeBtn = document.getElementById('deleteFriendModeBtn');
+            const cancelFriendDeleteBtn = document.getElementById('cancelFriendDeleteBtn');
+            
             if (friendsTab && roomsTab && createRoomBtn && addFriendBtn) {
                 friendsTab.addEventListener('shown.bs.tab', function () {
                     createRoomBtn.style.display = 'none';
                     addFriendBtn.style.display = 'block';
+                    
+                    // 隐藏房间删除按钮
+                    if (deleteModeBtn) deleteModeBtn.style.display = 'none';
+                    if (cancelDeleteBtn) cancelDeleteBtn.style.display = 'none';
+                    if (confirmDeleteBtn) confirmDeleteBtn.style.display = 'none';
+                    
+                    // 显示好友删除按钮
+                    if (deleteFriendModeBtn) deleteFriendModeBtn.style.display = 'block';
+                    if (cancelFriendDeleteBtn) cancelFriendDeleteBtn.style.display = 'none';
+                    
+                    // 退出房间删除模式
+                    if (document.body.classList.contains('room-delete-mode')) {
+                        document.body.classList.remove('room-delete-mode');
+                    }
                     
                     // 加载好友列表
                     if (window.chatroomController && window.chatroomController.friendsManager) {
@@ -3241,6 +3309,25 @@
                 roomsTab.addEventListener('shown.bs.tab', function () {
                     createRoomBtn.style.display = 'block';
                     addFriendBtn.style.display = 'none';
+                    
+                    // 显示房间删除按钮
+                    if (deleteModeBtn) deleteModeBtn.style.display = 'block';
+                    if (cancelDeleteBtn) cancelDeleteBtn.style.display = 'none';
+                    if (confirmDeleteBtn) confirmDeleteBtn.style.display = 'none';
+                    
+                    // 隐藏好友删除按钮
+                    if (deleteFriendModeBtn) deleteFriendModeBtn.style.display = 'none';
+                    if (cancelFriendDeleteBtn) cancelFriendDeleteBtn.style.display = 'none';
+                    
+                    // 退出好友删除模式
+                    if (document.body.classList.contains('friend-delete-mode')) {
+                        document.body.classList.remove('friend-delete-mode');
+                    }
+                    
+                    // 确保房间列表状态正确
+                    if (window.chatroomController) {
+                        window.chatroomController.renderRoomList();
+                    }
                 });
             }
         }
@@ -4204,7 +4291,26 @@
         // 全局函数供HTML调用
         window.toggleDeleteMode = () => {
             chatroomController.toggleDeleteMode();
-        };
+        }
+
+        // 切换好友删除模式
+        window.toggleFriendDeleteMode = function() {
+            const body = document.body;
+            const deleteBtn = document.getElementById('deleteFriendModeBtn');
+            const cancelBtn = document.getElementById('cancelFriendDeleteBtn');
+            
+            if (body.classList.contains('friend-delete-mode')) {
+                // 退出删除模式
+                body.classList.remove('friend-delete-mode');
+                deleteBtn.style.display = 'block';
+                cancelBtn.style.display = 'none';
+            } else {
+                // 进入删除模式
+                body.classList.add('friend-delete-mode');
+                deleteBtn.style.display = 'none';
+                cancelBtn.style.display = 'block';
+            }
+        };;
 
         window.updateDeleteButtonState = () => {
             chatroomController.updateDeleteButtonState();
