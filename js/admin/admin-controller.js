@@ -1450,6 +1450,80 @@ async function toggleAgentStatus(agentId, currentStatus) {
 }
 
 /**
+ * 编辑用户
+ */
+async function editUser(userId) {
+    try {
+        console.log('✏️ Loading user data for editing:', userId);
+        
+        // 1. 获取用户详情
+        const response = await apiClient.get(`/admin/users/${userId}`);
+        if (!response.success) {
+            throw new Error(response.message || '获取用户信息失败');
+        }
+        
+        const user = response.data;
+        console.log('👤 User data loaded:', user);
+        
+        // 2. 填充编辑表单
+        document.getElementById('editUserId').value = user.id;
+        document.getElementById('editUsername').value = user.username;
+        document.getElementById('editEmail').value = user.email;
+        document.getElementById('editRole').value = user.role || 'user';
+        document.getElementById('editStatus').value = user.status || 'active';
+        document.getElementById('editPassword').value = ''; // 密码字段清空
+        
+        // 3. 显示编辑模态框
+        const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+        modal.show();
+    } catch (error) {
+        console.error('❌ 加载用户信息失败:', error);
+        alert(`加载用户信息失败: ${error.message}`);
+    }
+}
+
+/**
+ * 保存用户更改
+ */
+async function saveUserChanges() {
+    try {
+        const userId = document.getElementById('editUserId').value;
+        const password = document.getElementById('editPassword').value;
+        
+        const formData = {
+            username: document.getElementById('editUsername').value,
+            email: document.getElementById('editEmail').value,
+            role: document.getElementById('editRole').value,
+            status: document.getElementById('editStatus').value
+        };
+        
+        // 只有输入了新密码才包含password字段
+        if (password && password.trim() !== '') {
+            formData.password = password;
+        }
+        
+        console.log('💾 Saving user changes:', { userId, ...formData });
+        
+        const response = await apiClient.put(`/admin/users/${userId}`, formData);
+        if (response.success) {
+            showSuccess('用户信息更新成功');
+            
+            // 关闭模态框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editUserModal'));
+            modal.hide();
+            
+            // 重新加载用户列表
+            await loadUsersData();
+        } else {
+            throw new Error(response.message || '更新用户失败');
+        }
+    } catch (error) {
+        console.error('❌ 更新用户失败:', error);
+        alert(`更新用户失败: ${error.message}`);
+    }
+}
+
+/**
  * 删除用户
  */
 async function deleteUser(userId) {
@@ -1462,7 +1536,7 @@ async function deleteUser(userId) {
         
         const response = await apiClient.delete(`/admin/users/${userId}`);
         if (response.success) {
-            alert('用户删除成功');
+            showSuccess('用户删除成功');
             await loadUsersData();
         } else {
             throw new Error(response.message || '删除用户失败');
@@ -1795,6 +1869,8 @@ function getStatusDisplayName(status) {
 window.showSection = showSection;
 window.showCreateUserModal = showCreateUserModal;
 window.createUser = createUser;
+window.editUser = editUser;
+window.saveUserChanges = saveUserChanges;
 window.showCreateAgentModal = showCreateAgentModal;
 window.createAgent = createAgent;
 window.editAgent = editAgent;

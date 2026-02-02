@@ -1190,6 +1190,55 @@
         </div>
     </div>
 
+    <!-- 编辑用户模态框 -->
+    <div class="modal fade" id="editUserModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">编辑用户</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editUserForm">
+                        <input type="hidden" id="editUserId" name="id">
+                        <div class="mb-3">
+                            <label class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="editUsername" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">邮箱</label>
+                            <input type="email" class="form-control" id="editEmail" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">角色</label>
+                            <select class="form-select" id="editRole" name="role">
+                                <option value="user">普通用户</option>
+                                <option value="admin">管理员</option>
+                                <option value="moderator">版主</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">状态</label>
+                            <select class="form-select" id="editStatus" name="status">
+                                <option value="active">活跃</option>
+                                <option value="inactive">非活跃</option>
+                                <option value="banned">已封禁</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">新密码 <small class="text-muted">(留空表示不修改)</small></label>
+                            <input type="password" class="form-control" id="editPassword" name="password" placeholder="如需修改密码请输入新密码">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" onclick="saveUserChanges()">保存更改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 创建智能体模态框 -->
     <div class="modal fade" id="createAgentModal" tabindex="-1">
         <div class="modal-dialog modal-lg">

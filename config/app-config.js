@@ -132,7 +132,7 @@ if (window.location.hostname === 'localhost' || window.location.hostname === '12
 } else if (window.location.hostname === 'nas.pznas.com') {
     // 反代生产环境配置
     window.APP_CONFIG.DEBUG.ENABLED = false;
-    window.APP_CONFIG.API.BASE_URL = 'https://nas.pznas.com:7990/api';
+    window.APP_CONFIG.API.BASE_URL = 'https://www.pznas.com:7990/api';
 } else {
     // 其他生产环境配置
     window.APP_CONFIG.DEBUG.ENABLED = false;
